@@ -1,0 +1,50 @@
+/* PG-005〜007 の共通部分。値は tokens.css のトークンだけ。--text-metric は 03_tokens の 40px */
+.run-head { display: flex; align-items: center; gap: var(--space-3); min-height: var(--control-height); margin-bottom: var(--space-4); }
+.run-back { display: inline-flex; align-items: center; gap: var(--space-1); color: var(--color-muted-fg); text-decoration: none; font-size: 14px; }
+.run-back:hover { color: var(--color-fg); }
+.run-back svg, .change svg, .metric-delta svg, .result-status svg { width: 16px; height: 16px; flex: none; }
+.run-name { color: var(--color-muted-fg); font-size: 14px; }
+.run-pick { min-width: 220px; }
+.run-actions { margin-left: auto; display: flex; align-items: center; gap: var(--space-2); }
+
+.metrics-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-6); margin-bottom: var(--space-5); }
+.metric { display: grid; gap: var(--space-1); justify-items: start; min-width: 96px; }
+.metric-value { font-size: 20px; font-weight: 700; line-height: 1.4; }
+.metric-large .metric-value { font-size: 40px; font-weight: 400; line-height: 1.1; }
+.metric-label { font-size: 14px; color: var(--color-muted-fg); }
+.metric-delta { display: inline-flex; align-items: center; gap: var(--space-1); font-size: 14px; color: var(--color-muted-fg); }
+.metric-up { color: var(--color-success); }
+.metric-down { color: var(--color-danger); }
+
+.result-status { display: inline-flex; align-items: center; gap: var(--space-1); white-space: nowrap; }
+.result-success { color: var(--color-success); }
+.result-danger { color: var(--color-danger); }
+.result-warning { color: var(--color-warning); }
+.result-muted { color: var(--color-muted-fg); }
+.result-cell { display: inline-flex; align-items: center; gap: var(--space-3); }
+.grade { display: inline-flex; gap: var(--space-1); }
+.grade .btn { min-width: var(--control-height-sm); padding: 0 var(--space-2); }
+.table-tools { display: flex; justify-content: flex-end; margin-bottom: var(--space-2); }
+.progress { margin-bottom: var(--space-4); }
+
+.result-detail { margin-top: var(--space-5); padding-top: var(--space-4); border-top: var(--line-width) solid var(--color-line); display: grid; gap: var(--space-4); }
+.result-detail-head, .side-head, .side-pane-head { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.result-detail-head .btn:last-child, .side-head .btn { margin-left: auto; }
+.result-title { margin: 0; font-size: 20px; font-weight: 700; line-height: 1.4; overflow-wrap: anywhere; }
+.result-heading { margin: 0 0 var(--space-2); font-size: 14px; font-weight: 400; color: var(--color-muted-fg); }
+.result-input { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.result-body { display: grid; gap: var(--space-4); min-width: 0; }
+.result-tools { display: grid; gap: var(--space-2); }
+
+.section-title { margin: var(--space-5) 0 var(--space-2); font-size: 20px; font-weight: 700; line-height: 1.4; }
+.checks { display: grid; gap: var(--space-1); }
+.checks-row { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); }
+.check { display: inline-flex; align-items: center; gap: var(--space-2); min-height: var(--control-height-sm); cursor: pointer; }
+.check input { width: 16px; height: 16px; accent-color: var(--color-primary); }
+.tag-fieldset { margin: 0; padding: 0; border: 0; min-width: 0; display: grid; gap: var(--space-1); }
+.tag-fieldset legend { padding: 0; }
+
+.change { display: inline-flex; align-items: center; gap: var(--space-1); white-space: nowrap; }
+.change-regressed { color: var(--color-danger); }
+.change-improved { color: var(--color-success); }
+.change-same { color: var(--color-muted-fg); }

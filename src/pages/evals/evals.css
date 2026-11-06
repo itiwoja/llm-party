@@ -1,0 +1,18 @@
+/* PG-005 評価セット。値は tokens.css のトークンだけ */
+.eval-main { display: grid; gap: var(--space-4); align-content: start; }
+.eval-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
+.eval-title { display: flex; align-items: baseline; gap: var(--space-3); min-width: 0; }
+.eval-name { font-size: 20px; font-weight: 700; line-height: 1.4; overflow-wrap: anywhere; }
+.eval-count { color: var(--color-muted-fg); }
+.row-count { color: var(--color-muted-fg); font-size: 13px; }
+.eval-set-form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.4fr) auto; gap: var(--space-3); align-items: end; }
+.eval-dir { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2); align-items: end; }
+.eval-tools { display: flex; gap: var(--space-2); }
+.case-actions { display: inline-flex; gap: var(--space-1); }
+.import-errors { display: grid; gap: var(--space-2); }
+.import-error-list { margin: 0; padding-left: var(--space-5); font-size: 14px; color: var(--color-muted-fg); }
+.eval-runs .section-title { margin-top: var(--space-3); }
+.case-form, .run-dialog { max-height: calc(100vh - 200px); overflow-y: auto; padding: 2px; }
+.dialog:has(.case-form) .dialog-footer, .dialog:has(.run-dialog) .dialog-footer { margin-top: 0; }
+.case-form .select-trigger { width: 100%; }
+@media (max-width: 1279px) { .eval-set-form { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
