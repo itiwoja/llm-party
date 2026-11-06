@@ -69,7 +69,7 @@ sequenceDiagram
   | presetId | string | ○ | |
   | content | string | ○ | 空でない |
 - レスポンス（202）：`{ "turnId": "01JC…", "status": "running" }`
-- エラー：404（スレッド・プリセットがない）、409 `BUSY`（同じワークスペースでターンが動いている／評価中で別プリセット）、503 `ENGINE_FAILED`
+- エラー：404（スレッド・プリセットがない）、409 `BUSY`（別のターンが動いている（D-63）／評価中で別プリセット）、503 `ENGINE_FAILED`
 - 副作用：messages・turns を作る。必要ならエンジンを読み込み直し、自動要約する。イベント `turn.*`・`tool.*`・`engine`
 
 ### API-038：POST /api/tool-calls/:id/decision
@@ -143,7 +143,7 @@ SSE。1本の接続で全種類を流す。切れたら画面がつなぎ直し�
 | `turn.delta` | `{ turnId, messageId, content?, reasoning? }`（差分） | SCR-001 |
 | `turn.usage` | `{ turnId, usedTokens, contextSize, tokensPerSecond? }`（生成中は速度も送る） | SCR-001 |
 | `turn.compacted` | `{ threadId, summaryMessageId, count }` | SCR-001 |
-| `turn.finished` | `{ turnId, status, error? }` | SCR-001 |
+| `turn.finished` | `{ turnId, status, error?, truncated? }`（`truncated` は生成の上限に達したとき。D-61） | SCR-001 |
 | `tool.pending` | `{ toolCallId, tool, args, preview? }`（書き込みは差分のプレビュー） | SCR-001 |
 | `tool.started` | `{ toolCallId }` | SCR-001 |
 | `tool.output` | `{ toolCallId, chunk }`（コマンドの出力） | SCR-001 右パネル |

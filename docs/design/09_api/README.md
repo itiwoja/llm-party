@@ -55,7 +55,7 @@ flowchart LR
 | VALIDATION_ERROR | 400 | 入力が不正 |
 | NOT_FOUND | 404 | 対象がない |
 | CONFLICT | 409 | 重複・使用中で消せない（プリセットで使っているモデルなど） |
-| BUSY | 409 | ワークスペースで別のターンが動いている、評価中に別プリセットで送信 |
+| BUSY | 409 | 別のターンが動いている（D-63）、評価中に別プリセットで送信 |
 | INSUFFICIENT_STORAGE | 507 | 空き容量不足（BR-05） |
 | PATH_NOT_ALLOWED | 400 | ワークスペースにできないフォルダ |
 | INVALID_GGUF | 400 | GGUF でない・種類違い・LoRA の形式違い |

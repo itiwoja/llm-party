@@ -63,6 +63,7 @@ flowchart TD
      | `-ngl` | `auto`（CPU バックエンドでは 0） | VRAM に合わせて載せる |
      | `--host` / `--port` | `127.0.0.1` / 空きポート | 外から繋がせない |
      | `--api-key` | 起動ごとの乱数 | 同じ PC の他プロセスからの利用を防ぐ |
+     | `--parallel` | `1` | D-60。生成は一度に1つなので、文脈をいつも丸ごと使う |
      | `--jinja` | 有効 | Qwen3.5 のチャットテンプレートとツール呼び出し |
      | `--lora` + `--lora-init-without-apply` | プリセットの LoRA（カンマ区切り） | 倍率はリクエストごとに指定（R-04） |
      | `--no-webui` 相当 | 有効 | 同梱の Web UI は使わない |
@@ -99,6 +100,7 @@ flowchart TD
   3. `POST /v1/chat/completions`（API-101）を `stream: true` で呼ぶ。送るもの：システムプロンプト（エージェントならツールの使い方を足す）、会話、生成設定、`lora`（倍率）、`chat_template_kwargs.enable_thinking`、エージェントなら `tools`
   4. 受け取った差分を `turn.delta` イベントで画面へ流す。思考（`reasoning_content`）と本文を分けて保存する
   5. 応答の終わりで、ツール呼び出しがあれば FR-008 へ。なければターンを `completed`
+- 上限：1回の生成は 8,192 トークンまで（D-61）。上限に達したら本文を保存してターンを `completed` にし、CP-207 を出す
 - 表示：本文は Markdown として表示する（[CMP-022](../ui/04_components.md#cmp-022-markdown-本文)）。生成中も届いた分を順に整形する（D-57）
 - 停止：生成中の HTTP を切り、そこまでの本文を保存してターンを `cancelled`
 - エラー：エンジンの HTTP エラー → ターンを `failed`、エラー内容を会話に表示

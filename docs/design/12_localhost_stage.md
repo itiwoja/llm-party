@@ -70,7 +70,7 @@ WSL で動かすのは検証のためで、Linux 版の配布ではない。D-19
 ## llama-server の用意
 1. llama.cpp の b12125 のリリースから `llama-b12125-bin-ubuntu-cuda-12.8-x64.tar.gz` と `cudart-llama-b12125-bin-ubuntu-cuda-12.8-x64.tar.gz` を取る
 2. 両方を展開し、`cudart-` の中の `.so` を `llama-server` と同じフォルダへコピーする。別のフォルダのままだと GPU を認識しない
-3. 起動するときは `LD_LIBRARY_PATH` にそのフォルダを入れ、`LLM_PARTY_LLAMA_BIN` で `llama-server` を指す
+3. `LLM_PARTY_LLAMA_BIN` で `llama-server` を指す
 
 ## 接続と認証
 - 待ち受けは `127.0.0.1` だけ（NFR-011）。LAN から見えるアドレスでは待ち受けない

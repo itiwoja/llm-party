@@ -48,8 +48,10 @@ sequenceDiagram
   "tools": [
     { "type": "function", "function": { "name": "read_file", "description": "…", "parameters": { "type": "object", "properties": { "path": { "type": "string" }, "startLine": { "type": "integer" }, "endLine": { "type": "integer" } }, "required": ["path"] } } }
   ],
+  "max_tokens": 8192,
   "stream": true,
   "stream_options": { "include_usage": true },
+  "timings_per_token": true,
   "temperature": 0.6, "top_p": 0.95, "top_k": 20, "min_p": 0.0,
   "presence_penalty": 0.0, "repeat_penalty": 1.0,
   "lora": [{ "id": 0, "scale": 0.8 }],
@@ -60,6 +62,7 @@ sequenceDiagram
 </details>
 
 - 応答（SSE）：`choices[0].delta` の `content`（本文）、`reasoning_content`（思考。`--reasoning-format` の既定で分かれる）、`tool_calls`（引数は分割されて届くのでつなげる）。最後に `usage`
+- `timings_per_token` は生成中の速度（`turn.usage`）を出すために付ける
 - `lora` の `id` は起動時の `--lora` の並び順。省いたアダプタは倍率 0（R-04）。`lora` を空配列にすると起動時の倍率に戻る。登録していない `id` はエラーにならず無視される
 - 思考 OFF のプリセットは `chat_template_kwargs.enable_thinking = false`（Qwen3.5 のモデルカードの指定。`/think` `/nothink` は使えない）
 
@@ -67,7 +70,7 @@ sequenceDiagram
 - `{ "content": "…" }` → `{ "tokens": [ … ] }`。FR-006 の計測と FR-009 の出力の切り詰めに使う
 
 ## 起動引数で使うもの（エンドポイント以外）
-- `--list-devices`（FR-001 の判定。llama.cpp `common/arg.cpp` で確認）、`-m`・`-c`・`-ngl`・`--host`・`--port`・`--api-key`・`--jinja`・`--lora`・`--lora-init-without-apply`（FR-003）
+- `--list-devices`（FR-001 の判定。llama.cpp `common/arg.cpp` で確認）、`-m`・`-c`・`-ngl`・`--host`・`--port`・`--api-key`・`--parallel`・`--jinja`・`--lora`・`--lora-init-without-apply`（FR-003）
 
 ## 使わないもの
 - 同梱の Web UI、`--tools` の組み込みツール・MCP（エージェントのツールは worker が持つ）、ルーターモード（複数モデル）、`/metrics`
