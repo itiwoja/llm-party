@@ -57,46 +57,46 @@ describe("DB の版上げ", () => {
 describe("スレッド検索（D-58）", () => {
   function storeWithThreads() {
     const { db, store } = seededStore();
-    const a = store.createThread(null);
-    const b = store.createThread(null);
-    store.addMessage({ threadId: a.id, turnId: null, role: "user", content: "ログイン処理のバグを直してください" });
-    store.addMessage({ threadId: b.id, turnId: null, role: "user", content: "100%_完了 の意味" });
+    const a = store.threads.create(null);
+    const b = store.threads.create(null);
+    store.threads.addMessage({ threadId: a.id, turnId: null, role: "user", content: "ログイン処理のバグを直してください" });
+    store.threads.addMessage({ threadId: b.id, turnId: null, role: "user", content: "100%_完了 の意味" });
     return { db, store, a, b };
   }
 
   it("3文字以上は本文の途中でも見つかる", () => {
     const { store, a } = storeWithThreads();
-    expect(store.listThreads({ q: "処理のバグ" }).items.map((t) => t.id)).toEqual([a.id]);
+    expect(store.threads.list({ q: "処理のバグ" }).items.map((t) => t.id)).toEqual([a.id]);
   });
 
   it("2文字以下も見つかる", () => {
     const { store, a } = storeWithThreads();
-    expect(store.listThreads({ q: "バグ" }).items.map((t) => t.id)).toEqual([a.id]);
+    expect(store.threads.list({ q: "バグ" }).items.map((t) => t.id)).toEqual([a.id]);
   });
 
   it("LIKE の記号は文字として扱う", () => {
     const { store, b } = storeWithThreads();
-    expect(store.listThreads({ q: "%_" }).items.map((t) => t.id)).toEqual([b.id]);
-    expect(store.listThreads({ q: "__" }).items).toEqual([]);
+    expect(store.threads.list({ q: "%_" }).items.map((t) => t.id)).toEqual([b.id]);
+    expect(store.threads.list({ q: "__" }).items).toEqual([]);
   });
 
   it("引用符を含む語でも SQL エラーにしない", () => {
     const { store } = storeWithThreads();
-    expect(store.listThreads({ q: 'ab"cd' }).items).toEqual([]);
+    expect(store.threads.list({ q: 'ab"cd' }).items).toEqual([]);
   });
 
   it("メッセージを消すと検索からも消える", () => {
     const { db, store } = storeWithThreads();
     db.prepare("DELETE FROM messages").run();
-    expect(store.listThreads({ q: "処理のバグ" }).items).toEqual([]);
+    expect(store.threads.list({ q: "処理のバグ" }).items).toEqual([]);
   });
 
   it("カーソルで続きを取れる", () => {
     const { store, a, b } = storeWithThreads();
-    const first = store.listThreads({ limit: 1 });
+    const first = store.threads.list({ limit: 1 });
     expect(first.items).toHaveLength(1);
     expect(first.nextCursor).not.toBeNull();
-    const second = store.listThreads({ limit: 1, cursor: first.nextCursor! });
+    const second = store.threads.list({ limit: 1, cursor: first.nextCursor! });
     expect(new Set([first.items[0].id, second.items[0].id])).toEqual(new Set([a.id, b.id]));
     expect(second.nextCursor).toBeNull();
   });

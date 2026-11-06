@@ -106,6 +106,10 @@ export class EngineManager {
     rmSync(this.pidFile, { force: true });
   }
 
+  get backend(): EngineOptions["backend"] {
+    return this.options.backend;
+  }
+
   private publish(): void {
     this.options.bus.publish("engine", {
       state: this.state,

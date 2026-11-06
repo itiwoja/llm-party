@@ -4,13 +4,18 @@ import express from "express";
 import { createApp } from "./app";
 import { loadLocalConfig } from "./config";
 import { createContext } from "./context";
+import { logger, pruneLogs } from "./logger";
+import { localRoutes } from "./routes/local";
 import { loadOrCreateToken } from "./token";
 
 /** localhost 段階の起動の入口（12） */
 const config = loadLocalConfig();
 const token = loadOrCreateToken(config.dataDir);
+const logsDir = path.join(config.dataDir, "logs");
+logger.init(logsDir);
+pruneLogs(logsDir);
 const context = createContext({ bin: config.llamaBin, backend: config.backend, dataDir: config.dataDir });
-const app = createApp({ port: config.port, token, context });
+const app = createApp({ port: config.port, token, context, extraRoutes: localRoutes });
 const server = createServer(app);
 
 if (process.env.NODE_ENV === "production") {
@@ -41,6 +46,7 @@ server.once("error", (error: NodeJS.ErrnoException) => {
 
 // LAN から見えるアドレスでは待ち受けない（NFR-011）
 server.listen(config.port, "127.0.0.1", () => {
+  logger.info(`起動 port=${config.port} backend=${config.backend}`);
   console.log(`LLM-PARTY: http://127.0.0.1:${config.port}/#token=${token}`);
   if (!config.llamaBin) console.warn("LLM_PARTY_LLAMA_BIN が未設定です。モデルを読み込むときに失敗します");
 });

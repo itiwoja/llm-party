@@ -16,8 +16,15 @@ export async function* readChatStream(body: ReadableStream<Uint8Array>): AsyncGe
   }
 }
 
+/** ストリームの tool_calls 差分。index ごとに断片が届く（API-101） */
+export interface ToolCallDelta {
+  index: number;
+  id?: string | null;
+  function?: { name?: string | null; arguments?: string | null };
+}
+
 export interface ChatChunk {
-  choices?: { delta?: { content?: string | null; reasoning_content?: string | null }; finish_reason?: string | null }[];
+  choices?: { delta?: { content?: string | null; reasoning_content?: string | null; tool_calls?: ToolCallDelta[] | null }; finish_reason?: string | null }[];
   usage?: { prompt_tokens: number; completion_tokens: number } | null;
   timings?: { predicted_per_second?: number; cache_n?: number; prompt_n?: number; predicted_n?: number };
 }

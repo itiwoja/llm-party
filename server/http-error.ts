@@ -1,4 +1,5 @@
 import type { ErrorRequestHandler, Response } from "express";
+import { logger } from "./logger";
 
 /** 09 共通エラーの 12 種 */
 export const ERROR_STATUS = {
@@ -38,5 +39,6 @@ export const errorHandler: ErrorRequestHandler = (error, _req, res, next) => {
   if (res.headersSent) return next(error);
   if (error instanceof ApiError) return sendError(res, error);
   console.error("[worker]", error);
+  logger.error("worker error", error);
   sendError(res, new ApiError("INTERNAL", "内部エラーが発生しました"));
 };

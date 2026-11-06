@@ -3,7 +3,7 @@ import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import os from "node:os";
 import path from "node:path";
-import { createApp } from "../server/app";
+import { createApp, type AppOptions } from "../server/app";
 import { type Context, createContext } from "../server/context";
 import { EventBus, type BusEvent } from "../server/events";
 
@@ -25,15 +25,18 @@ export interface TestWorker {
   close(): Promise<void>;
 }
 
-export async function startWorker(bin: string | null = FAKE_LLAMA): Promise<TestWorker> {
+export async function startWorker(
+  bin: string | null = FAKE_LLAMA,
+  options: { hfBaseUrl?: string; extraRoutes?: AppOptions["extraRoutes"]; commandTimeoutMs?: number } = {},
+): Promise<TestWorker> {
   const { dir, remove } = tempDir();
-  const context = createContext({ bin, backend: "cpu", dataDir: dir, loadTimeoutMs: 3000, stopGraceMs: 500 });
+  const context = createContext({ bin, backend: "cpu", dataDir: dir, loadTimeoutMs: 3000, stopGraceMs: 500, hfBaseUrl: options.hfBaseUrl, commandTimeoutMs: options.commandTimeoutMs });
   // Host の検査に実際のポートを使うので、先に空きポートを取ってから app を作る
   const probe = createApp({ port: 0, token: TOKEN, context }).listen(0, "127.0.0.1");
   await new Promise((resolve) => probe.once("listening", resolve));
   const port = (probe.address() as AddressInfo).port;
   await new Promise((resolve) => probe.close(resolve));
-  const server: Server = createApp({ port, token: TOKEN, context }).listen(port, "127.0.0.1");
+  const server: Server = createApp({ port, token: TOKEN, context, extraRoutes: options.extraRoutes }).listen(port, "127.0.0.1");
   await new Promise((resolve) => server.once("listening", resolve));
 
   return {
