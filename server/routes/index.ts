@@ -4,6 +4,7 @@ import { agentRoutes } from "./agent";
 import { engineRoutes } from "./engine";
 import { evalRoutes } from "./eval";
 import { hfRoutes } from "./hf";
+import { imageRecipeRoutes } from "./image-recipes";
 import { imageRoutes } from "./images";
 import { modelRoutes } from "./models";
 import { presetRoutes } from "./presets";
@@ -19,6 +20,7 @@ export function apiRoutes(context: Context): Router {
   api.use(agentRoutes(context));
   api.use(hfRoutes(context));
   api.use(imageRoutes(context));
+  api.use(imageRecipeRoutes(context));
   api.use(evalRoutes(context));
   api.use(settingRoutes(context));
   return api;

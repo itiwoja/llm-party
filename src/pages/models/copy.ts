@@ -71,5 +71,10 @@ export const PG3_MISSING = {
   colStrength: "強さ", // HF 検索結果の列。強さはパラメータ数で測る（HF は性能の点数を返さない）
   modelsOnlyHint: "モデル（GGUF）だけを表示。画像の入力部（mmproj）と量子化の計算用（imatrix）は外す", // 同
   noModelFile: "GGUF のモデルがない。チャットでは動かせない", // 同
+  recipeNote: "既定の組み合わせは 16GB 以上の GPU を前提", // R-18（画像の一括 DL の注意）
+  recipeTotal: (size: string) => `合計 ${size}`, // API-098 の sizeBytes
+  recipeStart: "一括で DL する", // API-097
+  recipeInstalled: "入っています", // API-098 の installed
+  recipeQueued: "DL の待ち行列に入れました。進みは DL で見られる", // API-097 の 202
   strengthHint:"強さは パラメータ数 で比べる。バーは今の結果の中で一番大きいモデルを 100% とする。パラメータ数の分からないモデルは末尾", // 同
 } as const;

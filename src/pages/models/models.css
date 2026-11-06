@@ -5,6 +5,8 @@
 .models-search { padding: var(--space-3) 0; max-width: var(--form-max); }
 .models-memory { width: 10em; }
 .models-note { margin: 0; font-size: 14px; color: var(--color-muted-fg); }
+/* 画像の一括 DL（HF タブの上）。文言と合計は左、ボタンか「入っています」は右 */
+.models-recipe { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-3) 0; }
 .models-files { display: grid; gap: var(--space-3); margin-top: var(--space-5); }
 .models-path { margin: 0; font-size: 14px; color: var(--color-muted-fg); overflow-wrap: anywhere; }
 /* ファイル名の違う部分を太く、全体の名前を小さく添える（モデルが多いとき何が違うか分かるように） */

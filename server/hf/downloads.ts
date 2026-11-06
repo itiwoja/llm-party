@@ -9,6 +9,7 @@ import type { Store } from "../store";
 import type { DownloadRecord } from "../store/downloads";
 import { HfClient, RetryableError } from "./client";
 import { readSafetensors } from "../safetensors";
+import { RECIPES, type Recipe } from "./recipes";
 import { assertFileName, assertGguf, assertRepo, assertSafetensors, expandSelection, insideDir, quantOf } from "./names";
 
 export interface DownloadOptions {
@@ -147,6 +148,53 @@ export class DownloadService {
     return record;
   }
 
+  /**
+   * レシピの部品を1つの DL（image-set）にして待ち行列に入れる（D-73）。
+   * 部品ごとにリポジトリが違うので、file の name は `<repo>/<file>`、repo は部品のリポジトリ
+   */
+  async createRecipe(recipeId: Recipe["id"]): Promise<DownloadRecord> {
+    const { store } = this.options;
+    const recipe = RECIPES.find((item) => item.id === recipeId);
+    if (!recipe) throw new ApiError("VALIDATION_ERROR", "入力が正しくありません", [{ field: "recipe" }]);
+    const destDir = store.downloads.modelsDir(this.options.dataDir);
+    const pathOf = (part: { repo: string; file: string }) => insideDir(destDir, part.repo, part.file);
+    const diffusion = recipe.parts.find((part) => part.key === "diffusion")!;
+    const active = ["queued", "downloading", "retrying", "verifying"];
+    if (store.downloads.isRegistered("image-set", pathOf(diffusion)) || this.list().some((item) => item.kind === "image-set" && active.includes(item.status))) {
+      throw new ApiError("CONFLICT", "このモデルは登録済みか、取得中です");
+    }
+
+    const trees = new Map<string, Awaited<ReturnType<HfClient["listFiles"]>>>();
+    const files: DownloadRecord["files"] = [];
+    for (const part of recipe.parts) {
+      assertRepo(part.repo);
+      assertFileName(part.file);
+      pathOf(part);
+      if (!trees.has(part.repo)) trees.set(part.repo, await this.client.listFiles(part.repo));
+      const found = trees.get(part.repo)!.find((file) => file.path === part.file);
+      if (!found) throw new ApiError("UPSTREAM_ERROR", `${part.repo} に ${part.file} がありません`);
+      files.push({ name: `${part.repo}/${part.file}`, size: found.size, sha256: found.sha256, repo: part.repo });
+    }
+    // ゲート付きは始める前に分かるよう、リポジトリごとに先頭の1バイトだけ取ってみる
+    try {
+      for (const repo of trees.keys()) {
+        const part = recipe.parts.find((item) => item.repo === repo && files.find((file) => file.name === `${repo}/${item.file}`)!.size > 0);
+        if (!part) continue;
+        const probe = await this.client.check(await this.client.fetch(this.client.resolveUrl(repo, part.file), { headers: { Range: "bytes=0-0" } }));
+        await probe.body?.cancel();
+      }
+    } catch (error) {
+      if (error instanceof RetryableError) throw new ApiError("UPSTREAM_ERROR", error.message);
+      throw error;
+    }
+    await ensureSpace(destDir, files.reduce((sum, file) => sum + file.size, 0));
+
+    const record = store.downloads.create({ kind: "image-set", repo: diffusion.repo, files, destDir });
+    this.emit(record);
+    this.pump();
+    return record;
+  }
+
   /** 取り消して .part を消す */
   async cancel(id: string): Promise<DownloadRecord> {
     const record = this.require(id);
@@ -263,7 +311,9 @@ export class DownloadService {
         continue;
       }
       mkdirSync(path.dirname(final), { recursive: true });
-      await this.fetchFile(job, record.repo, file.name, file.size, `${final}.part`);
+      const repo = file.repo ?? record.repo;
+      // image-set の name は `<repo>/<file>`。HF 上のファイル名は repo の後ろ
+      await this.fetchFile(job, repo, file.repo ? file.name.slice(repo.length + 1) : file.name, file.size, `${final}.part`);
       this.tick(job, true);
     }
 
@@ -273,7 +323,7 @@ export class DownloadService {
       const final = target(file.name);
       const part = `${final}.part`;
       if (!existsSync(part)) continue; // 前の回で外し終えている
-      await this.verify(job, part, file, record.kind === "model" || record.kind === "adapter");
+      await this.verify(job, part, file, record.kind === "model" || record.kind === "adapter" || (record.kind === "image-set" && file.name.endsWith(".gguf")));
       toRename.push(final);
     }
     const total = record.files.reduce((sum, file) => sum + file.size, 0);
@@ -281,6 +331,24 @@ export class DownloadService {
     if (record.kind === "file") {
       for (const final of toRename) await rename(`${final}.part`, final);
       this.set(job.id, { status: "completed", receivedBytes: total });
+      return;
+    }
+
+    if (record.kind === "image-set") {
+      for (const final of toRename) await rename(`${final}.part`, final);
+      const recipe = RECIPES.find((item) => record.files.length === item.parts.length && item.parts.every((part) => record.files.some((file) => file.name === `${part.repo}/${part.file}`)));
+      if (!recipe) throw new ApiError("VALIDATION_ERROR", "入力が正しくありません", [{ field: "recipe" }]);
+      const at = (key: string) => {
+        const part = recipe.parts.find((item) => item.key === key)!;
+        return target(`${part.repo}/${part.file}`);
+      };
+      const parts = { diffusion: at("diffusion"), llm: at("llm"), vae: at("vae"), tokenizer: at("tokenizer") };
+      const model = store.models.create({
+        name: recipe.name, path: parts.diffusion, source: "hf", architecture: recipe.id,
+        quantization: null, sizeBytes: total, trainContext: null, use: "image", parts,
+      });
+      store.downloads.setModelRepo(model.id, record.repo);
+      this.set(job.id, { status: "completed", receivedBytes: total, resultId: model.id });
       return;
     }
 

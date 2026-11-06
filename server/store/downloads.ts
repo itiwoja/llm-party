@@ -9,12 +9,14 @@ export interface DownloadFile {
   name: string;
   size: number;
   sha256: string | null;
+  /** 部品ごとにリポジトリが違う DL（image-set）だけ。name は destDir からの相対で `<repo>/<file>` */
+  repo?: string;
 }
 
 export interface DownloadRecord {
   id: string;
   /** file は保存だけ。チャットのモデルにはならない（形式を問わない） */
-  kind: "model" | "adapter" | "image" | "file";
+  kind: "model" | "adapter" | "image" | "image-set" | "file";
   repo: string;
   files: DownloadFile[];
   destDir: string;
@@ -109,7 +111,7 @@ export class DownloadStore {
   }
 
   /** そのファイルが models / adapters に登録済みか（再 DL を入口で 409 にする） */
-  isRegistered(kind: "model" | "adapter" | "image", file: string): boolean {
+  isRegistered(kind: "model" | "adapter" | "image" | "image-set", file: string): boolean {
     return this.db.prepare(`SELECT 1 FROM ${kind === "adapter" ? "adapters" : "models"} WHERE path = ?`).get(file) !== undefined;
   }
 

@@ -9,7 +9,7 @@ import { hrefOf } from "../../router";
 import { PG3, PG3_MISSING } from "./copy";
 import { ErrorLine } from "./ErrorLine";
 import { distinctLabels } from "./fileLabel";
-import { errorMessage, formatBytes, formatDate } from "./format";
+import { BYTES_PER_GB, errorMessage, formatBytes, formatDate } from "./format";
 import type { HfFile, HfRepo } from "./types";
 
 
@@ -82,6 +82,16 @@ export function hfFailure(err: unknown): ReactNode {
   return <ErrorLine message={errorMessage(err)} />;
 }
 
+/** API-098 の一覧の1件。画像のレシピ（今は MOSS-Image だけ） */
+interface ImageRecipe { id: string; name: string; sizeBytes: number; installed: boolean }
+const MOSS_RECIPE_ID = "moss-image";
+
+/** API-098。MOSS-Image の行だけを取り出す（無ければ null） */
+async function fetchMossRecipe(): Promise<ImageRecipe | null> {
+  const { items } = await api.get<{ items: ImageRecipe[] }>("/image-recipes");
+  return items.find((r) => r.id === MOSS_RECIPE_ID) ?? null;
+}
+
 /** Hugging Face を探す（API-053〜055）。語は Enter で送り、ジャンルと無検閲は変えた時点で探し直す */
 export function HfTab({ onStarted }: { onStarted(): void }) {
   const [filters, setFilters] = useState<Filters>({ query: "", genre: "all", uncensored: false, vram: null, ram: null });
@@ -97,6 +107,30 @@ export function HfTab({ onStarted }: { onStarted(): void }) {
   // ジャンルを続けて変えたとき、古い検索の結果で上書きしない
   const latestSearch = useRef(0);
   const filesRef = useRef<HTMLElement>(null);
+  // 画像の一括 DL（API-097・098）。一覧の失敗と押したときの失敗は同じ欄に出す
+  const [recipe, setRecipe] = useState<ImageRecipe | null>(null);
+  const [recipeFailure, setRecipeFailure] = useState<unknown>(null);
+  const [recipeStarting, setRecipeStarting] = useState(false);
+  const [recipeQueued, setRecipeQueued] = useState(false);
+
+  useEffect(() => {
+    fetchMossRecipe().then(setRecipe).catch(setRecipeFailure);
+  }, []);
+
+  /** API-097。待ち行列に入れたら成功の文を出す。画面は切り替えない（進みは DL の画面で見る） */
+  async function startRecipe() {
+    setRecipeFailure(null);
+    setRecipeQueued(false);
+    setRecipeStarting(true);
+    try {
+      await api("/image-recipes", { recipe: MOSS_RECIPE_ID });
+      setRecipeQueued(true);
+    } catch (err) {
+      setRecipeFailure(err);
+    } finally {
+      setRecipeStarting(false);
+    }
+  }
 
   // ファイル一覧は長い表の下に開くので、開いたら見える所まで動かす。読み込み後は下に余白ができるのでもう一度動かす
   useEffect(() => {
@@ -217,6 +251,24 @@ export function HfTab({ onStarted }: { onStarted(): void }) {
 
   return (
     <>
+      {recipe ? (
+        <section className="models-recipe" aria-label={recipe.name}>
+          <div>
+            <strong>{recipe.name}</strong>
+            <p className="models-note">{PG3_MISSING.recipeNote}</p>
+            <p className="models-note numeric">{PG3_MISSING.recipeTotal(gbText(recipe.sizeBytes / BYTES_PER_GB))}</p>
+          </div>
+          {recipe.installed ? (
+            <span className="models-note">{PG3_MISSING.recipeInstalled}</span>
+          ) : (
+            <Button size="sm" loading={recipeStarting} disabled={recipeStarting || recipeQueued} onClick={() => void startRecipe()}>
+              {PG3_MISSING.recipeStart}
+            </Button>
+          )}
+        </section>
+      ) : null}
+      {recipeFailure ? hfFailure(recipeFailure) : null}
+      {recipeQueued ? <p className="models-note" role="status">{PG3_MISSING.recipeQueued}</p> : null}
       <div className="models-filters">
         <SelectField label={PG3_MISSING.genre} hideLabel value={filters.genre} options={GENRE_OPTIONS} onValueChange={(v) => refine({ genre: v as Genre })} />
         <SwitchField label={PG3_MISSING.uncensored} checked={filters.uncensored} onCheckedChange={(uncensored) => refine({ uncensored })} />
