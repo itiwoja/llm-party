@@ -4,6 +4,7 @@ import { createServer } from "node:net";
 import path from "node:path";
 import type { EventBus } from "./events";
 import { ApiError } from "./http-error";
+import type { ImageParts } from "./store/models";
 
 export interface ImageParams {
   prompt: string;
@@ -26,6 +27,9 @@ export interface ImageEngineOptions {
   pollMs?: number;
 }
 
+/** 読み込む画像モデル。parts があれば複数部品、なければ path の単一ファイル */
+export interface ImageModelSpec { path: string; parts: ImageParts | null }
+
 const POLL_MS = 500;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -43,10 +47,11 @@ function freePort(): Promise<number> {
 
 /**
  * sd-server（stable-diffusion.cpp）を子プロセスとして1つだけ動かす。
- * 画像モデルは単一ファイル（チェックポイント）を起動引数 -m で読む。読み込みが済むまで待ち受けないので、/sdcpp/v1/capabilities が応えたら準備完了
+ * 画像モデルは単一ファイル（チェックポイント）なら起動引数 -m、複数部品なら --diffusion-model / --llm / --vae / --tokenizer で読む。読み込みが済むまで待ち受けないので、/sdcpp/v1/capabilities が応えたら準備完了
  */
 export class ImageEngine {
   modelPath: string | null = null;
+  private modelKey: string | null = null;
   private child: ChildProcess | null = null;
   private baseUrl = "";
   private queue: Promise<unknown> = Promise.resolve();
@@ -97,28 +102,34 @@ export class ImageEngine {
   }
 
   /** 同じモデルが読めていれば何もしない。違えば止めて読み直す */
-  load(modelPath: string): Promise<void> {
-    return this.enqueue(() => this.doLoad(modelPath));
+  load(model: ImageModelSpec): Promise<void> {
+    return this.enqueue(() => this.doLoad(model));
   }
 
   stop(): Promise<void> {
     return this.enqueue(() => this.doStop());
   }
 
-  private async doLoad(modelPath: string): Promise<void> {
-    if (this.child && this.modelPath === modelPath) return;
+  private async doLoad(model: ImageModelSpec): Promise<void> {
+    const key = JSON.stringify([model.path, model.parts]);
+    if (this.child && this.modelKey === key) return;
     if (!this.options.bin) throw new ApiError("ENGINE_FAILED", "LLM_PARTY_SD_BIN が設定されていません");
     await this.doStop();
 
     const port = await freePort();
     this.baseUrl = `http://127.0.0.1:${port}`;
     // 終了はプロセスグループごと行うので、自分のグループを持たせる
-    const child = spawn(this.options.bin, ["-m", modelPath, "--listen-ip", "127.0.0.1", "--listen-port", String(port)], {
+    const { parts } = model;
+    const modelArgs = parts
+      ? ["--diffusion-model", parts.diffusion, "--llm", parts.llm, "--vae", parts.vae, "--tokenizer", parts.tokenizer]
+      : ["-m", model.path];
+    const child = spawn(this.options.bin, [...modelArgs, "--listen-ip", "127.0.0.1", "--listen-port", String(port)], {
       stdio: ["ignore", "pipe", "pipe"],
       detached: true,
     });
     this.child = child;
-    this.modelPath = modelPath;
+    this.modelPath = model.path;
+    this.modelKey = key;
     const exited = new Promise<void>((resolve) => child.once("close", () => resolve()));
     const spawnFailed = new Promise<never>((_, reject) => child.once("error", reject));
     if (child.pid) writeFileSync(this.pidFile, String(child.pid));
@@ -135,6 +146,7 @@ export class ImageEngine {
       if (this.child !== child) return;
       this.child = null;
       this.modelPath = null;
+      this.modelKey = null;
       rmSync(this.pidFile, { force: true });
     });
 
@@ -224,6 +236,7 @@ export class ImageEngine {
     const child = this.child;
     this.child = null;
     this.modelPath = null;
+    this.modelKey = null;
     if (!child?.pid) return;
     const pid = child.pid;
     const closed = new Promise<void>((resolve) => {

@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { ImageEngine } from "../server/image-engine";
@@ -61,19 +61,46 @@ describe("ImageEngine", () => {
 
   it("読み込んで1枚生成し、PNG のバイト列を返す", async () => {
     const e = create("ok");
-    await e.load("/models/a.safetensors");
+    await e.load({ path: "/models/a.safetensors", parts: null });
     const png = await e.generate(params, new AbortController().signal);
     expect(png.subarray(0, 8).toString("hex")).toBe("89504e470d0a1a0a");
   });
 
+  /** fake-sd が標準エラーに出した args 行（sd-server のログ）を読む */
+  const loggedArgs = () => {
+    const dir = path.join(temp.dir, "logs");
+    const text = readdirSync(dir).map((f) => readFileSync(path.join(dir, f), "utf8")).join("\n");
+    return text.split("\n").find((l) => l.startsWith("args: ")) ?? "";
+  };
+
+  it("parts があれば --diffusion-model / --llm / --vae / --tokenizer を渡し、-m は付けない", async () => {
+    const e = create("ok");
+    const parts = { diffusion: "/m/d.gguf", llm: "/m/l.gguf", vae: "/m/v.safetensors", tokenizer: "/m/t.json" };
+    await e.load({ path: parts.diffusion, parts });
+    const line = loggedArgs();
+    expect(line).toContain("--diffusion-model /m/d.gguf");
+    expect(line).toContain("--llm /m/l.gguf");
+    expect(line).toContain("--vae /m/v.safetensors");
+    expect(line).toContain("--tokenizer /m/t.json");
+    expect(line.split(" ")).not.toContain("-m");
+  });
+
+  it("parts がなければ従来どおり -m を渡す", async () => {
+    const e = create("ok");
+    await e.load({ path: "/models/a.safetensors", parts: null });
+    const line = loggedArgs();
+    expect(line).toContain("-m /models/a.safetensors");
+    expect(line).not.toContain("--diffusion-model");
+  });
+
   it("起動直後に落ちたら ENGINE_FAILED", async () => {
     const e = create("fail");
-    await expect(e.load("/models/a.safetensors")).rejects.toMatchObject({ code: "ENGINE_FAILED" });
+    await expect(e.load({ path: "/models/a.safetensors", parts: null })).rejects.toMatchObject({ code: "ENGINE_FAILED" });
   });
 
   it("時間を過ぎたら取り消して ENGINE_FAILED", async () => {
     const e = create("slow", 400);
-    await e.load("/models/a.safetensors");
+    await e.load({ path: "/models/a.safetensors", parts: null });
     await expect(e.generate(params, new AbortController().signal)).rejects.toMatchObject({ code: "ENGINE_FAILED" });
   });
 
@@ -81,7 +108,7 @@ describe("ImageEngine", () => {
     temp = tempDir();
     engine = new ImageEngine({ bin: null, dataDir: temp.dir, bus: new EventBus() });
     expect(engine.available).toBe(false);
-    await expect(engine.load("/models/a.safetensors")).rejects.toMatchObject({ code: "ENGINE_FAILED" });
+    await expect(engine.load({ path: "/models/a.safetensors", parts: null })).rejects.toMatchObject({ code: "ENGINE_FAILED" });
   });
 });
 

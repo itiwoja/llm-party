@@ -8,6 +8,7 @@ import type { GenerationSlot } from "./generation-slot";
 import { ImageEngine, type ImageParams } from "./image-engine";
 import { ApiError } from "./http-error";
 import type { Store } from "./store";
+import type { ImageParts } from "./store/models";
 
 export interface ImageRequest extends ImageParams {
   modelId: string;
@@ -46,11 +47,11 @@ export class ImageService {
     return { status: "running" };
   }
 
-  private async run(threadId: string, model: { id: string; name: string; path: string }, input: ImageRequest): Promise<void> {
+  private async run(threadId: string, model: { id: string; name: string; path: string; parts: ImageParts | null }, input: ImageRequest): Promise<void> {
     const release = await this.slot.acquire(new AbortController().signal);
     try {
       await this.engine.stop();
-      await this.image.load(model.path);
+      await this.image.load({ path: model.path, parts: model.parts });
       const png = await this.image.generate(
         { prompt: input.prompt, width: input.width, height: input.height, steps: input.steps, seed: input.seed },
         new AbortController().signal,

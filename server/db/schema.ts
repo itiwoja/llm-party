@@ -244,4 +244,8 @@ export const MIGRATIONS: string[] = [
     created_at TEXT NOT NULL
   );
   `,
+  // v4：複数の部品でできた画像モデル（MOSS-Image, D-73）。parts は { diffusion, llm, vae, tokenizer } の絶対パス（JSON）。単一ファイルの画像モデルは NULL
+  `
+  ALTER TABLE models ADD COLUMN parts TEXT;
+  `,
 ];

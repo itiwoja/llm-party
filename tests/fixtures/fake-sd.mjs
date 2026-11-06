@@ -10,7 +10,10 @@ if (mode === "fail") {
   console.error("error: failed to load model");
   process.exit(1);
 }
-if (!args.includes("-m")) {
+// 受け取った引数を1行で標準エラーに出す（テストが読む）
+console.error(`args: ${args.join(" ")}`);
+const hasParts = ["--diffusion-model", "--llm", "--vae", "--tokenizer"].every((name) => args.includes(name));
+if (!args.includes("-m") && !hasParts) {
   console.error("model is required");
   process.exit(1);
 }

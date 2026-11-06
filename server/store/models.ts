@@ -8,6 +8,9 @@ import { isUniqueError, now } from "./shared";
 /** コピーのときに置き場に残す余裕（BR-05・D-31）。単位は GB を 1024 のべきで数える */
 export const COPY_MARGIN_BYTES = 2_000_000_000;
 
+/** 複数部品で読む画像モデルの部品（絶対パス）。単一ファイルの画像モデルは null */
+export interface ImageParts { diffusion: string; llm: string; vae: string; tokenizer: string }
+
 export interface ModelInput {
   name: string;
   path: string;
@@ -18,16 +21,19 @@ export interface ModelInput {
   quantization: string | null;
   sizeBytes: number;
   trainContext: number | null;
+  /** 部品でできた画像モデルだけ。単一ファイルは null（-m で読む） */
+  parts?: ImageParts | null;
 }
 
 interface ModelRow {
   id: string; name: string; path: string; source: string; kind: string; architecture: string;
-  quantization: string | null; size_bytes: number; train_context: number | null; created_at: string;
+  quantization: string | null; size_bytes: number; train_context: number | null; created_at: string; parts: string | null;
 }
 
 const toModel = (row: ModelRow) => ({
   id: row.id, name: row.name, path: row.path, source: row.source, use: row.kind, architecture: row.architecture,
-  quantization: row.quantization, sizeBytes: row.size_bytes, trainContext: row.train_context, createdAt: row.created_at,
+  quantization: row.quantization, sizeBytes: row.size_bytes, trainContext: row.train_context,
+  parts: row.parts ? (JSON.parse(row.parts) as ImageParts) : null, createdAt: row.created_at,
 });
 
 export class ModelStore {
@@ -46,9 +52,9 @@ export class ModelStore {
     const id = ulid();
     const time = now();
     try {
-      this.db.prepare(`INSERT INTO models (id, name, path, source, kind, architecture, quantization, size_bytes, train_context, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-        .run(id, input.name, input.path, input.source, input.use ?? "chat", input.architecture, input.quantization, input.sizeBytes, input.trainContext, time, time);
+      this.db.prepare(`INSERT INTO models (id, name, path, source, kind, architecture, quantization, size_bytes, train_context, parts, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .run(id, input.name, input.path, input.source, input.use ?? "chat", input.architecture, input.quantization, input.sizeBytes, input.trainContext, input.parts ? JSON.stringify(input.parts) : null, time, time);
     } catch (error) {
       if (isUniqueError(error)) throw new ApiError("CONFLICT", "このファイルは登録済みです");
       throw error;
