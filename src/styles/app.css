@@ -1,24 +1,218 @@
-/* 土台の確認用の最小の見た目。部品は ui/04 に沿って作り直す */
-button, input, select, textarea { font: inherit; color: inherit; }
-button { min-height: var(--control-height); padding: 0 var(--space-3); background: var(--color-surface); border: var(--line-width) solid var(--color-control); border-radius: var(--radius); cursor: pointer; }
-button[type="submit"] { background: var(--button-primary-bg); color: var(--button-primary-fg); border-color: transparent; }
-button:disabled { opacity: 0.5; cursor: default; }
-input, textarea, select { background: var(--color-surface); border: var(--line-width) solid var(--color-control); border-radius: var(--radius); padding: var(--space-2); box-sizing: border-box; }
-.box { display: grid; gap: var(--space-3); max-width: var(--form-max); margin: var(--space-7) auto; padding: 0 var(--space-4); }
-.box h1 { font-size: 20px; margin: 0; }
-.box p { margin: 0; color: var(--color-muted-fg); }
-.layout { display: grid; grid-template-columns: var(--list-width) 1fr; height: 100%; }
-.threads { padding: var(--space-3); border-right: var(--line-width) solid var(--color-line); overflow-y: auto; }
-.threads ul { list-style: none; margin: var(--space-3) 0 0; padding: 0; }
-.threads li button { width: 100%; border: 0; background: none; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.threads li button[aria-current="true"] { background: var(--color-hover); }
-.chat { display: flex; flex-direction: column; height: 100%; min-width: 0; max-width: var(--thread-max); margin: 0 auto; width: 100%; padding: 0 var(--space-4); box-sizing: border-box; }
-.log { flex: 1; overflow-y: auto; padding: var(--space-5) 0; }
-.log article { margin-bottom: var(--space-5); }
-.log article.user { padding: var(--space-3); background: var(--color-hover); border-radius: var(--radius); }
-.content { white-space: pre-wrap; overflow-wrap: anywhere; }
-pre { font-family: var(--font-mono); font-size: 14px; white-space: pre-wrap; color: var(--color-muted-fg); }
-.chat form { display: flex; gap: var(--space-2); align-items: flex-end; }
-.chat textarea { flex: 1; min-height: 72px; resize: vertical; }
-.metrics { margin: var(--space-2) 0 var(--space-3); font-family: var(--font-mono); font-size: 14px; color: var(--color-muted-fg); font-variant-numeric: tabular-nums; }
-.error { color: var(--color-danger); white-space: pre-wrap; }
+/* 骨組みと共通部品の見た目。値はすべて tokens.css のトークン（設計書 03 が正本） */
+*, *::before, *::after { box-sizing: border-box; }
+button, input, select, textarea { font: inherit; color: inherit; letter-spacing: inherit; }
+a { color: var(--color-primary); }
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.numeric { font-variant-numeric: tabular-nums; font-family: var(--font-mono); }
+.empty { margin: var(--space-3) 0; color: var(--color-muted-fg); font-size: 14px; line-height: 1.5; }
+.spin { animation: spin var(--duration-spin) linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+svg.lucide, .btn svg, .icon-btn svg { width: var(--icon-size); height: var(--icon-size); stroke-width: 1.75; flex: none; }
+
+/* 共通の状態：focus-visible */
+:focus-visible { outline: var(--focus-width) solid var(--color-focus-ring); outline-offset: var(--focus-width); }
+
+/* CMP-001 ボタン */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); min-height: var(--control-height); padding: 0 var(--space-4); border: var(--line-width) solid transparent; border-radius: var(--radius); background: transparent; cursor: pointer; white-space: nowrap; transition: background-color var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-out); }
+.btn-sm { min-height: var(--control-height-sm); padding: 0 var(--space-3); font-size: 14px; }
+.btn:active:not(:disabled) { transform: scale(0.97); }
+.btn-primary { background: var(--button-primary-bg); color: var(--button-primary-fg); }
+.btn-secondary { border-color: var(--color-control); }
+.btn-ghost:hover:not(:disabled), .btn-secondary:hover:not(:disabled) { background: var(--color-hover); }
+.btn-danger { background: var(--color-danger); color: var(--color-on-danger); }
+.btn-tone-danger { color: var(--color-danger); }
+@media (hover: hover) { .btn-primary:hover:not(:disabled) { background: var(--color-primary-hover); } .btn-danger:hover:not(:disabled) { filter: brightness(1.08); } }
+.btn:disabled { color: var(--color-muted-fg); cursor: default; }
+.btn-primary:disabled, .btn-danger:disabled { background: var(--color-hover); }
+.icon-btn { display: inline-grid; place-items: center; width: var(--control-height-sm); height: var(--control-height-sm); padding: 0; border: 0; border-radius: var(--radius); background: transparent; color: var(--color-muted-fg); cursor: pointer; }
+.icon-btn:hover { background: var(--color-hover); color: var(--color-fg); }
+
+/* CMP-005 入力欄 */
+.field { display: grid; gap: var(--space-1); min-width: 0; }
+.field-label { font-size: 14px; line-height: 1.5; color: var(--color-muted-fg); }
+.input { width: 100%; min-height: var(--control-height); padding: var(--space-2) var(--space-3); background: var(--color-surface); color: var(--color-fg); border: var(--line-width) solid var(--color-control); border-radius: var(--radius); }
+.input[aria-invalid="true"] { border-color: var(--color-danger); }
+.input.numeric { text-align: right; }
+.composer { resize: none; overflow-y: auto; line-height: 1.7; display: block; }
+.field-hint { margin: 0; font-size: 14px; color: var(--color-muted-fg); }
+.field-error { display: flex; align-items: flex-start; gap: var(--space-1); margin: 0; font-size: 14px; line-height: 1.5; color: var(--color-danger); white-space: pre-wrap; }
+.field-error svg { margin-top: 2px; width: 16px; height: 16px; flex: none; }
+
+/* CMP-003 検索欄 */
+.search { position: relative; display: flex; align-items: center; }
+.search-icon { position: absolute; left: var(--space-3); color: var(--color-muted-fg); pointer-events: none; }
+.search-input { width: 100%; min-height: var(--control-height); padding: 0 var(--space-6) 0 calc(var(--space-3) + var(--icon-size) + var(--space-2)); background: var(--color-surface); border: var(--line-width) solid var(--color-control); border-radius: var(--radius); }
+.search-input::-webkit-search-cancel-button { display: none; }
+.search-clear { position: absolute; right: 4px; }
+
+/* CMP-004 一覧の行 */
+.rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.row { position: relative; display: flex; align-items: center; min-height: var(--row-height); border-radius: var(--radius); }
+.row[data-selected]::before { content: ""; position: absolute; left: 0; top: 4px; bottom: 4px; width: 2px; background: var(--color-primary); border-radius: 1px; }
+.row[data-selected] { background: var(--color-hover); }
+.row:hover { background: var(--color-hover); }
+.row-link { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-height: var(--row-height); padding: 0 var(--space-3); color: var(--color-fg); text-decoration: none; font-size: 14px; border-radius: var(--radius); transition: transform var(--duration-fast) var(--ease-out); }
+.row-link:active { transform: scale(0.97); }
+.row-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row-more { opacity: 0; margin-right: 4px; }
+.row:hover .row-more, .row:focus-within .row-more, .row-more[data-state="open"] { opacity: 1; }
+.row-editing { padding: 0 var(--space-1); }
+
+/* ドット */
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: var(--radius-full); background: var(--color-muted-fg); flex: none; }
+.dot-ok { background: var(--color-success); }
+.dot-busy { background: var(--color-warning); }
+.dot-error { background: var(--color-danger); }
+.dot-pulse { background: var(--color-primary); animation: pulse var(--duration-pulse) var(--ease-in-out) infinite; }
+@keyframes pulse { 50% { opacity: 0.4; } }
+
+/* CMP-012 進捗バー */
+.progress { display: flex; align-items: center; gap: var(--space-3); }
+.progress-track { flex: 1; height: var(--space-1); border-radius: var(--radius-full); background: var(--color-hover); overflow: hidden; }
+.progress-fill { height: 100%; background: var(--color-primary); }
+.progress-num, .progress-unknown { font-size: 14px; color: var(--color-muted-fg); margin: 0; }
+
+/* CMP-013 タブ */
+.tabs-list { display: flex; gap: var(--space-4); border-bottom: var(--line-width) solid var(--color-line); }
+.tab { min-height: var(--control-height); padding: 0 var(--space-1); background: none; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; color: var(--color-muted-fg); cursor: pointer; }
+.tab[data-state="active"] { color: var(--color-fg); border-bottom-color: var(--color-primary); }
+
+/* CMP-014 表 */
+.table-scroll { overflow-y: auto; }
+.table { width: 100%; border-collapse: collapse; font-size: 14px; line-height: 1.5; }
+.table th { text-align: left; font-weight: 400; color: var(--color-muted-fg); padding: 0 var(--space-3); height: var(--row-height); }
+.table td { padding: 0 var(--space-3); height: var(--row-height); border-top: var(--line-width) solid var(--color-line); }
+.table .num-col { text-align: right; }
+.table tr.clickable { cursor: pointer; }
+.table tr.clickable:hover td { background: var(--color-hover); }
+
+/* CMP-015 選択部品 */
+.select-trigger { display: inline-flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-height: var(--control-height); padding: 0 var(--space-3); background: var(--color-surface); border: var(--line-width) solid var(--color-control); border-radius: var(--radius); cursor: pointer; font-family: var(--font-sans); }
+.select-trigger svg { width: 16px; height: 16px; color: var(--color-muted-fg); }
+.select-title { font-size: 20px; font-weight: 700; line-height: 1.4; border-color: transparent; background: transparent; padding: 0 var(--space-2); }
+.select-title:hover { background: var(--color-hover); }
+.select-item { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.select-check { color: var(--color-primary); display: inline-flex; }
+/* ダイアログの中でも背面幕の下に隠れないよう、ダイアログより上に出す */
+.menu.select-content { z-index: calc(var(--z-dialog) + 1); }
+.select-content { min-width: var(--radix-select-trigger-width); max-height: 320px; overflow-y: auto; }
+.switch { position: relative; width: 36px; height: 20px; border-radius: var(--radius-full); border: var(--line-width) solid var(--color-control); background: transparent; padding: 0; cursor: pointer; }
+.switch[data-state="checked"] { background: var(--color-primary); border-color: var(--color-primary); }
+.switch-thumb { display: block; width: 14px; height: 14px; border-radius: var(--radius-full); background: var(--color-control); transform: translateX(2px); transition: transform var(--duration-fast) var(--ease-out); }
+.switch[data-state="checked"] .switch-thumb { background: var(--color-on-primary); transform: translateX(18px); }
+.switch-field { display: flex; align-items: center; gap: var(--space-3); }
+.radio-group { display: flex; gap: var(--space-4); }
+.radio-item { display: flex; align-items: center; gap: var(--space-2); }
+.radio { width: 18px; height: 18px; padding: 0; border-radius: var(--radius-full); border: var(--line-width) solid var(--color-control); background: transparent; display: grid; place-items: center; cursor: pointer; }
+.radio-dot { width: 10px; height: 10px; border-radius: var(--radius-full); background: var(--color-primary); }
+
+/* CMP-019 ダイアログ / CMP-020 メニュー / ツールチップ / CMP-021 トースト */
+.dialog-scrim { position: fixed; inset: 0; background: var(--color-scrim); z-index: var(--z-dialog); }
+.dialog { position: fixed; z-index: var(--z-dialog); top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(var(--form-max), calc(100vw - var(--space-5) * 2)); padding: var(--space-5); background: var(--color-surface); border: var(--line-width) solid var(--color-line); border-radius: var(--radius-lg); display: grid; gap: var(--space-4); }
+.dialog-title { margin: 0; font-size: 20px; font-weight: 700; line-height: 1.4; overflow-wrap: anywhere; }
+.dialog-description { margin: 0; color: var(--color-muted-fg); }
+.dialog-form { display: grid; gap: var(--space-4); }
+.dialog-footer { display: flex; justify-content: flex-end; gap: var(--space-2); }
+.dialog-scrim[data-state="open"] { animation: fade var(--duration-normal) var(--ease-out); }
+.dialog[data-state="open"] { animation: dialog-in var(--duration-normal) var(--ease-out); }
+.dialog[data-state="closed"] { animation: dialog-out var(--duration-fast) var(--ease-out); }
+@keyframes fade { from { opacity: 0; } }
+@keyframes dialog-in { from { opacity: 0; transform: translate(-50%, -50%) scale(0.95); } }
+@keyframes dialog-out { to { opacity: 0; transform: translate(-50%, -50%) scale(0.95); } }
+.menu { z-index: var(--z-menu); min-width: 160px; padding: var(--space-1); background: var(--color-surface); border: var(--line-width) solid var(--color-line); border-radius: var(--radius-lg); animation: pop var(--duration-fast) var(--ease-out); transform-origin: var(--radix-popper-transform-origin, top); }
+@keyframes pop { from { opacity: 0; transform: scale(0.95); } }
+.menu-item { display: flex; align-items: center; min-height: var(--control-height-sm); padding: 0 var(--space-3); border-radius: var(--radius); font-size: 14px; cursor: pointer; outline: none; }
+.menu-item[data-highlighted] { background: var(--color-hover); }
+.menu-item-danger { color: var(--color-danger); }
+.tooltip { z-index: var(--z-menu); padding: var(--space-1) var(--space-2); background: var(--color-surface); color: var(--color-fg); border: var(--line-width) solid var(--color-line); border-radius: var(--radius); font-size: 14px; line-height: 1.5; animation: pop var(--duration-fast) var(--ease-out); }
+.toast-viewport { position: fixed; right: var(--space-4); bottom: var(--space-4); z-index: var(--z-toast); display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; outline: none; }
+.toast { padding: var(--space-3) var(--space-4); background: var(--color-surface); border: var(--line-width) solid var(--color-line); border-radius: var(--radius-lg); font-size: 14px; }
+.toast[data-state="open"] { animation: toast-in var(--duration-normal) var(--ease-out); }
+.toast[data-state="closed"] { animation: fade var(--duration-fast) reverse forwards; }
+@keyframes toast-in { from { opacity: 0; transform: translateY(8px); } }
+
+/* CMP-006 の土台：折りたたみ */
+.collapsible-trigger { display: flex; align-items: center; gap: var(--space-1); min-height: var(--control-height-sm); width: 100%; padding: 0; background: none; border: 0; color: var(--color-muted-fg); font-size: 14px; cursor: pointer; text-align: left; }
+.collapsible-arrow { width: 16px; height: 16px; transition: transform var(--duration-fast) var(--ease-out); }
+.collapsible-trigger[data-state="open"] .collapsible-arrow { transform: rotate(90deg); }
+
+/* CMP-008 数字の1行 */
+.metrics { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4); margin: var(--space-2) 0 var(--space-3); font-size: 14px; line-height: 1.6; color: var(--color-muted-fg); }
+.metrics-item { display: inline-flex; align-items: center; gap: var(--space-2); }
+
+/* CMP-009 状態の帯 */
+.band { display: flex; align-items: center; gap: var(--space-3); min-height: var(--control-height); padding: var(--space-1) var(--space-4); background: var(--color-surface); border-bottom: var(--line-width) solid var(--color-line); font-size: 14px; }
+.band svg { width: var(--icon-size); height: var(--icon-size); stroke-width: 1.75; flex: none; }
+.band-info { color: var(--color-muted-fg); }
+.band-warning { color: var(--color-warning); }
+.band-error { color: var(--color-danger); }
+.band-text { flex: 1; min-width: 0; }
+.band-detail { display: block; color: var(--color-muted-fg); font-family: var(--font-mono); font-size: 13px; overflow-wrap: anywhere; }
+
+/* CMP-022 Markdown 本文 */
+.md { overflow-wrap: anywhere; }
+.md > :first-child { margin-top: 0; }
+.md > :last-child { margin-bottom: 0; }
+.md h1, .md h2, .md h3, .md h4 { line-height: 1.4; margin: var(--space-5) 0 var(--space-2); font-weight: 700; }
+.md h1 { font-size: 20px; } .md h2 { font-size: 18px; } .md h3, .md h4 { font-size: 16px; }
+.md p, .md ul, .md ol, .md blockquote { margin: 0 0 var(--space-3); }
+.md ul, .md ol { padding-left: var(--space-5); }
+.md blockquote { padding-left: var(--space-3); border-left: 2px solid var(--color-line); color: var(--color-muted-fg); }
+.md hr { border: 0; border-top: var(--line-width) solid var(--color-line); margin: var(--space-5) 0; }
+.md-table { overflow-x: auto; margin: 0 0 var(--space-3); }
+.md-table table { border-collapse: collapse; font-size: 14px; line-height: 1.5; }
+.md-table th, .md-table td { padding: var(--space-1) var(--space-3); border: var(--line-width) solid var(--color-line); text-align: left; }
+.md-table th { font-weight: 700; background: var(--color-hover); }
+.inline-code { font-family: var(--font-mono); font-size: 0.9em; padding: 0 var(--space-1); background: var(--color-hover); border-radius: var(--radius); }
+.code { margin: 0 0 var(--space-3); border: var(--line-width) solid var(--color-line); border-radius: var(--radius); background: var(--color-surface); overflow: hidden; }
+.code-head { display: flex; align-items: center; justify-content: space-between; min-height: var(--control-height-sm); padding: 0 var(--space-2) 0 var(--space-3); border-bottom: var(--line-width) solid var(--color-line); font-family: var(--font-mono); font-size: 13px; color: var(--color-muted-fg); letter-spacing: 0; }
+.code-copy { display: inline-flex; align-items: center; gap: var(--space-1); min-height: var(--control-height-sm); padding: 0 var(--space-2); background: none; border: 0; border-radius: var(--radius); color: var(--color-muted-fg); font-family: var(--font-sans); font-size: 13px; cursor: pointer; }
+.code-copy:hover { background: var(--color-hover); color: var(--color-fg); }
+.code-copy svg { width: 14px; height: 14px; }
+.code-body { margin: 0; padding: var(--space-3); overflow-x: auto; font-family: var(--font-mono); font-size: 14px; line-height: 1.6; letter-spacing: 0; tab-size: 4; }
+.code-body code { font-family: inherit; background: none; padding: 0; }
+.hljs-keyword, .hljs-selector-tag, .hljs-doctag { color: var(--color-primary); }
+.hljs-string, .hljs-regexp, .hljs-addition { color: var(--color-success); }
+.hljs-number, .hljs-literal, .hljs-symbol, .hljs-bullet { color: var(--color-warning); }
+.hljs-comment, .hljs-quote, .hljs-meta { color: var(--color-muted-fg); }
+.hljs-title, .hljs-built_in, .hljs-type, .hljs-attr, .hljs-attribute, .hljs-name, .hljs-section, .hljs-variable, .hljs-params { color: var(--color-fg); font-weight: 700; }
+.hljs-deletion { color: var(--color-danger); }
+
+/* 骨組み */
+.shell { display: flex; flex-direction: column; height: 100%; }
+.shell-body { flex: 1; display: flex; min-height: 0; }
+.rail { flex: none; width: var(--rail-width); display: flex; flex-direction: column; align-items: center; gap: var(--space-1); padding: var(--space-2) 0; border-right: var(--line-width) solid var(--color-line); }
+.rail-link { position: relative; display: grid; place-items: center; width: var(--control-height); height: var(--control-height); color: var(--color-muted-fg); border-radius: var(--radius); }
+.rail-link:hover { background: var(--color-hover); color: var(--color-fg); }
+.rail-link[aria-current="page"] { color: var(--rail-active); }
+.rail-link[aria-current="page"]::before { content: ""; position: absolute; left: -6px; top: 6px; bottom: 6px; width: 2px; background: var(--rail-active); }
+.rail-dot { position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border-radius: var(--radius-full); background: var(--color-warning); }
+.page { flex: 1; min-width: 0; min-height: 0; display: grid; position: relative; }
+.page-work { grid-template-columns: var(--list-width) minmax(0, 1fr) auto; }
+.page-manage { grid-template-columns: var(--list-width) minmax(0, 1fr); }
+.page-manage.no-list { grid-template-columns: minmax(0, 1fr); }
+.page-measure { grid-template-columns: minmax(0, 1fr); }
+.list-pane { display: flex; flex-direction: column; gap: var(--space-3); min-height: 0; padding: var(--space-3); border-right: var(--line-width) solid var(--color-line); overflow-y: auto; }
+.work-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; width: 100%; max-width: calc(var(--thread-max) + var(--space-4) * 2); margin: 0 auto; padding: 0 var(--space-4); }
+.manage-main, .measure-main { min-width: 0; min-height: 0; padding: var(--space-4); overflow-y: auto; }
+.step-main { width: 100%; max-width: var(--form-max); margin: var(--space-7) auto; padding: 0 var(--space-4); }
+.panel { width: var(--panel-width); border-left: var(--line-width) solid var(--color-line); background: var(--color-bg); min-height: 0; overflow-y: auto; animation: panel-in var(--duration-slow) var(--ease-out); }
+@keyframes panel-in { from { transform: translateX(100%); } }
+@media (max-width: 1279px) { .panel { position: absolute; top: 0; right: 0; bottom: 0; z-index: var(--z-panel); } }
+
+/* PG-001 */
+.thread-head { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) 0 0; }
+.head-context { font-size: 14px; color: var(--color-muted-fg); }
+.log { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-4) 0; }
+.log-inner { display: grid; gap: var(--space-5); }
+.user-text { padding: var(--space-3); background: var(--color-hover); border-radius: var(--radius); white-space: pre-wrap; overflow-wrap: anywhere; }
+.reasoning { margin: var(--space-1) 0 var(--space-3); padding-left: var(--space-3); border-left: 2px solid var(--color-line); color: var(--color-muted-fg); font-size: 14px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.composer-form { padding-top: var(--space-3); display: flex; align-items: flex-end; gap: var(--space-2); }
+.composer-form .field { flex: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .spin, .dot-pulse { animation: none; }
+  .btn, .row-link, .collapsible-arrow, .switch-thumb { transition: none; }
+  .btn:active:not(:disabled), .row-link:active { transform: none; }
+  .dialog[data-state], .dialog-scrim, .menu, .tooltip, .toast[data-state] { animation-name: fade; }
+  .panel { animation-name: fade; }
+}

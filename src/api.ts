@@ -1,22 +1,36 @@
 import { getConnection } from "./platform";
 
 export class ApiRequestError extends Error {
-  constructor(readonly status: number, readonly code: string, message: string) {
+  constructor(readonly status: number, readonly code: string, message: string, readonly details: { field?: string; message?: string; name?: string }[] = []) {
     super(message);
   }
 }
 
-export async function api<T>(pathname: string, body?: unknown): Promise<T> {
+type Method = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
+
+async function request<T>(method: Method, pathname: string, body?: unknown): Promise<T> {
   const { baseUrl, token } = getConnection();
   const res = await fetch(`${baseUrl}${pathname}`, {
-    method: body === undefined ? "GET" : "POST",
+    method,
     headers: { Authorization: `Bearer ${token ?? ""}`, "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const data = await res.json().catch(() => null);
-  if (!res.ok) throw new ApiRequestError(res.status, data?.error?.code ?? "INTERNAL", data?.error?.message ?? res.statusText);
+  if (!res.ok) throw new ApiRequestError(res.status, data?.error?.code ?? "INTERNAL", data?.error?.message ?? res.statusText, data?.error?.details);
   return data as T;
 }
+
+/** `api(path)` は GET、`api(path, body)` は POST。ほかの動詞は `api.patch` などを使う */
+export const api = Object.assign(
+  <T>(pathname: string, body?: unknown) => request<T>(body === undefined ? "GET" : "POST", pathname, body),
+  {
+    get: <T>(pathname: string) => request<T>("GET", pathname),
+    post: <T>(pathname: string, body?: unknown) => request<T>("POST", pathname, body ?? {}),
+    patch: <T>(pathname: string, body: unknown) => request<T>("PATCH", pathname, body),
+    put: <T>(pathname: string, body: unknown) => request<T>("PUT", pathname, body),
+    delete: <T = null>(pathname: string) => request<T>("DELETE", pathname),
+  },
+);
 
 export interface ServerEvent {
   event: string;
