@@ -1,0 +1,11 @@
+/* PG-002 初回セットアップ。見出しは --text-title、値は --text-body、手順の数字は右上に等幅 */
+.setup { display: grid; gap: var(--space-4); }
+.setup-no { margin: 0; text-align: right; font-size: 14px; color: var(--color-muted-fg); }
+.setup h1, .setup h2 { margin: 0; font-size: 20px; font-weight: 700; line-height: 1.4; }
+.setup-text { margin: 0; }
+.setup-row { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.setup-row .field-label { font-size: 14px; color: var(--color-muted-fg); }
+.setup-path { margin: 0; font-family: var(--font-mono); font-size: 14px; overflow-wrap: anywhere; min-width: 0; }
+.setup-note { margin: 0; font-size: 14px; color: var(--color-muted-fg); }
+.setup-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
+.setup-dl { display: grid; gap: var(--space-2); }
