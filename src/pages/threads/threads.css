@@ -1,0 +1,68 @@
+/* PG-001：ツールカード・承認カード・差分・端末・右パネル */
+.row-mark { display: inline-flex; align-items: center; gap: var(--space-2); min-width: 0; color: var(--color-muted-fg); }
+.row-workspace { font-size: 13px; max-width: 8em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row-kind { width: 14px; height: 14px; flex: none; }
+.head-panel { margin-left: auto; }
+
+.tool-card { border: var(--line-width) solid var(--color-line); border-radius: var(--radius-lg); padding: 0 var(--space-3); background: var(--color-surface); }
+.tool-card-pending { border-color: var(--color-warning); }
+.tool-summary { display: flex; align-items: center; gap: var(--space-2); min-width: 0; flex: 1; color: var(--color-fg); }
+.tool-card .collapsible-trigger { min-height: var(--control-height); color: var(--color-fg); }
+.tool-icon { width: 16px; height: 16px; flex: none; }
+.tool-warning { color: var(--color-warning); }
+.tool-success { color: var(--color-success); }
+.tool-danger { color: var(--color-danger); }
+.tool-muted { color: var(--color-muted-fg); }
+.tool-name { font-family: var(--font-mono); font-size: 14px; flex: none; }
+.tool-target { font-family: var(--font-mono); font-size: 13px; color: var(--color-muted-fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.tool-status { margin-left: auto; font-size: 13px; color: var(--color-muted-fg); flex: none; }
+.tool-body { padding: var(--space-1) 0 var(--space-3); display: grid; gap: var(--space-2); }
+.tool-label { margin: 0; font-size: 13px; color: var(--color-muted-fg); }
+.tool-output { margin: 0; padding: var(--space-2) var(--space-3); max-height: 240px; overflow: auto; background: var(--color-bg); border-radius: var(--radius); font-family: var(--font-mono); font-size: 13px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; letter-spacing: 0; }
+.tool-note { margin: 0; font-size: 14px; color: var(--color-muted-fg); overflow-wrap: anywhere; }
+.approval-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }
+.step-limit { padding: var(--space-3); border: var(--line-width) solid var(--color-line); border-radius: var(--radius-lg); background: var(--color-surface); }
+.step-limit p { margin: 0; }
+.context-full { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding-top: var(--space-2); }
+.workspace-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); padding-top: var(--space-2); }
+.workspace-name { font-size: 14px; color: var(--color-muted-fg); overflow-wrap: anywhere; }
+.summary-body { padding: var(--space-2) 0 var(--space-2) var(--space-3); border-left: 2px solid var(--color-line); color: var(--color-muted-fg); font-size: 14px; }
+
+/* CMP-010 差分 */
+.diff { margin: 0; overflow-x: auto; background: var(--color-surface); border: var(--line-width) solid var(--color-line); border-radius: var(--radius); font-family: var(--font-mono); font-size: 13px; line-height: 1.6; letter-spacing: 0; }
+.diff-line { display: block; padding: 0 var(--space-3) 0 0; white-space: pre; min-width: max-content; }
+.diff-sign { display: inline-block; width: 2ch; margin: 0 var(--space-1); text-align: center; user-select: none; }
+.diff-add { background: var(--color-diff-add); }
+.diff-del { background: var(--color-diff-del); }
+.diff-hunk, .diff-meta { color: var(--color-muted-fg); }
+.diff-meta { display: none; }
+.diff-hunk { padding-left: var(--space-3); }
+.count-add { color: var(--color-success); }
+.count-del { color: var(--color-danger); }
+
+/* 右パネル */
+.panel-inner { display: flex; flex-direction: column; min-height: 100%; padding: var(--space-2) var(--space-3) var(--space-4); position: relative; }
+.panel-close { position: absolute; top: var(--space-2); right: var(--space-3); z-index: 1; }
+.panel-inner .tabs-list { padding-right: calc(var(--control-height-sm) + var(--space-2)); }
+.tabs-content { padding-top: var(--space-3); }
+.diff-tab { display: grid; gap: var(--space-3); }
+.file-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.file-item { display: flex; justify-content: space-between; gap: var(--space-3); width: 100%; min-height: var(--control-height-sm); padding: 0 var(--space-2); background: none; border: 0; border-radius: var(--radius); color: var(--color-fg); text-align: left; cursor: pointer; font-size: 13px; }
+.file-item:hover, .file-item[aria-current="true"] { background: var(--color-hover); }
+.file-path { font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-count { flex: none; }
+.step-diff { display: grid; gap: var(--space-2); justify-items: start; }
+.step-diff .diff { justify-self: stretch; }
+
+/* CMP-011 端末 */
+.terminal { background: var(--color-bg); font-family: var(--font-mono); font-size: 13px; line-height: 1.6; letter-spacing: 0; max-height: calc(100vh - 160px); overflow: auto; }
+.terminal-block + .terminal-block { margin-top: var(--space-3); border-top: var(--line-width) solid var(--color-line); padding-top: var(--space-3); }
+.terminal-head { display: flex; justify-content: space-between; gap: var(--space-3); }
+.terminal-cmd { overflow-wrap: anywhere; font-weight: 700; }
+.terminal-exit { flex: none; color: var(--color-muted-fg); }
+.terminal-out { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-family: inherit; }
+.approval-body { display: grid; gap: var(--space-2); }
+.log-inner { grid-template-columns: minmax(0, 1fr); }
+.tool-card, .tool-card .collapsible { min-width: 0; }
+.tool-card .collapsible-trigger { min-width: 0; overflow: hidden; }
+.tool-card .collapsible-arrow { flex: none; }
