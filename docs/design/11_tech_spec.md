@@ -113,14 +113,14 @@ flowchart LR
 | R-01 | 未署名で SmartScreen 警告 | 手順の案内、SignPath は後で | [05](05_non_functional.md) |
 | R-02 | CUDA パックと同梱版のずれ | ビルド番号で照合、ずれたら Vulkan＋再 DL 案内 | [models-runtime](04_functional_spec/models-runtime.md) |
 | R-03 | PEFT 形式の LoRA が読めない | 登録時に判定して変換を案内 | 同上 |
-| R-04 | リクエストごとの LoRA 倍率・思考 ON/OFF が未確認 | 最初に確かめ、だめなら読み込み直し方式 | [chat-agent](04_functional_spec/chat-agent.md) |
+| R-04 | リクエストごとの LoRA 倍率の実機確認が残る | 手元の LoRA で確かめ、だめなら読み込み直し方式 | [chat-agent](04_functional_spec/chat-agent.md) |
 | R-05 | 9B のツール誤用・繰り返し | エラーを返して直させる、40 回上限 | [04 README](04_functional_spec/README.md) |
 | R-06 | 自動要約で指示が落ちる | 最初の指示とシステムは残す、元は DB に残す | 同上 |
 | R-07 | 外部通信がある | 通信先を明示、本文は送らない | [05](05_non_functional.md) |
 | R-08 | ネイティブモジュールのビルド | asarUnpack と検査 | [07](07_architecture.md) |
 | R-09 | cudart の再配布条件 | 公開前に確認、だめなら公式から直接 DL | [models-runtime](04_functional_spec/models-runtime.md) |
 | R-10 | コマンドはワークスペース外に影響しうる | 承認制、自動承認は明示 ON だけ | [04 README](04_functional_spec/README.md) |
-| R-14 | WSL 用 llama-server を自分で用意する | 手順を最初に確かめて README に書く | [12](12_localhost_stage.md) |
+| R-14 | WSL 用 llama-server を自分で用意する | 公式の Ubuntu 用 CUDA 版で確認済み。手順は 12 | [12](12_localhost_stage.md) |
 | R-15 | Windows 固有の動きは exe 段階まで確かめられない | exe 段階の確認に入れる | 同上 |
 | R-16 | 他のサイトから localhost の API を叩かれる | トークン＋Host・Origin の確認 | 同上 |
 

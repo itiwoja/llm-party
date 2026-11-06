@@ -9,7 +9,7 @@
 ## 🧭 判断してほしいこと
 | # | 種類 | 論点 | 選択肢 | おすすめ（理由） | 決まらないと止まるもの |
 |---|---|---|---|---|---|
-| R-04 | リスク | llama-server の `/v1/chat/completions` が、リクエストごとの `lora`（倍率）と `chat_template_kwargs`（思考 ON/OFF）を受け付けるか未確認（公式 README で確認できたのは `/completion` の `lora` と起動引数 `--chat-template-kwargs`） | — | 実装の最初に同梱版で確かめる。だめなら、倍率・思考モードが違うときもエンジンを読み込み直す（BR-01 を変更） | FR-003, FR-005 |
+| R-04 | リスク | 9B と b12125 で `chat_template_kwargs.enable_thinking` がリクエストごとに効くことを確認済み。`lora` は `/v1/chat/completions` が受け取ることをソースで確認済みで、倍率が効くことの実機確認だけ残る（手元に LoRA の GGUF がない） | — | 手元の LoRA で確かめる（[exe 段階へ進む条件](../12_localhost_stage.md#exe-段階へ進む条件)の1）。だめなら、倍率・思考モードが違うときもエンジンを読み込み直す（BR-01 を変更） | FR-003, FR-005 |
 
 その他の論点（Q-06, R-05, R-06, R-10）は [04 README](README.md#-判断してほしいこと)。
 

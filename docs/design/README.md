@@ -9,14 +9,14 @@
 | R-01 | リスク | 未署名で SmartScreen の警告 | 手順を案内、SignPath は後で | — | [05](05_non_functional.md#-判断してほしいこと) |
 | R-02 | リスク | CUDA パックと同梱 llama.cpp の版ずれ | ビルド番号で照合、ずれたら Vulkan＋再 DL | — | [models-runtime](04_functional_spec/models-runtime.md#-判断してほしいこと) |
 | R-03 | リスク | PEFT 形式の LoRA は読めない | 登録時に判定して変換を案内 | — | 同上 |
-| R-04 | リスク | リクエストごとの LoRA 倍率・思考 ON/OFF が未確認 | 実装の最初に確認。だめなら読み込み直し | FR-003, FR-005 | [chat-agent](04_functional_spec/chat-agent.md#-判断してほしいこと) |
+| R-04 | リスク | リクエストごとの LoRA 倍率の実機確認が残る（思考 ON/OFF は確認済み） | 手元の LoRA で確かめる。だめなら読み込み直し | FR-003, FR-005 | [chat-agent](04_functional_spec/chat-agent.md#-判断してほしいこと) |
 | R-05 | リスク | 9B のツール誤用・繰り返し | エラーを返す・40 回上限 | — | [04](04_functional_spec/README.md#-判断してほしいこと) |
 | R-06 | リスク | 自動要約で指示が落ちる | 最初の指示とシステムは残す | — | 同上 |
 | R-07 | リスク | 外への通信がある（HF・GitHub） | 通信先を明示、本文は送らない | — | [05](05_non_functional.md#-判断してほしいこと) |
 | R-08 | リスク | ネイティブモジュールのビルド | asarUnpack と検査 | — | [07](07_architecture.md#-判断してほしいこと) |
 | R-09 | リスク | cudart の再配布条件 | 公開前に確認、だめなら公式から直接 DL | FR-002 | [models-runtime](04_functional_spec/models-runtime.md#-判断してほしいこと) |
 | R-10 | リスク | コマンドはワークスペース外にも影響しうる | 承認制、自動承認は明示 ON のみ | — | [04](04_functional_spec/README.md#-判断してほしいこと) |
-| R-14 | リスク | WSL 用の CUDA 版 llama-server は自分で用意する | 公式の Ubuntu 用 CUDA 版を使う（D-59）。動くかは実装の最初に確かめる | 動作確認 | [12](12_localhost_stage.md#-判断してほしいこと) |
+| R-14 | リスク | WSL 用の CUDA 版 llama-server は自分で用意する | 公式の Ubuntu 用 CUDA 版が GPU で動くことを確認済み（D-59）。手順は [12](12_localhost_stage.md#llama-server-の用意) | 動作確認 | [12](12_localhost_stage.md#-判断してほしいこと) |
 | R-15 | リスク | Windows 固有の動きは exe 段階まで確かめられない | exe 段階の確認に入れる | exe 段階 | 同上 |
 | R-16 | リスク | 他のサイトから localhost の API を叩かれる | トークン＋Host・Origin の確認 | — | 同上 |
 

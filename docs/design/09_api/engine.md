@@ -4,7 +4,7 @@
 > **3行で**
 > 1. worker が使う llama-server のエンドポイントは3つだけ：`/health`・`/v1/chat/completions`・`/tokenize`。
 > 2. 根拠は llama.cpp の `tools/server/README.md`（2026-11-05 時点、ビルド b12125 前後）。
-> 3. リクエストごとの `lora` と `chat_template_kwargs` が `/v1/chat/completions` で効くかは未確認（R-04）。
+> 3. リクエストごとの `chat_template_kwargs` は `/v1/chat/completions` で効く。`lora` の倍率は実機確認が残る（R-04）。
 
 ## 🧭 判断してほしいこと
 なし（R-04 は [chat-agent](../04_functional_spec/chat-agent.md#-判断してほしいこと)）
@@ -60,7 +60,7 @@ sequenceDiagram
 </details>
 
 - 応答（SSE）：`choices[0].delta` の `content`（本文）、`reasoning_content`（思考。`--reasoning-format` の既定で分かれる）、`tool_calls`（引数は分割されて届くのでつなげる）。最後に `usage`
-- `lora` の `id` は起動時の `--lora` の並び順。省いたアダプタは倍率 0（README の `/completion` の記述。R-04）
+- `lora` の `id` は起動時の `--lora` の並び順。省いたアダプタは倍率 0（R-04）。`lora` を空配列にすると起動時の倍率に戻る。登録していない `id` はエラーにならず無視される
 - 思考 OFF のプリセットは `chat_template_kwargs.enable_thinking = false`（Qwen3.5 のモデルカードの指定。`/think` `/nothink` は使えない）
 
 ## API-102：POST /tokenize

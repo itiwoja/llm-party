@@ -9,7 +9,7 @@
 ## 🧭 判断してほしいこと
 | # | 種類 | 論点 | 選択肢 | おすすめ（理由） | 決まらないと止まるもの |
 |---|---|---|---|---|---|
-| R-14 | リスク | WSL 用の CUDA 版 llama-server は同梱の仕組みがなく、自分で用意する | — | 公式の `llama-b12125-bin-ubuntu-cuda-12.8-x64` を取り、`LLM_PARTY_LLAMA_BIN` で指す（D-59）。動くかは実装の最初に確かめ、手順を README に書く | 全機能の動作確認 |
+| R-14 | リスク | WSL 用の CUDA 版 llama-server は同梱の仕組みがなく、自分で用意する | — | 公式の `llama-b12125-bin-ubuntu-cuda-12.8-x64` が RTX 4060 で動くことを確認済み（D-59）。手順は [llama-server の用意](#llama-server-の用意) | 全機能の動作確認 |
 | R-15 | リスク | PowerShell・ジャンクション・Windows のパスなどの動きは、exe 段階まで確かめられない | — | [exe 段階でやること](#exe-段階でやること)に Windows での確認を入れる。パスとシェルは差し替えられる形で作る | exe 段階 |
 | R-16 | リスク | エージェントがコマンドを動かす API をブラウザから呼ぶので、他のサイトから叩かれないようにする必要がある | — | トークンに加えて Host と Origin を確かめる（[接続と認証](#接続と認証)） | — |
 
@@ -66,6 +66,11 @@ WSL で動かすのは検証のためで、Linux 版の配布ではない。D-19
 | `LLM_PARTY_BACKEND` | `cuda` | 表示と記録に使うバックエンド名（`cuda` / `vulkan` / `cpu`） |
 | `LLM_PARTY_PORT` | `8787` | 待ち受けポート |
 | `LLM_PARTY_DATA_DIR` | リポジトリの `data/` | データの置き場。`data/` は Git に入れない |
+
+## llama-server の用意
+1. llama.cpp の b12125 のリリースから `llama-b12125-bin-ubuntu-cuda-12.8-x64.tar.gz` と `cudart-llama-b12125-bin-ubuntu-cuda-12.8-x64.tar.gz` を取る
+2. 両方を展開し、`cudart-` の中の `.so` を `llama-server` と同じフォルダへコピーする。別のフォルダのままだと GPU を認識しない
+3. 起動するときは `LD_LIBRARY_PATH` にそのフォルダを入れ、`LLM_PARTY_LLAMA_BIN` で `llama-server` を指す
 
 ## 接続と認証
 - 待ち受けは `127.0.0.1` だけ（NFR-011）。LAN から見えるアドレスでは待ち受けない
