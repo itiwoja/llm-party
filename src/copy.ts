@@ -7,6 +7,7 @@ export const CP = {
   retry: "再試行", // CP-009
   close: "閉じる", // CP-011
   bandLoading: (preset: string) => `モデル読み込み中：${preset}`, // CP-012
+  bandInstalling: (percent: number | null) => `推論エンジンを取得しています${percent === null ? "…" : `… ${percent}%`}`,
   bandApproval: (n: number) => `承認待ち ${n} 件`, // CP-013
   bandEval: (done: number, total: number) => `評価中 ${done}/${total}`, // CP-014
   bandLoadFailed: "モデル読み込み失敗。下の出力で原因を確認", // CP-016
@@ -48,6 +49,7 @@ export const MISSING_COPY = {
   presetSelect: "プリセット", // CMP-015 のラベル（読み上げ）
   engineReady: "準備完了", // 05 のワイヤーにだけ出てくる
   engineStarting: "読み込み中", // 04 CMP-012 の説明にだけ出てくる
+  engineInstalling: "取得中", // ADR-011：llama-server を初回に取得している
   engineStopped: "停止中", // 仮
   engineFailed: "失敗", // 仮（CP-100 の DL 状態と同じ語）
   toastRegion: "通知", // CMP-021 の読み上げ名

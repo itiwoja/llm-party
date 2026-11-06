@@ -3,11 +3,14 @@ import { randomBytes } from "node:crypto";
 import { appendFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import path from "node:path";
+import { installLlama, type InstallInput } from "./runtime/installer";
+import type { LlamaFlavor } from "./runtime/manifest";
+import { hasNvidiaGpu, resolveLlama } from "./runtime/resolver";
 import type { EventBus } from "./events";
 import { ApiError } from "./http-error";
 import { GENERATION_SLOTS } from "./generation-slot";
 
-export type EngineState = "stopped" | "starting" | "ready" | "failed";
+export type EngineState = "stopped" | "starting" | "ready" | "failed" | "installing";
 
 export interface EngineSpec {
   presetId: string;
@@ -26,6 +29,8 @@ export interface EngineOptions {
   stopGraceMs?: number;
   /** 読み込みの前に呼ぶ。画像生成の sd-server を止めて VRAM を空けるのに使う */
   beforeLoad?: () => Promise<void>;
+  /** llama-server の取得。テストで差し替える（省略時は runtime/installer の installLlama） */
+  installer?: (input: InstallInput) => Promise<string>;
 }
 
 const POLL_MS = 500;
@@ -86,6 +91,10 @@ export class EngineManager {
   private readonly logsDir: string;
   private readonly loadTimeoutMs: number;
   private readonly stopGraceMs: number;
+  /** 実際に動かしているバックエンド（取得した種類に従う）。動かしていないときは null */
+  private activeBackend: EngineOptions["backend"] | null = null;
+  /** 取得中の割合（0〜100） */
+  private installPercent: number | null = null;
 
   constructor(private options: EngineOptions) {
     this.pidFile = path.join(options.dataDir, "runtime", "engine.pid");
@@ -107,7 +116,7 @@ export class EngineManager {
     }
     try {
       const cmdline = readFileSync(`/proc/${pid}/cmdline`, "utf8");
-      if (this.options.bin && cmdline.includes(path.basename(this.options.bin))) process.kill(-pid, "SIGKILL");
+      if (cmdline.includes("llama-server")) process.kill(-pid, "SIGKILL");
     } catch {
       // もう終わっている
     }
@@ -115,15 +124,16 @@ export class EngineManager {
   }
 
   get backend(): EngineOptions["backend"] {
-    return this.options.backend;
+    return this.activeBackend ?? this.options.backend;
   }
 
   private publish(): void {
     this.options.bus.publish("engine", {
       state: this.state,
       presetId: this.presetId,
-      backend: this.options.backend,
+      backend: this.backend,
       ...(this.error ? { error: this.error } : {}),
+      ...(this.state === "installing" && this.installPercent !== null ? { installPercent: this.installPercent } : {}),
     });
   }
 
@@ -158,9 +168,22 @@ export class EngineManager {
       return;
     }
     await this.options.beforeLoad?.();
-    if (!this.options.bin) {
-      this.setState("failed", "LLM_PARTY_LLAMA_BIN が設定されていません");
-      throw new ApiError("ENGINE_FAILED", "LLM_PARTY_LLAMA_BIN が設定されていません");
+    const resolution = resolveLlama({ override: this.options.bin, dataDir: this.options.dataDir, flavor: await this.preferredFlavor() });
+    let bin: string;
+    let backend: EngineOptions["backend"];
+    if (resolution.status === "override-missing") {
+      this.setState("failed", resolution.message);
+      throw new ApiError("ENGINE_FAILED", resolution.message);
+    } else if (resolution.status === "override") {
+      bin = resolution.bin;
+      backend = this.options.backend;
+    } else if (resolution.status === "installed") {
+      bin = resolution.bin;
+      backend = resolution.flavor;
+    } else {
+      // 初回：取得してから読み込む（ADR-011）
+      bin = await this.install(resolution.flavor);
+      backend = resolution.flavor;
     }
     await this.doStop();
 
@@ -173,7 +196,8 @@ export class EngineManager {
     this.apiKey = randomBytes(32).toString("hex");
     this.baseUrl = `http://127.0.0.1:${port}`;
     // 終了はプロセスグループごと行うので、自分のグループを持たせる
-    const child = spawn(this.options.bin, buildArgs(spec, this.options.backend, port, this.apiKey), {
+    this.activeBackend = backend;
+    const child = spawn(bin, buildArgs(spec, backend, port, this.apiKey), {
       stdio: ["ignore", "pipe", "pipe"],
       detached: true,
     });
@@ -203,6 +227,36 @@ export class EngineManager {
       throw new ApiError("ENGINE_FAILED", message);
     }
     this.setState("ready");
+  }
+
+  /** 種類の選び方（判断 D3）：NVIDIA の GPU があれば CUDA、無ければ CPU */
+  private async preferredFlavor(): Promise<LlamaFlavor["id"]> {
+    return (await hasNvidiaGpu()) ? "cuda" : "cpu";
+  }
+
+  /** llama-server を取得する。状態は installing（進捗つき）→ 成功なら呼び出し元が続ける、失敗なら failed */
+  private async install(flavor: LlamaFlavor["id"]): Promise<string> {
+    this.installPercent = 0;
+    this.setState("installing");
+    try {
+      const install = this.options.installer ?? installLlama;
+      const bin = await install({
+        dataDir: this.options.dataDir,
+        flavor,
+        signal: new AbortController().signal,
+        onProgress: (percent) => {
+          this.installPercent = percent;
+          this.publish();
+        },
+      });
+      this.installPercent = null;
+      return bin;
+    } catch (error) {
+      this.installPercent = null;
+      const message = error instanceof Error ? error.message : "llama-server を取得できませんでした";
+      this.setState("failed", message);
+      throw new ApiError("ENGINE_FAILED", message);
+    }
   }
 
   private describeFailure(error: unknown): string {

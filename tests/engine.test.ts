@@ -88,12 +88,34 @@ describe("EngineManager", () => {
   });
 
   it("存在しないバイナリは failed", async () => {
-    await expect(create("/no/such/llama-server").load(SPEC)).rejects.toThrow(/起動できません/);
+    await expect(create("/no/such/llama-server").load(SPEC)).rejects.toThrow(/見つかりません.*\/no\/such\/llama-server/);
     expect(engine.state).toBe("failed");
   });
 
-  it("バイナリの指定がなければ failed", async () => {
-    await expect(create(null).load(SPEC)).rejects.toThrow(/LLM_PARTY_LLAMA_BIN/);
+  it("指定がなく取得もまだなら、取得してから読み込む（installing → ready・進捗つき）", async () => {
+    const events: { state: string; installPercent?: number }[] = [];
+    bus.subscribe((event) => { if (event.event === "engine") events.push(event.data as never); });
+    engine = new EngineManager({
+      bin: null, backend: "cpu", dataDir: temp.dir, bus, loadTimeoutMs: 1500, stopGraceMs: 300,
+      installer: async ({ onProgress }) => {
+        onProgress(50);
+        return FAKE_LLAMA;
+      },
+    });
+    await engine.load(SPEC);
+    expect(engine.state).toBe("ready");
+    expect(events.some((e) => e.state === "installing" && e.installPercent === 50)).toBe(true);
+    expect(events.findIndex((e) => e.state === "installing")).toBeLessThan(events.findIndex((e) => e.state === "ready"));
+  });
+
+  it("取得に失敗したら failed で、理由を画面に出す", async () => {
+    engine = new EngineManager({
+      bin: null, backend: "cpu", dataDir: temp.dir, bus, loadTimeoutMs: 1500, stopGraceMs: 300,
+      installer: async () => { throw new Error("取得に失敗しました（3 回試しました）"); },
+    });
+    await expect(engine.load(SPEC)).rejects.toThrow(/取得に失敗しました/);
+    expect(engine.state).toBe("failed");
+    expect(engine.error).toContain("3 回試しました");
   });
 
   it("動作中に落ちたら failed の engine イベントを出す", async () => {

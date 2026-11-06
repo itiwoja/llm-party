@@ -23,6 +23,7 @@ import "./threads.css";
 const ENGINE_STATUS: Record<EngineState, { tone: "ok" | "busy" | "error" | "idle"; label: string }> = {
   ready: { tone: "ok", label: MISSING_COPY.engineReady },
   starting: { tone: "busy", label: MISSING_COPY.engineStarting },
+  installing: { tone: "busy", label: MISSING_COPY.engineInstalling },
   stopped: { tone: "idle", label: MISSING_COPY.engineStopped },
   failed: { tone: "error", label: MISSING_COPY.engineFailed },
 };

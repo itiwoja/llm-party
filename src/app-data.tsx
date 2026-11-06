@@ -90,7 +90,7 @@ export function AppDataProvider({ children, onUnauthorized }: { children: ReactN
     void reloadPresets().catch(unauthorized);
     void reloadModels().catch(unauthorized);
     return subscribeEvents((event) => {
-      if (event.event === "engine") setEngine({ state: event.data.state, presetId: event.data.presetId ?? null, error: event.data.error ?? null });
+      if (event.event === "engine") setEngine({ state: event.data.state, presetId: event.data.presetId ?? null, error: event.data.error ?? null, installPercent: event.data.installPercent ?? null });
       listeners.current.forEach((l) => l(event));
     });
   }, [onUnauthorized, reloadPresets, reloadModels]);
@@ -100,6 +100,9 @@ export function AppDataProvider({ children, onUnauthorized }: { children: ReactN
     if (engine.state === "starting") {
       const name = presets.find((p) => p.id === engine.presetId)?.name ?? "";
       return { kind: "info", busy: true, message: CP.bandLoading(name) };
+    }
+    if (engine.state === "installing") {
+      return { kind: "info", busy: true, message: CP.bandInstalling(engine.installPercent ?? null) };
     }
     if (engine.state === "failed") {
       const presetId = engine.presetId ?? presets[0]?.id;
