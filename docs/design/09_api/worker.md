@@ -140,7 +140,7 @@ SSE。1本の接続で全種類を流す。切れたら画面がつなぎ直し�
 |---|---|---|
 | `engine` | `{ state, presetId, backend, error? }` | SCR-001 |
 | `turn.delta` | `{ turnId, messageId, content?, reasoning? }`（差分） | SCR-001 |
-| `turn.usage` | `{ turnId, usedTokens, contextSize }` | SCR-001 |
+| `turn.usage` | `{ turnId, usedTokens, contextSize, tokensPerSecond? }`（生成中は速度も送る） | SCR-001 |
 | `turn.compacted` | `{ threadId, summaryMessageId, count }` | SCR-001 |
 | `turn.finished` | `{ turnId, status, error? }` | SCR-001 |
 | `tool.pending` | `{ toolCallId, tool, args, preview? }`（書き込みは差分のプレビュー） | SCR-001 |

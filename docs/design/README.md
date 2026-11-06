@@ -6,7 +6,6 @@
 |---|---|---|---|---|---|
 | Q-01 | 未決 | SQLite のドライバ | better-sqlite3（実績・FTS5。asar の外に置く手間あり） | 08、ビルド | [07](07_architecture.md#-判断してほしいこと) |
 | Q-02 | 未決 | CUDA パックの版（12.4 / 13.4） | 12.4（古いドライバでも動く。約 650MB） | FR-002、CI | [models-runtime](04_functional_spec/models-runtime.md#-判断してほしいこと) |
-| Q-05 | 未決 | 画面の言語 | 日本語のみ | SCR 全般 | [01](01_requirements.md#-判断してほしいこと) |
 | Q-06 | 未決 | コマンドを動かすシェル | Windows PowerShell 5.1 | FR-009 | [04](04_functional_spec/README.md#-判断してほしいこと) |
 | Q-09 | 未決 | 生成速度の目安 | 目安なし（評価で毎回測る） | NFR-002 | [05](05_non_functional.md#-判断してほしいこと) |
 | R-01 | リスク | 未署名で SmartScreen の警告 | 手順を案内、SignPath は後で | — | [05](05_non_functional.md#-判断してほしいこと) |
@@ -20,7 +19,7 @@
 | R-09 | リスク | cudart の再配布条件 | 公開前に確認、だめなら公式から直接 DL | FR-002 | [models-runtime](04_functional_spec/models-runtime.md#-判断してほしいこと) |
 | R-10 | リスク | コマンドはワークスペース外にも影響しうる | 承認制、自動承認は明示 ON のみ | — | [04](04_functional_spec/README.md#-判断してほしいこと) |
 
-番号の欠け（Q-03, Q-04, Q-07, Q-08）は決着済み → [00 決定事項ログ](00_overview.md#決定事項ログ)（D-33, D-43, D-42, D-38）。
+番号の欠け（Q-03, Q-04, Q-05, Q-07, Q-08）は決着済み → [00 決定事項ログ](00_overview.md#決定事項ログ)（D-33, D-43, D-46, D-42, D-38）。
 
 ## 全体図（C4 レベル1：コンテキスト）
 ```mermaid
@@ -34,6 +33,7 @@ flowchart LR
 ## 読む順番
 | 目的 | 読むもの | 所要 |
 |---|---|---|
+| 画面の見た目と文言を知りたい | [ui/README](ui/README.md) | 5分 |
 | 全体像だけ知りたい | この README → [11_tech_spec](11_tech_spec.md) の要約層 | 5分 |
 | 何を作るか判断したい | [01](01_requirements.md) → [02](02_user_stories.md) の要約層 | 10分 |
 | 振る舞いを知りたい | [04 README](04_functional_spec/README.md) → [chat-agent](04_functional_spec/chat-agent.md) → [eval](04_functional_spec/eval.md) | 20分 |
@@ -51,4 +51,4 @@ flowchart LR
 | [ADR-007](adr/ADR-007-update-flow.md) | 起動時に確認、DL と適用は利用者の操作 | 承認 |
 
 ## 最近の変更
-- なし（v0.1 初版、2026-11-05）
+- 2026-11-06：[UI 設計書](ui/README.md) v0.1 を追加。Q-05 決着（D-46）、新規作成の形（D-47）、文言の正本（D-48）、`turn.usage` に `tokensPerSecond` を追加

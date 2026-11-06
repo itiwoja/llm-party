@@ -120,7 +120,7 @@ flowchart LR
 | R-10 | コマンドはワークスペース外に影響しうる | 承認制、自動承認は明示 ON だけ | [04 README](04_functional_spec/README.md) |
 
 ## 13. 未決事項・Claude 判断で決めた項目
-- 未決：Q-01, Q-02, Q-05, Q-06, Q-09（[README](README.md#-判断してほしいこと)）
+- 未決：Q-01, Q-02, Q-06, Q-09（[README](README.md#-判断してほしいこと)）
 - Claude 判断：ADR-002 のうち「子プロセスにする」点、D-45（細部の定石の一覧）。定石：D-33〜D-37, D-39（[00](00_overview.md#決定事項ログ)）
 
 ## 14. 参照ドキュメント
