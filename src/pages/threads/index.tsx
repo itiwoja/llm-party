@@ -1,4 +1,4 @@
-import { ArrowUp, Folder, Image as ImageIcon, PanelRight, Square } from "lucide-react";
+import { ArrowUp, Folder, PanelRight, Square } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiRequestError } from "../../api";
 import { useAppData, useBand, useServerEvent } from "../../app-data";
@@ -56,7 +56,7 @@ export function ThreadsPage() {
   const threadId = route.page === "threads" ? route.id : undefined;
   /** 新しいスレッドの入力画面で選んでいるプロジェクト */
   const projectId = route.page === "threads" ? route.projectId : undefined;
-  const { presets, engine } = useAppData();
+  const { presets, models, engine } = useAppData();
 
   const [threads, setThreads] = useState<ThreadInfo[]>([]);
   const [projects, setProjects] = useState<Workspace[]>([]);
@@ -77,10 +77,19 @@ export function ThreadsPage() {
   const [panelOpen, setPanelOpen] = useState(false);
   const [panelTab, setPanelTab] = useState("diff");
   const [evalProgress, setEvalProgress] = useState<{ done: number; total: number } | null>(null);
-  /** 画像モード：入力を画像の生成に回す（D-72）。画像モデルは画像モデルだけを並べる */
+  /** 画像モード：モデルの選択で画像モデルを選んだとき。入力を画像の生成に回す（D-72） */
   const [imageMode, setImageMode] = useState(false);
-  const [imageModels, setImageModels] = useState<{ value: string; label: string }[]>([]);
   const [imageModelId, setImageModelId] = useState("");
+  const imageModels = useMemo(() => models.filter((m) => m.use === "image"), [models]);
+  /** チャットのプリセットと画像モデルを1か所で選ぶ。値は種類:id */
+  const modelOptions = useMemo(
+    () => [
+      ...presets.map((p) => ({ value: `preset:${p.id}`, label: p.name, group: PG1.chatGroup })),
+      ...imageModels.map((m) => ({ value: `image:${m.id}`, label: m.name, group: PG1.imageGroup })),
+    ],
+    [presets, imageModels],
+  );
+  const modelChoice = imageMode ? `image:${imageModelId}` : `preset:${presetId}`;
   const [imageBusy, setImageBusy] = useState(false);
 
   const composer = useRef<HTMLTextAreaElement>(null);
@@ -303,17 +312,24 @@ export function ThreadsPage() {
     }
   });
 
-  // 画像モードを開いたら、画像モデルの一覧を読む
+  // 画像モデルが変わったら、選んでいる画像モデルを確かめる。1 つも無くなったらチャットへ戻す
   useEffect(() => {
-    if (!imageMode) return;
-    void api.get<{ items: { id: string; name: string; use: string }[] }>("/models")
-      .then((data) => {
-        const items = data.items.filter((model) => model.use === "image");
-        setImageModels(items.map((model) => ({ value: model.id, label: model.name })));
-        setImageModelId((current) => (items.some((model) => model.id === current) ? current : items[0]?.id ?? ""));
-      })
-      .catch((err) => setError(errorText(err)));
-  }, [imageMode]);
+    setImageModelId((current) => (imageModels.some((m) => m.id === current) ? current : imageModels[0]?.id ?? ""));
+    if (imageModels.length === 0) setImageMode(false);
+  }, [imageModels]);
+
+  /** 1 か所の選択。画像モデルなら画像モード、プリセットならチャット（presetId は常に持つ。スレッドの作成に要る） */
+  function chooseModel(value: string) {
+    const [kind, ...rest] = value.split(":");
+    const id = rest.join(":");
+    if (kind === "image") {
+      setImageModelId(id);
+      setImageMode(true);
+    } else {
+      setPresetId(id);
+      setImageMode(false);
+    }
+  }
 
   async function send() {
     const content = input.trim();
@@ -500,21 +516,16 @@ export function ThreadsPage() {
             />
           </div>
           <div className="composer-model">
-            <Button size="sm" variant="ghost" aria-pressed={imageMode} disabled={generating || imageBusy} icon={<ImageIcon aria-hidden />} onClick={() => setImageMode((on) => !on)}>{PG1.imageMode}</Button>
-            {imageMode ? (
-              <SelectField compact hideLabel label={PG1.imageModel} value={imageModelId} onValueChange={setImageModelId} options={imageModels} disabled={imageBusy} />
-            ) : null}
-            {imageMode && imageModels.length === 0 ? <span className="composer-note">{PG1.noImageModel}</span> : null}
             {imageBusy ? <span className="composer-note" role="status">{PG1.imageGenerating}</span> : null}
-            {contextSize ? <span className="numeric head-context">{Math.round(contextSize / 1024)}K</span> : null}
+            {contextSize && !imageMode ? <span className="numeric head-context">{Math.round(contextSize / 1024)}K</span> : null}
             <SelectField
               compact
               hideLabel
-              label={MISSING_COPY.presetSelect}
-              value={presetId}
-              onValueChange={setPresetId}
-              options={presets.map((p) => ({ value: p.id, label: p.name }))}
-              disabled={generating}
+              label={PG1.modelSelect}
+              value={modelChoice}
+              onValueChange={chooseModel}
+              options={modelOptions}
+              disabled={generating || imageBusy}
             />
             {generating ? (
               <IconButton className="composer-stop" label={CP.stop} disabled={stepWait} onClick={() => turn && void api.post(`/turns/${turn.id}/cancel`).catch((err) => setError(errorText(err)))}>

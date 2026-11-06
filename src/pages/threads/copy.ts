@@ -1,8 +1,8 @@
 /** PG-001 の文言。正本は docs/design/ui/08_copy.md（CP-ID をそのまま写す。言い換えない） */
 export const PG1 = {
-  imageMode: "画像", // 画像生成に切り替えるボタン
-  imageModel: "画像モデル", // 画像モデルの選択（読み上げ名）
-  noImageModel: "画像モデルがありません。モデル画面で取ってください",
+  modelSelect: "モデル", // チャットのプリセットと画像モデルを1か所で選ぶ（読み上げ名）
+  chatGroup: "チャット", // 選択肢の見出し（チャットのプリセット）
+  imageGroup: "画像", // 選択肢の見出し（画像モデル。選ぶと画像を生成する）
   imageGenerating: "画像を生成しています…",
   imageLoading: "画像を読み込んでいます",
   imageLoadFailed: "画像を表示できません",

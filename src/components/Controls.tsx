@@ -4,7 +4,7 @@ import * as Radio from "@radix-ui/react-radio-group";
 import { Check, ChevronDown } from "lucide-react";
 import { useId } from "react";
 
-export interface Option { value: string; label: string }
+export interface Option { value: string; label: string; /** 同じ名前のものを並べて見出しで区切る（省けば区切らない） */ group?: string }
 
 interface SelectProps {
   value: string;
@@ -16,6 +16,16 @@ interface SelectProps {
   /** 枠なしの小さい形で出す（入力欄の右下のプリセット選択）。メニューは右端にそろえる */
   compact?: boolean;
   disabled?: boolean;
+}
+
+/** group の無い選択肢は先頭にまとめ、group のあるものは出てきた順に見出しごとにまとめる */
+function groupOptions(options: Option[]): [string, Option[]][] {
+  const groups = new Map<string, Option[]>();
+  for (const o of options) {
+    const key = o.group ?? "";
+    groups.set(key, [...(groups.get(key) ?? []), o]);
+  }
+  return [...groups];
 }
 
 /** CMP-015（セレクト）。プリセット名などは等幅にしない */
@@ -32,11 +42,16 @@ export function SelectField({ value, onValueChange, options, label, hideLabel, c
         <Select.Portal>
           <Select.Content className="menu select-content" position="popper" sideOffset={4} align={compact ? "end" : "start"}>
             <Select.Viewport>
-              {options.map((o) => (
-                <Select.Item key={o.value} value={o.value} className="menu-item select-item">
-                  <Select.ItemText>{o.label}</Select.ItemText>
-                  <Select.ItemIndicator className="select-check"><Check aria-hidden /></Select.ItemIndicator>
-                </Select.Item>
+              {groupOptions(options).map(([group, items]) => (
+                <Select.Group key={group || "-"}>
+                  {group ? <Select.Label className="select-group-label">{group}</Select.Label> : null}
+                  {items.map((o) => (
+                    <Select.Item key={o.value} value={o.value} className="menu-item select-item">
+                      <Select.ItemText>{o.label}</Select.ItemText>
+                      <Select.ItemIndicator className="select-check"><Check aria-hidden /></Select.ItemIndicator>
+                    </Select.Item>
+                  ))}
+                </Select.Group>
               ))}
             </Select.Viewport>
           </Select.Content>
