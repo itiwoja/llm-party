@@ -1,4 +1,5 @@
 import { type ChatChunk, readChatStream, type ToolCallDelta } from "../llama-stream";
+import { RepeatGuard } from "./repeat-guard";
 
 export type { ToolCallDelta };
 
@@ -44,6 +45,8 @@ export interface Generation {
   usage?: { prompt_tokens: number; completion_tokens: number };
   /** max_tokens に達した（D-61） */
   truncated: boolean;
+  /** 思考の繰り返しを検知して途中で止めた（D-70） */
+  looped?: boolean;
 }
 
 export interface CompletionRequest {
@@ -52,6 +55,8 @@ export interface CompletionRequest {
   signal: AbortSignal;
   /** messages・tools・生成設定・lora など、そのまま JSON で送るもの */
   body: Record<string, unknown>;
+  /** 思考のループを検知したら生成を止める（D-70）。評価は比較の条件を変えないよう使わない */
+  stopOnRepeatedThought?: boolean;
   makeId: () => string;
   onDelta?(delta: { content?: string; reasoning?: string }): void;
   /** usage か timings を含むチャンクごと */
@@ -70,6 +75,7 @@ export async function streamCompletion(request: CompletionRequest): Promise<Gene
 
   const result: Generation = { content: "", reasoning: "", toolCalls: [], truncated: false };
   const assembler = new ToolCallAssembler();
+  const guard = request.stopOnRepeatedThought ? new RepeatGuard() : null;
   for await (const chunk of readChatStream(res.body)) {
     const choice = chunk.choices?.[0];
     const text = choice?.delta?.content ?? "";
@@ -78,6 +84,11 @@ export async function streamCompletion(request: CompletionRequest): Promise<Gene
       result.content += text;
       result.reasoning += thought;
       request.onDelta?.({ ...(text ? { content: text } : {}), ...(thought ? { reasoning: thought } : {}) });
+    }
+    // 抜けると読み取りが取り消され、接続が切れて llama-server も生成をやめる
+    if (thought && guard?.feed(thought)) {
+      result.looped = true;
+      return result;
     }
     if (choice?.delta?.tool_calls) assembler.add(choice.delta.tool_calls);
     if (choice?.finish_reason === "length") result.truncated = true;

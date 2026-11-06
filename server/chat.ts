@@ -210,12 +210,13 @@ export class ChatService {
     let promptTokens: number | undefined;
     let completionTokens: number | undefined;
     let truncated = false;
+    let looped = false;
     let lastUsageAt = 0;
 
     const finish = (status: "completed" | "cancelled" | "failed", error?: string) => {
       if (status !== "completed") this.store.agent.closeToolCalls(turnId, error ?? "停止しました");
       this.store.threads.finishTurn(turnId, status, { promptTokens, completionTokens, error });
-      this.bus.publish("turn.finished", { turnId, status, ...(error ? { error } : {}), ...(truncated ? { truncated } : {}) });
+      this.bus.publish("turn.finished", { turnId, status, ...(error ? { error } : {}), ...(truncated ? { truncated } : {}), ...(looped ? { looped } : {}) });
     };
 
     /** FR-006：直前の usage に、新しく足した分を /tokenize で数えて足す。基準がなければ全体を数える */
@@ -270,6 +271,7 @@ export class ChatService {
       try {
         const generation = await complete({
           baseUrl: this.engine.baseUrl, apiKey: this.engine.apiKey, signal, makeId: ulid,
+          stopOnRepeatedThought: true,
           body: {
             messages: system ? [{ role: "system", content: system }, ...history] : history,
             ...(workspace ? { tools: toolDefinitions() } : {}),
@@ -302,6 +304,7 @@ export class ChatService {
           completionTokens = (completionTokens ?? 0) + generation.usage.completion_tokens;
         }
         truncated = generation.truncated;
+        looped = generation.looped ?? false;
         return generation;
       } finally {
         this.store.threads.updateMessage(messageId, content, reasoning || null);

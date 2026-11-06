@@ -143,7 +143,7 @@ SSE。1本の接続で全種類を流す。切れたら画面がつなぎ直し�
 | `turn.delta` | `{ turnId, messageId, content?, reasoning? }`（差分） | SCR-001 |
 | `turn.usage` | `{ turnId, usedTokens, contextSize, tokensPerSecond? }`（生成中は速度も送る） | SCR-001 |
 | `turn.compacted` | `{ threadId, summaryMessageId, count }` | SCR-001 |
-| `turn.finished` | `{ turnId, status, error?, truncated? }`（`truncated` は生成の上限に達したとき。D-61） | SCR-001 |
+| `turn.finished` | `{ turnId, status, error?, truncated?, looped? }`（`truncated` は生成の上限に達したとき。D-61。`looped` は思考のループを検知して止めたとき。D-70） | SCR-001 |
 | `tool.pending` | `{ toolCallId, tool, args, preview? }`（書き込みは差分のプレビュー） | SCR-001 |
 | `tool.started` | `{ toolCallId }` | SCR-001 |
 | `tool.output` | `{ toolCallId, chunk }`（コマンドの出力） | SCR-001 右パネル |

@@ -68,6 +68,7 @@ export function ThreadsPage() {
   const [usage, setUsage] = useState<Usage>({ percent: null, tokensPerSecond: null });
   const [error, setError] = useState("");
   const [truncated, setTruncated] = useState(false);
+  const [looped, setLooped] = useState(false);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [workspaceError, setWorkspaceError] = useState("");
   const [panelOpen, setPanelOpen] = useState(false);
@@ -90,6 +91,7 @@ export function ThreadsPage() {
   const pendingCalls = useMemo(() => toolCalls.filter((c) => c.status === "pending_approval"), [toolCalls]);
 
   useBand("truncated", truncated ? { kind: "warning", message: CP.truncated } : null);
+  useBand("looped", looped ? { kind: "warning", message: CP.looped } : null);
   useBand("approval", pendingCalls.length > 0 ? { kind: "warning", message: PG1.bandApproval(pendingCalls.length) } : null);
   useBand("eval", evalProgress ? { kind: "info", busy: true, message: PG1.bandEval(evalProgress.done, evalProgress.total) } : null);
 
@@ -157,6 +159,7 @@ export function ThreadsPage() {
   useEffect(() => {
     setError("");
     setTruncated(false);
+    setLooped(false);
     setUsage({ percent: null, tokensPerSecond: null });
     setMessages([]);
     setToolCalls([]);
@@ -270,6 +273,7 @@ export function ThreadsPage() {
       // 文脈満杯は入力欄の下に出す（ターンの error から導く）
       if (data.error && data.error !== PG1.contextFull) setError(data.error);
       else if (data.truncated) setTruncated(true);
+      else if (data.looped) setLooped(true);
       if (threadRef.current === active.threadId) {
         void loadDetail(active.threadId).catch(() => undefined);
         void loadChanges(active.threadId);
@@ -287,6 +291,7 @@ export function ThreadsPage() {
     if (!content || turn || !presetId) return;
     setError("");
     setTruncated(false);
+    setLooped(false);
     try {
       const id = threadId ?? (await api<ThreadInfo>("/threads", { presetId, ...(workspace ? { workspaceId: workspace.id } : {}) })).id;
       threadRef.current = id;

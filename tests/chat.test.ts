@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type BusEvent } from "../server/events";
@@ -108,6 +108,31 @@ describe("チャット1往復", () => {
     const { presetId, threadId } = await setup(worker);
     const { body } = await worker.api(`/threads/${threadId}/turns`, { body: { presetId, content: "長く" } });
     expect((await finished(worker, body.turnId)).data).toEqual({ turnId: body.turnId, status: "completed", truncated: true });
+  });
+
+  const scriptThoughts = (worker: TestWorker, reasoning: string[]) => {
+    const file = path.join(worker.dir, "script.json");
+    writeFileSync(file, JSON.stringify([{ reasoning, content: "本文" }]));
+    vi.stubEnv("FAKE_LLAMA_SCRIPT", file);
+  };
+
+  it("思考が同じ行を繰り返したら止めて looped を知らせる（D-70）", async () => {
+    scriptThoughts(worker, Array(6).fill("こんにちは！何かお手伝いできることはありますか？長めの行\n"));
+    const { presetId, threadId } = await setup(worker, true);
+    const { body } = await worker.api(`/threads/${threadId}/turns`, { body: { presetId, content: "こんちくわ" } });
+    expect((await finished(worker, body.turnId)).data).toEqual({ turnId: body.turnId, status: "completed", looped: true });
+    const detail = await worker.api(`/threads/${threadId}/messages`);
+    expect(detail.body.messages[1].content).toBe("");
+    expect(detail.body.messages[1].reasoning.split("\n").filter(Boolean)).toHaveLength(5);
+  });
+
+  it("違う思考が続くだけなら止めない", async () => {
+    scriptThoughts(worker, Array.from({ length: 6 }, (_, i) => `これは ${i} 番目の、少し長めの思考の行です\n`));
+    const { presetId, threadId } = await setup(worker, true);
+    const { body } = await worker.api(`/threads/${threadId}/turns`, { body: { presetId, content: "こんちくわ" } });
+    expect((await finished(worker, body.turnId)).data).toEqual({ turnId: body.turnId, status: "completed" });
+    const detail = await worker.api(`/threads/${threadId}/messages`);
+    expect(detail.body.messages[1].content).toBe("本文");
   });
 
   it("生成中の別の送信は BUSY", async () => {

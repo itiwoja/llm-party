@@ -17,7 +17,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const chunk = (res, data) => res.write(`data: ${JSON.stringify(data)}\n\n`);
 
 // FAKE_LLAMA_SCRIPT=<JSON ファイル> のとき、リクエストごとに決めた応答を返す（エージェントのテスト用）。
-// 並びは [{ content?, toolCalls?: [{ id, name, arguments: 文字列 | オブジェクト }], times?: 回数, loop?: true }]。
+// 並びは [{ reasoning?: 文字列の配列（1 要素を 1 チャンクで流す）, content?, toolCalls?: [{ id, name, arguments: 文字列 | オブジェクト }], times?: 回数, loop?: true }]。
 // usage は応答の usage の上書き（文脈の計測のテスト用）。arguments は 3 つに分けて流す。loop は残りのリクエストすべて
 const script = process.env.FAKE_LLAMA_SCRIPT ? JSON.parse(readFileSync(process.env.FAKE_LLAMA_SCRIPT, "utf8")) : null;
 let scripted = 0;
@@ -32,6 +32,7 @@ function pickStep() {
 }
 async function respondScripted(res, step) {
   res.writeHead(200, { "Content-Type": "text/event-stream" });
+  for (const thought of step.reasoning ?? []) chunk(res, { choices: [{ delta: { reasoning_content: thought } }] });
   if (step.content) chunk(res, { choices: [{ delta: { content: step.content } }] });
   (step.toolCalls ?? []).forEach((call, index) => {
     const raw = typeof call.arguments === "string" ? call.arguments : JSON.stringify(call.arguments ?? {});

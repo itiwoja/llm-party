@@ -27,6 +27,7 @@ export const CP = {
   confirmDeleteThread: (title: string) => `「${title}」を削除。会話は戻せない。作業フォルダのファイルは残る`, // CP-033
   thinking: "思考", // CP-034
   truncated: "生成の上限に到達。続きは次の指示で", // CP-207
+  looped: "思考の繰り返しを検知して停止。指示を送り直して再試行", // CP-284
   pickFolderTitle: "フォルダのパス", // CP-200
   pickFileTitle: "ファイルのパス", // CP-201
   pathHint: "WSL のパスを貼り付け", // CP-202
