@@ -19,6 +19,10 @@
 | R-14 | リスク | WSL 用の CUDA 版 llama-server は自分で用意する | 公式の Ubuntu 用 CUDA 版が GPU で動くことを確認済み（D-59）。手順は [12](12_localhost_stage.md#llama-server-の用意) | 動作確認 | [12](12_localhost_stage.md#-判断してほしいこと) |
 | R-15 | リスク | Windows 固有の動きは exe 段階まで確かめられない | exe 段階の確認に入れる | exe 段階 | 同上 |
 | R-16 | リスク | 他のサイトから localhost の API を叩かれる | トークン＋Host・Origin の確認 | — | 同上 |
+| Q-14 | 未決 | MOSS-Image の DiT の版：unsloth の UD-Q4_K_XL か、leejet の MOSS-Image-SFT-GGUF か | unsloth の UD-Q4_K_XL（手順が検証済みの card に合う） | API-097 の部品一覧 | [ADR-010](adr/ADR-010-moss-image-recipe.md) |
+| Q-15 | 未決 | 既定のエンコーダ（Qwen3.5-9B Q8_0 は約 9GB 級）を、小さい量子化に替えるか | 替えない（品質を優先）。8GB 機は後で決める | R-18 の扱い | [ADR-010](adr/ADR-010-moss-image-recipe.md) |
+| R-17 | リスク | 同梱の sd-server を master-975 以降に上げても、MOSS の複数ファイル指定が未確認 | 実機で1枚生成を確かめる。だめなら版を上げ直す | FR-012 | [ADR-010](adr/ADR-010-moss-image-recipe.md) |
+| R-18 | リスク | 既定の組み合わせは 8GB の GPU に載らない見込み | 16GB 以上を前提にと明記し、8GB は Q-15 の結論後 | FR-012 | [ADR-010](adr/ADR-010-moss-image-recipe.md) |
 
 番号の欠け（Q-01, Q-03, Q-04, Q-05, Q-07, Q-08, Q-09）は決着済み → [00 決定事項ログ](00_overview.md#決定事項ログ)（D-55, D-33, D-43, D-46, D-42, D-38, D-56）。Q-02 と Q-06 は exe 段階で決める（D-59）。
 

@@ -108,6 +108,8 @@ sequenceDiagram
 |---|---|---|---|---|
 | API-095 | POST | `/api/threads/:id/images` | `{ modelId, prompt, width?, height?, steps?, seed? }` を受けて 202 `{ status: "running" }`。結果は SSE の `image` イベント（`{ threadId, status: "completed", imageId }` または `{ threadId, status: "failed", error }`）で届く。画像モデル（`use: image`）だけを受ける | FR-012, D-72 |
 | API-096 | GET | `/api/images/:id` | 生成した PNG を返す（`dataDir/images` の中だけ） | FR-012, D-72 |
+| API-097 | POST | `/api/image-recipes` | `{ recipe: "moss-image" }` を受けて、レシピの部品を DL の待ち行列に入れる（kind `image-set`）。202 で DL の行を返す。空き容量が部品の合計＋2GB に足りなければ断る（INSUFFICIENT_STORAGE）。DL が終わると画像モデル（`use: image`）が1つ登録される | FR-012, D-73, ADR-010 |
+| API-098 | GET | `/api/image-recipes` | レシピの一覧。各レシピの部品（ファイル名・取得元・サイズ）、合計サイズ、登録済みかどうか | FR-012, D-73 |
 
 - 生成したものは `messages` に `role = image` で入る。内容は JSON（`imageId`・`prompt`・`modelName`・`width`・`height`）。履歴の文脈には入らない
 - 同時に1枚。チャットの生成中・評価中は断る（BUSY）
