@@ -255,7 +255,12 @@ export function EvalsPage() {
               <span className="eval-name">{creating ? draft.name || PG5.newSet : saved!.name}</span>
               {!creating ? <span className="numeric eval-count">{saved!.cases.length}</span> : null}
             </div>
-            {!creating ? <Button variant="primary" loading={busy} disabled={saved!.cases.length === 0 && draft.cases.length === 0} onClick={() => void startRun()}>{PG5.run}</Button> : null}
+            {!creating ? (
+              <div className="eval-head-actions">
+                <Button variant="primary" loading={busy} disabled={saved!.cases.length === 0 && draft.cases.length === 0} onClick={() => void startRun()}>{PG5.run}</Button>
+                <Button variant="danger" onClick={() => setDeleting(sets?.find((s) => s.id === saved!.id) ?? null)}>{CP.delete}</Button>
+              </div>
+            ) : null}
           </div>
 
           <form className="eval-set-form" onSubmit={(e) => { e.preventDefault(); if (draft.name.trim()) void save(); }}>

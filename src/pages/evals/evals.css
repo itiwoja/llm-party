@@ -16,3 +16,5 @@
 .dialog:has(.case-form) .dialog-footer, .dialog:has(.run-dialog) .dialog-footer { margin-top: 0; }
 .case-form .select-trigger { width: 100%; }
 @media (max-width: 1279px) { .eval-set-form { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+
+.eval-head-actions { display: flex; align-items: center; gap: var(--space-2); }
