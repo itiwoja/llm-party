@@ -31,6 +31,7 @@ const send = (res, status, body) => {
 createServer((req, res) => {
   const url = new URL(req.url, "http://x");
   if (req.method === "GET" && url.pathname === "/sdcpp/v1/capabilities") return send(res, 200, { model: { id: "fake" } });
+  if (req.method === "GET" && url.pathname === "/sdapi/v1/progress") return send(res, 200, { progress: 0.5, state: {} });
   if (req.method === "POST" && url.pathname === "/sdcpp/v1/img_gen") {
     let raw = "";
     req.on("data", (chunk) => { raw += chunk; });

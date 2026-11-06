@@ -1,4 +1,6 @@
-import { type ChildProcess, spawn } from "node:child_process";
+import { type ChildProcess, execFileSync, spawn } from "node:child_process";
+import { missingBinaryMessage } from "./binary";
+import { randomUUID } from "node:crypto";
 import { appendFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import path from "node:path";
@@ -20,8 +22,8 @@ export interface ImageEngineOptions {
   bin: string | null;
   dataDir: string;
   bus: EventBus;
-  /** 1枚の生成の上限（設計 D-72）。過ぎたら sd-server に取り消しを頼んで失敗にする */
-  generateTimeoutMs?: number;
+  /** 1枚の生成の上限（ミリ秒）。null なら上限を置かない（既定）。過ぎたら sd-server に取り消しを頼んで失敗にする */
+  generateTimeoutMs?: number | null;
   loadTimeoutMs?: number;
   stopGraceMs?: number;
   pollMs?: number;
@@ -57,7 +59,7 @@ export class ImageEngine {
   private queue: Promise<unknown> = Promise.resolve();
   private readonly pidFile: string;
   private readonly logsDir: string;
-  private readonly generateTimeoutMs: number;
+  private readonly generateTimeoutMs: number | null;
   private readonly loadTimeoutMs: number;
   private readonly stopGraceMs: number;
   private readonly pollMs: number;
@@ -65,7 +67,7 @@ export class ImageEngine {
   constructor(private options: ImageEngineOptions) {
     this.pidFile = path.join(options.dataDir, "runtime", "sd-engine.pid");
     this.logsDir = path.join(options.dataDir, "logs");
-    this.generateTimeoutMs = options.generateTimeoutMs ?? 300_000;
+    this.generateTimeoutMs = options.generateTimeoutMs ?? null;
     this.loadTimeoutMs = options.loadTimeoutMs ?? 180_000;
     this.stopGraceMs = options.stopGraceMs ?? 5_000;
     this.pollMs = options.pollMs ?? POLL_MS;
@@ -76,6 +78,20 @@ export class ImageEngine {
 
   get available(): boolean {
     return this.options.bin !== null;
+  }
+
+  /** sd-cli（Windows の .exe も可）なら、生成のたびに起動する。待ち受けないので WSL から Windows の GPU 版を呼べる */
+  private get cliMode(): boolean {
+    return this.options.bin !== null && /sd-cli[^/\\]*$/i.test(this.options.bin);
+  }
+
+  private cliModel: ImageModelSpec | null = null;
+  private cliChild: ChildProcess | null = null;
+
+  /** WSL から Windows の exe を呼ぶときは、パスを Windows 形式（\\wsl.localhost\...）に直す */
+  private toHostPath(file: string): string {
+    if (!this.options.bin?.toLowerCase().endsWith(".exe")) return file;
+    return execFileSync("wslpath", ["-w", file], { encoding: "utf8" }).trim();
   }
 
   /** 前回のプロセスが残っていれば止める（PID の再利用を避けるため中身を確かめる） */
@@ -103,6 +119,7 @@ export class ImageEngine {
 
   /** 同じモデルが読めていれば何もしない。違えば止めて読み直す */
   load(model: ImageModelSpec): Promise<void> {
+    if (this.cliMode) return this.enqueue(async () => { this.cliModel = model; });
     return this.enqueue(() => this.doLoad(model));
   }
 
@@ -114,6 +131,8 @@ export class ImageEngine {
     const key = JSON.stringify([model.path, model.parts]);
     if (this.child && this.modelKey === key) return;
     if (!this.options.bin) throw new ApiError("ENGINE_FAILED", "LLM_PARTY_SD_BIN が設定されていません");
+    const missing = missingBinaryMessage(this.options.bin, "LLM_PARTY_SD_BIN");
+    if (missing) throw new ApiError("ENGINE_FAILED", missing);
     await this.doStop();
 
     const port = await freePort();
@@ -177,12 +196,80 @@ export class ImageEngine {
     }
   }
 
-  /** 1枚生成して PNG のバイト列を返す。時間を過ぎたら取り消して失敗にする */
-  generate(params: ImageParams, signal: AbortSignal): Promise<Buffer> {
-    return this.enqueue(() => this.doGenerate(params, signal));
+  /** 1枚生成して PNG のバイト列を返す。時間を過ぎたら取り消して失敗にする。進捗（0〜100）は onProgress に届く（sd-server のみ） */
+  generate(params: ImageParams, signal: AbortSignal, onProgress?: (percent: number) => void): Promise<Buffer> {
+    return this.enqueue(() => (this.cliMode ? this.doGenerateCli(params, signal) : this.doGenerate(params, signal, onProgress)));
   }
 
-  private async doGenerate(params: ImageParams, signal: AbortSignal): Promise<Buffer> {
+  /** sd-cli で 1 枚作る。時間を過ぎたら、または取り消されたら子プロセスを止める */
+  private async doGenerateCli(params: ImageParams, signal: AbortSignal): Promise<Buffer> {
+    const model = this.cliModel;
+    if (!model || !this.options.bin) throw new ApiError("ENGINE_FAILED", "画像モデルが読み込まれていません");
+    const runDir = path.join(this.options.dataDir, "runtime");
+    mkdirSync(runDir, { recursive: true });
+    const out = path.join(runDir, `${randomUUID()}.png`);
+    const host = (file: string) => this.toHostPath(file);
+    const modelArgs = model.parts
+      ? ["--diffusion-model", host(model.parts.diffusion), "--llm", host(model.parts.llm), "--vae", host(model.parts.vae), "--tokenizer", host(model.parts.tokenizer)]
+      : ["-m", host(model.path)];
+    const args = [
+      ...modelArgs,
+      "-p", params.prompt,
+      "-W", String(params.width),
+      "-H", String(params.height),
+      "--steps", String(params.steps),
+      "--seed", String(params.seed),
+      "-o", host(out),
+    ];
+    const child = spawn(this.options.bin, args, { stdio: ["ignore", "pipe", "pipe"] });
+    this.cliChild = child;
+    let tail: string[] = [];
+    const log = (chunk: Buffer) => {
+      const text = chunk.toString("utf8");
+      tail = [...tail, ...text.split("\n").filter(Boolean)].slice(-20);
+      const date = new Date().toISOString().slice(0, 10).replaceAll("-", "");
+      appendFileSync(path.join(this.logsDir, `sd-cli-${date}.log`), text);
+    };
+    child.stdout?.on("data", log);
+    child.stderr?.on("data", log);
+
+    let timer: NodeJS.Timeout | undefined;
+    const finished = new Promise<number | null>((resolve, reject) => {
+      child.once("error", reject);
+      child.once("close", (code) => resolve(code));
+    });
+    const timeout = new Promise<never>((_, reject) => {
+      if (this.generateTimeoutMs === null) return;
+      timer = setTimeout(() => {
+        child.kill("SIGKILL");
+        reject(new Error("timeout"));
+      }, this.generateTimeoutMs);
+    });
+    const aborted = new Promise<never>((_, reject) => {
+      signal.addEventListener("abort", () => {
+        child.kill("SIGKILL");
+        reject(new Error("aborted"));
+      }, { once: true });
+    });
+    try {
+      const code = await Promise.race([finished, timeout, aborted]);
+      if (code !== 0) throw new ApiError("ENGINE_FAILED", `画像の生成に失敗しました\n${tail.join("\n")}`);
+      return readFileSync(out);
+    } catch (error) {
+      if (error instanceof ApiError) throw error;
+      if (error instanceof Error && error.message === "timeout") {
+        throw new ApiError("ENGINE_FAILED", `画像の生成が時間切れになりました（${Math.round((this.generateTimeoutMs ?? 0) / 1000)} 秒）`);
+      }
+      if (error instanceof Error && error.message === "aborted") throw new ApiError("ENGINE_FAILED", "画像の生成が取り消されました");
+      throw new ApiError("ENGINE_FAILED", `sd-cli を起動できません: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      clearTimeout(timer);
+      this.cliChild = null;
+      rmSync(out, { force: true });
+    }
+  }
+
+  private async doGenerate(params: ImageParams, signal: AbortSignal, onProgress?: (percent: number) => void): Promise<Buffer> {
     if (!this.child) throw new ApiError("ENGINE_FAILED", "画像モデルが読み込まれていません");
     const submit = await fetch(`${this.baseUrl}/sdcpp/v1/img_gen`, {
       method: "POST",
@@ -205,12 +292,18 @@ export class ImageEngine {
     const { id } = (await submit.json()) as { id: string };
 
     const started = Date.now();
+    let lastPercent = -1;
     while (true) {
-      if (Date.now() - started > this.generateTimeoutMs || signal.aborted) {
+      if ((this.generateTimeoutMs !== null && Date.now() - started > this.generateTimeoutMs) || signal.aborted) {
         await this.cancelJob(id);
-        throw new ApiError("ENGINE_FAILED", `画像の生成が時間切れになりました（${Math.round(this.generateTimeoutMs / 1000)} 秒）`);
+        throw new ApiError("ENGINE_FAILED", `画像の生成が時間切れになりました（${Math.round((this.generateTimeoutMs ?? 0) / 1000)} 秒）`);
       }
       await sleep(this.pollMs);
+      const percent = await this.progressPercent();
+      if (percent !== null && percent !== lastPercent) {
+        lastPercent = percent;
+        onProgress?.(percent);
+      }
       const res = await fetch(`${this.baseUrl}/sdcpp/v1/jobs/${encodeURIComponent(id)}`, { signal: AbortSignal.timeout(this.pollMs * 4) }).catch(() => null);
       if (!res || !res.ok) continue;
       const job = (await res.json()) as {
@@ -228,11 +321,26 @@ export class ImageEngine {
     }
   }
 
+  /** sd-server の進捗（0.0〜1.0）を 0〜100 の整数で返す。取れなければ null（進捗は表示だけなので失敗しても生成は続ける） */
+  private async progressPercent(): Promise<number | null> {
+    const res = await fetch(`${this.baseUrl}/sdapi/v1/progress`, { signal: AbortSignal.timeout(this.pollMs * 4) }).catch(() => null);
+    if (!res || !res.ok) return null;
+    const body = (await res.json().catch(() => null)) as { progress?: unknown } | null;
+    if (typeof body?.progress !== "number" || !Number.isFinite(body.progress)) return null;
+    return Math.min(100, Math.max(0, Math.round(body.progress * 100)));
+  }
+
   private async cancelJob(id: string): Promise<void> {
     await fetch(`${this.baseUrl}/sdcpp/v1/jobs/${encodeURIComponent(id)}/cancel`, { method: "POST", signal: AbortSignal.timeout(this.pollMs * 4) }).catch(() => undefined);
   }
 
   private async doStop(): Promise<void> {
+    if (this.cliMode) {
+      this.cliModel = null;
+      this.cliChild?.kill("SIGKILL");
+      this.cliChild = null;
+      return;
+    }
     const child = this.child;
     this.child = null;
     this.modelPath = null;

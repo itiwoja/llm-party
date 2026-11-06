@@ -28,6 +28,11 @@ export function imageRoutes({ store, images, dataDir }: Context): Router {
     res.status(202).json(images.start(req.params.id, { ...input, modelId: input.modelId }));
   });
 
+  // 実行中の画像生成を止める（終わった後に呼んでも何もしない）
+  api.post("/threads/:id/images/cancel", (req, res) => {
+    res.json(images.cancel(req.params.id));
+  });
+
   // 生成した PNG（ファイルは dataDir/images の中だけを返す）
   api.get("/images/:id", (req, res) => {
     const image = store.images.get(req.params.id);

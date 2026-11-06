@@ -20,6 +20,8 @@ export interface ImageRequest extends ImageParams {
  */
 export class ImageService {
   private busy = false;
+  /** 今動いている生成の取り消し口（止めるときに使う） */
+  private running: { threadId: string; abort: AbortController } | null = null;
 
   constructor(
     private store: Store,
@@ -41,20 +43,39 @@ export class ImageService {
     if (this.slot.evalPresetId) throw new ApiError("BUSY", "評価の実行中です");
 
     this.busy = true;
-    void this.run(threadId, model, input).finally(() => {
+    const abort = new AbortController();
+    this.running = { threadId, abort };
+    void this.run(threadId, model, input, abort.signal).finally(() => {
       this.busy = false;
+      this.running = null;
     });
     return { status: "running" };
   }
 
-  private async run(threadId: string, model: { id: string; name: string; path: string; parts: ImageParts | null }, input: ImageRequest): Promise<void> {
-    const release = await this.slot.acquire(new AbortController().signal, "image");
+  /** 実行中の画像生成を止める。止まると "image" イベントで status = cancelled が届く */
+  cancel(threadId: string): { status: "cancelling" | "idle" } {
+    if (!this.running || this.running.threadId !== threadId) return { status: "idle" };
+    this.running.abort.abort();
+    return { status: "cancelling" };
+  }
+
+  private async run(threadId: string, model: { id: string; name: string; path: string; parts: ImageParts | null }, input: ImageRequest, signal: AbortSignal): Promise<void> {
+    let release: () => void;
+    try {
+      release = await this.slot.acquire(signal, "image");
+    } catch {
+      // 順番を待っている間に止められた
+      this.bus.publish("image", { threadId, status: "cancelled" });
+      return;
+    }
     try {
       await this.engine.stop();
       await this.image.load({ path: model.path, parts: model.parts });
+      if (signal.aborted) throw new Error("取り消されました");
       const png = await this.image.generate(
         { prompt: input.prompt, width: input.width, height: input.height, steps: input.steps, seed: input.seed },
-        new AbortController().signal,
+        signal,
+        (percent) => this.bus.publish("image", { threadId, status: "progress", percent }),
       );
       const dir = path.join(this.dataDir, "images");
       mkdirSync(dir, { recursive: true });
@@ -71,6 +92,11 @@ export class ImageService {
       });
       this.bus.publish("image", { threadId, status: "completed", imageId: id });
     } catch (error) {
+      // 止められたのは失敗ではないので、エラーとしては出さない
+      if (signal.aborted) {
+        this.bus.publish("image", { threadId, status: "cancelled" });
+        return;
+      }
       const message = error instanceof Error ? error.message : "画像の生成に失敗しました";
       this.bus.publish("image", { threadId, status: "failed", error: message });
     } finally {

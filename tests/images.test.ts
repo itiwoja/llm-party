@@ -59,6 +59,14 @@ describe("ImageEngine", () => {
   };
   const params = { prompt: "a cat", width: 64, height: 64, steps: 2, seed: 1 };
 
+  it("生成中の進捗を 0〜100 の整数で通知する", async () => {
+    const e = create("ok");
+    await e.load({ path: "/models/a.safetensors", parts: null });
+    const seen: number[] = [];
+    await e.generate(params, new AbortController().signal, (percent) => seen.push(percent));
+    expect(seen).toEqual([50]);
+  });
+
   it("読み込んで1枚生成し、PNG のバイト列を返す", async () => {
     const e = create("ok");
     await e.load({ path: "/models/a.safetensors", parts: null });
@@ -130,7 +138,7 @@ describe("画像生成の経路", () => {
 
     const started = await worker.api(`/threads/${thread.id}/images`, { body: { modelId: model.id, prompt: "a cat", width: 64, height: 64, steps: 2 } });
     expect(started.status).toBe(202);
-    const done = await waitForEvent(worker.context.bus, (e) => e.event === "image" && (e.data as { threadId: string }).threadId === thread.id, 10_000);
+    const done = await waitForEvent(worker.context.bus, (e) => e.event === "image" && (e.data as { threadId: string; status: string }).status !== "progress" && (e.data as { threadId: string }).threadId === thread.id, 10_000);
     const imageId = (done.data as { imageId: string; status: string }).imageId;
     expect((done.data as { status: string }).status).toBe("completed");
 
@@ -141,6 +149,31 @@ describe("画像生成の経路", () => {
     expect(JSON.stringify(detail.body)).toContain(imageId);
     expect(store.threads.conversation(thread.id).map((m: { content: string }) => m.content).join("\n")).not.toContain(imageId);
     expect(store.threads.agentConversation(thread.id).map((m) => m.content).join("\n")).not.toContain(imageId);
+  });
+
+  it("生成中に止めると cancelled になり、画像は残らず、エラーにもならない", async () => {
+    worker = await startWorker(null, { sdBin: FAKE_SD });
+    process.env.FAKE_SD_MODE = "slow";
+    const { store } = worker.context;
+    const model = store.models.create({
+      name: "Test XL", path: path.join(worker.dir, "stop.safetensors"), source: "hf", use: "image",
+      architecture: "safetensors", quantization: null, sizeBytes: 10, trainContext: null,
+    });
+    const thread = store.threads.create(null);
+
+    const started = await worker.api(`/threads/${thread.id}/images`, { body: { modelId: model.id, prompt: "a cat", width: 64, height: 64, steps: 2 } });
+    expect(started.status).toBe(202);
+    await waitForEvent(worker.context.bus, (e) => e.event === "image" && (e.data as { status: string }).status === "progress", 10_000).catch(() => undefined);
+    const stopped = await worker.api(`/threads/${thread.id}/images/cancel`, { body: {} });
+    expect(stopped.body).toEqual({ status: "cancelling" });
+
+    const done = await waitForEvent(worker.context.bus, (e) => e.event === "image" && (e.data as { status: string }).status !== "progress" && (e.data as { threadId: string }).threadId === thread.id, 10_000);
+    expect((done.data as { status: string }).status).toBe("cancelled");
+    expect(store.threads.get(thread.id)).toBeTruthy();
+    expect(JSON.stringify((await worker.api(`/threads/${thread.id}/messages`)).body)).not.toContain("imageId");
+
+    // 終わった後に止めても何もしない
+    expect((await worker.api(`/threads/${thread.id}/images/cancel`, { body: {} })).body).toEqual({ status: "idle" });
   });
 
   it("チャット用のプリセットに画像モデルは使えない", async () => {

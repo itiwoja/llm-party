@@ -94,6 +94,10 @@ export function ThreadsPage() {
   );
   const modelChoice = imageMode ? `image:${imageModelId}` : `preset:${presetId}`;
   const [imageBusy, setImageBusy] = useState(false);
+  // 生成中の依頼。文は生成が終わるまで DB に入らないので、画面には送った時点でこれを出す
+  const [pendingImage, setPendingImage] = useState<{ threadId: string; prompt: string } | null>(null);
+  // 画像生成中の表示文。進捗の数字は画面に出さない（"image" の progress は無視する）
+  const imageNote = PG1.imageGenerating;
 
   const composer = useRef<HTMLTextAreaElement>(null);
   const turnRef = useRef(turn);
@@ -302,8 +306,11 @@ export function ThreadsPage() {
         void loadChanges(active.threadId);
       }
       void loadThreads();
+    } else if (event === "image" && data.status === "progress") {
+      // 進捗は画面に表示しない
     } else if (event === "image") {
       setImageBusy(false);
+      setPendingImage(null);
       if (data.status === "failed") setError(data.error);
       else if (threadRef.current === data.threadId) void loadDetail(data.threadId).catch(() => undefined);
     } else if (event === "eval.progress") {
@@ -343,10 +350,12 @@ export function ThreadsPage() {
       threadRef.current = id;
       if (imageMode) {
         setImageBusy(true);
+        setPendingImage({ threadId: id, prompt: content });
         try {
           await api(`/threads/${id}/images`, { modelId: imageModelId, prompt: content });
         } catch (err) {
           setImageBusy(false);
+          setPendingImage(null);
           throw err;
         }
         setInput("");
@@ -389,6 +398,13 @@ export function ThreadsPage() {
       if (threadId) void loadDetail(threadId).catch(() => undefined);
     }
   };
+
+  /** 画像生成を止める。届くのは "image" イベント（cancelled）で、画面の後始末はそこで行う */
+  async function stopImage() {
+    const id = threadRef.current;
+    if (!id) return;
+    await api.post(`/threads/${id}/images/cancel`).catch((err) => setError(errorText(err)));
+  }
 
   async function answerStepLimit(action: "continue" | "stop") {
     if (!turn) return;
@@ -470,15 +486,23 @@ export function ThreadsPage() {
         toolCalls={toolCalls}
         error={error || turnError}
         onDecide={decide}
-        footer={generating && stepWait ? (
-          <div className="step-limit" role="group" aria-label={PG1.stepLimit}>
-            <p>{PG1.stepLimit}</p>
-            <div className="approval-actions">
-              <Button variant="primary" size="sm" onClick={() => void answerStepLimit("continue")}>{PG1.continue}</Button>
-              <Button size="sm" onClick={() => void answerStepLimit("stop")}>{PG1.stop}</Button>
+        footer={<>
+          {pendingImage && pendingImage.threadId === threadId ? (
+            <>
+              <article className="message message-user"><div className="user-text">{pendingImage.prompt}</div></article>
+              <p className="image-message-state" role="status">{imageNote}</p>
+            </>
+          ) : null}
+          {generating && stepWait ? (
+            <div className="step-limit" role="group" aria-label={PG1.stepLimit}>
+              <p>{PG1.stepLimit}</p>
+              <div className="approval-actions">
+                <Button variant="primary" size="sm" onClick={() => void answerStepLimit("continue")}>{PG1.continue}</Button>
+                <Button size="sm" onClick={() => void answerStepLimit("stop")}>{PG1.stop}</Button>
+              </div>
             </div>
-          </div>
-        ) : null}
+          ) : null}
+        </>}
       />
       {contextFull ? (
         <div className="context-full" role="alert">
@@ -517,7 +541,7 @@ export function ThreadsPage() {
             />
           </div>
           <div className="composer-model">
-            {imageBusy ? <span className="composer-note" role="status">{PG1.imageGenerating}</span> : null}
+            {imageBusy ? <span className="composer-note" role="status">{imageNote}</span> : null}
             {contextSize && !imageMode ? <span className="numeric head-context">{Math.round(contextSize / 1024)}K</span> : null}
             <SelectField
               compact
@@ -532,8 +556,12 @@ export function ThreadsPage() {
               <IconButton className="composer-stop" label={CP.stop} disabled={stepWait} onClick={() => turn && void api.post(`/turns/${turn.id}/cancel`).catch((err) => setError(errorText(err)))}>
                 <Square aria-hidden />
               </IconButton>
+            ) : imageBusy ? (
+              <IconButton className="composer-stop" label={CP.stop} onClick={() => void stopImage()}>
+                <Square aria-hidden />
+              </IconButton>
             ) : (
-              <IconButton className="composer-send" type="submit" label={CP.send} disabled={!input.trim() || !presetId || turn !== null || imageBusy || (imageMode && !imageModelId)}>
+              <IconButton className="composer-send" type="submit" label={CP.send} disabled={!input.trim() || !presetId || turn !== null || (imageMode && !imageModelId)}>
                 <ArrowUp aria-hidden />
               </IconButton>
             )}
