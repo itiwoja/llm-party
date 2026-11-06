@@ -7,7 +7,7 @@
 > 3. ランはプリセットの中身を写して持つので、プリセットを消しても過去の評価は残る。
 
 ## 🧭 判断してほしいこと
-なし（ドライバは Q-01）
+なし（ドライバは better-sqlite3。D-55）
 
 ## 全体図
 ```mermaid
@@ -143,7 +143,7 @@ LoRA の GGUF。主なカラム：`id`, `base_model_id`, `path`
 主なカラム：`id`, `path`（実体パス・UNIQUE）, `name`（フォルダ名）, `created_at`, `last_used_at`
 
 ### TBL-006：threads
-主なカラム：`id`, `title`, `workspace_id`（NULL ならチャット。FK → workspaces、SET NULL はしない・RESTRICT）, `last_preset_id`（FK → presets、SET NULL）, `auto_approve`（0/1、既定は設定値）, `created_at`, `updated_at`。全文検索用に `threads_fts`（title とメッセージ本文）を持つ
+主なカラム：`id`, `title`, `workspace_id`（NULL ならチャット。FK → workspaces、SET NULL はしない・RESTRICT）, `last_preset_id`（FK → presets、SET NULL）, `auto_approve`（0/1、既定は設定値）, `created_at`, `updated_at`。全文検索用に `threads_fts`（title とメッセージ本文、`tokenize='trigram'`）を持つ。2文字以下の語は `threads_fts` を使わず `LIKE` で探す（D-58）
 
 ### TBL-017：turns
 主なカラム：`id`, `thread_id`（CASCADE）, `preset_id`（SET NULL）, `status`（04 の値）, `step_count`, `step_limit`（既定 40）, `prompt_tokens`, `completion_tokens`, `started_at`, `finished_at`, `error`

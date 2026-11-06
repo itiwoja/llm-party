@@ -138,6 +138,11 @@ flowchart LR
 | D-52 | localhost 段階の GPU は環境変数で手動指定。自動判定・CUDA パックは exe 段階へ | ユーザー | 知人の PC の違いを吸収する機能なので、本人だけの段階では要らない | FR-001, FR-002 | — |
 | D-53 | localhost 段階のポートは 8787 に固定（`LLM_PARTY_PORT` で変更可）。使用中なら起動エラー | ユーザー | 毎回同じ URL で開ける | 12, NFR-011 | — |
 | D-54 | localhost 段階の細部（Claude 判断・見直し可）：トークンは `data/local-token` に保存して使い回し、起動時の URL で画面に渡す。Host と Origin を確かめる。画面は worker から同一オリジンで配る（開発中は Vite をミドルウェアにする）。HF トークンは API-094 で `data/secrets/` に保存。シェルは bash。データは exe 版へ引き継がない。exe 段階へ進む条件の6項目 | Claude 判断 | 固定 URL とトークン認証を両立し、ポートを1つにする | 12 | — |
+| D-55 | SQLite のドライバは better-sqlite3（Q-01 決着） | ユーザー | Electron での実績。Node 24 で FTS5 の動作を確認済み | 07, 08, R-08 | [ADR-004](adr/ADR-004-sqlite.md) |
+| D-56 | 生成速度の目安は置かず、評価で毎回測って表示する（Q-09 決着） | ユーザー | GPU で大きく変わり、知人の PC では保証できない | NFR-002, FR-018 | — |
+| D-57 | AI の回答は Markdown で表示し、コードブロックは言語ごとに色分けしてコピーボタンを付ける。生成中も順に整形する | ユーザー | コーディング用途で読みやすくする | FR-005, CMP-022 | — |
+| D-58 | スレッド検索は3文字以上を FTS5 の `trigram`、2文字以下を `LIKE` で探す | ユーザー | FTS5 の既定では日本語が検索できない。`trigram` は2文字以下を探せない | FR-004, TBL-006 | — |
+| D-59 | localhost 段階の開発環境：npm、Node 24 系、llama-server は公式の b12125 `ubuntu-cuda-12.8-x64`、検証モデルは Qwen3.5 9B Q4_K_M、WSL のメモリ上限 8GB は変えない。Q-02 と Q-06 は exe 段階で決める | ユーザー | ビルドと sudo が要らない。9B は VRAM 8GB に収まる | 12, R-14 | — |
 
 ### ID体系
 | 接頭辞 | 対象 | ファイル |

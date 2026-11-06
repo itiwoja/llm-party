@@ -11,7 +11,6 @@
 ## 🧭 判断してほしいこと
 | # | 種類 | 論点 | 選択肢 | おすすめ（理由） | 決まらないと止まるもの |
 |---|---|---|---|---|---|
-| Q-01 | 未決 | SQLite のドライバ | A: better-sqlite3 / B: Node 組み込みの `node:sqlite` | A（Electron での実績が多く FTS5 も使える。asar の外に出し、Electron 用にビルドし直す手間はある）。B は Electron 45 の同梱 Node で安定して使えるか未確認 | 08 全体、ビルド設定 |
 | R-08 | リスク | ネイティブモジュール（better-sqlite3）は asar の外に置き、Electron の版に合わせてビルドする必要がある | — | DC-Designer の許可リスト方式のステージに `asarUnpack` を足し、`inspect-desktop` で `.node` の有無を検査する | ビルド |
 
 ## 全体図
@@ -78,7 +77,7 @@ worker は Electron に依存させず、起動の入口だけを分ける（uti
 | 画面 renderer | 全画面の表示。worker の API と SSE を使う。OS 操作は preload 経由で main に頼む | React 19、Vite、TypeScript |
 | preload | `window.llmParty` に決めた関数だけ公開（API-001〜010） | contextBridge |
 | main | 窓、`app://` プロトコル、IPC、electron-updater、safeStorage、ダイアログ、worker の起動と監視 | Electron 45 |
-| worker | API・SSE、SQLite、エンジン管理、エージェント、評価、HF / CUDA パックの DL | Node（Electron 同梱）、Express 5、better-sqlite3（Q-01） |
+| worker | API・SSE、SQLite、エンジン管理、エージェント、評価、HF / CUDA パックの DL | Node（Electron 同梱）、Express 5、better-sqlite3（D-55） |
 | llama-server | 推論（OpenAI 互換 API）。同時に1つ | llama.cpp ビルド b12125 時点（R-02） |
 
 ## レベル3：コンポーネント図（worker）
@@ -121,7 +120,7 @@ flowchart TB
 | worker | Node（utilityProcess）、Express 5 | 同上。推論と DL を main から切り離す | main で直接動かす |
 | 推論 | llama.cpp の llama-server（同梱・子プロセス） | GGUF・LoRA・ツール呼び出し・OpenAI 互換（D-07） | node-llama-cpp で同じプロセスに読み込む、Ollama（[ADR-002](adr/ADR-002-llama-server-child.md)） |
 | GPU | Vulkan＋CPU 同梱、CUDA は追加パック | インストーラーを小さく（D-11） | 全部同梱（[ADR-003](adr/ADR-003-gpu-runtime.md)） |
-| DB | SQLite（better-sqlite3。Q-01）、WAL、FTS5 | 評価の集計（D-15） | JSON ファイル（[ADR-004](adr/ADR-004-sqlite.md)） |
+| DB | SQLite（better-sqlite3。D-55）、WAL、FTS5 | 評価の集計（D-15） | JSON ファイル（[ADR-004](adr/ADR-004-sqlite.md)） |
 | 更新 | electron-updater（GitHub provider） | DC-Designer と同じ（D-03） | — |
 | テスト | Vitest | DC-Designer と同じ | — |
 | CI | GitHub Actions（windows-latest） | 同上 | — |
@@ -180,7 +179,7 @@ flowchart LR
 | [ADR-001](adr/ADR-001-electron-worker.md) | Electron＋utilityProcess の worker（DC-Designer 準拠） | 承認 |
 | [ADR-002](adr/ADR-002-llama-server-child.md) | 推論は llama-server を子プロセスで動かす | 承認 |
 | [ADR-003](adr/ADR-003-gpu-runtime.md) | Vulkan＋CPU 同梱、CUDA は追加パック | 承認 |
-| [ADR-004](adr/ADR-004-sqlite.md) | 保存は SQLite | 承認（ドライバは Q-01） |
+| [ADR-004](adr/ADR-004-sqlite.md) | 保存は SQLite | 承認（ドライバは better-sqlite3。D-55） |
 | [ADR-005](adr/ADR-005-approval-policy.md) | 読み取り自動・書き込みとコマンドは承認・外は拒否 | 承認 |
 | [ADR-006](adr/ADR-006-auto-compaction.md) | 文脈あふれは自動要約 | 承認 |
 | [ADR-007](adr/ADR-007-update-flow.md) | 更新は起動時確認・手動 DL・手動適用 | 承認 |

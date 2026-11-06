@@ -99,6 +99,7 @@ flowchart TD
   3. `POST /v1/chat/completions`（API-101）を `stream: true` で呼ぶ。送るもの：システムプロンプト（エージェントならツールの使い方を足す）、会話、生成設定、`lora`（倍率）、`chat_template_kwargs.enable_thinking`、エージェントなら `tools`
   4. 受け取った差分を `turn.delta` イベントで画面へ流す。思考（`reasoning_content`）と本文を分けて保存する
   5. 応答の終わりで、ツール呼び出しがあれば FR-008 へ。なければターンを `completed`
+- 表示：本文は Markdown として表示する（[CMP-022](../ui/04_components.md#cmp-022-markdown-本文)）。生成中も届いた分を順に整形する（D-57）
 - 停止：生成中の HTTP を切り、そこまでの本文を保存してターンを `cancelled`
 - エラー：エンジンの HTTP エラー → ターンを `failed`、エラー内容を会話に表示
 

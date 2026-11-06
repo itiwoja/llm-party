@@ -41,7 +41,7 @@ flowchart LR
 
 ## 2. システム全体像
 - 3プロセス＋子プロセス1つ。詳細は [07 レベル2](07_architecture.md#レベル2コンテナ図)・[レベル3](07_architecture.md#レベル3コンポーネント図worker)
-- スタック：Electron 45 / React 19 / Vite / TypeScript / Express 5 / SQLite（better-sqlite3 予定・Q-01）/ llama.cpp llama-server / electron-builder（NSIS）/ electron-updater / Vitest / GitHub Actions
+- スタック：Electron 45 / React 19 / Vite / TypeScript / Express 5 / SQLite（better-sqlite3）/ llama.cpp llama-server / electron-builder（NSIS）/ electron-updater / Vitest / GitHub Actions
 
 ## 3. 機能概要
 | 分野 | FR | 詳細 |
@@ -125,7 +125,7 @@ flowchart LR
 | R-16 | 他のサイトから localhost の API を叩かれる | トークン＋Host・Origin の確認 | 同上 |
 
 ## 13. 未決事項・Claude 判断で決めた項目
-- 未決：Q-01, Q-02, Q-06, Q-09（[README](README.md#-判断してほしいこと)）
+- 未決：Q-02, Q-06。どちらも exe 段階で決める（[README](README.md#-判断してほしいこと)）
 - Claude 判断：ADR-002 のうち「子プロセスにする」点、D-45（細部の定石の一覧）。定石：D-33〜D-37, D-39（[00](00_overview.md#決定事項ログ)）
 
 ## 14. 参照ドキュメント
