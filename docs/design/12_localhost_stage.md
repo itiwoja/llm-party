@@ -94,7 +94,7 @@ WSL で動かすのは検証のためで、Linux 版の配布ではない。D-19
 
 | ID | メソッド | パス | 概要 |
 |---|---|---|---|
-| API-093 | GET | `/api/local/info` | `{ version, llamaBuild, isPackaged: false, dataDir, logsDir }` |
+| API-093 | GET | `/api/local/info` | `{ version, llamaBuild, isPackaged: false, dataDir, logsDir }`。localhost 段階の `llamaBuild` は `null`（版は利用者が用意するので分からない） |
 | API-094 | GET / PUT | `/api/local/hf-token` | GET は `{ has }` だけ返す。PUT は `{ token \| null }`。`data/secrets/hf-token`（権限 600）に平文で保存し、画面には返さない |
 
 API-093 と API-094 は localhost 段階の起動の入口でだけ有効にする。exe 段階の worker には載せない。

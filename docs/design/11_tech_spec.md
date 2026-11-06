@@ -130,7 +130,7 @@ flowchart LR
 
 ## 14. 参照ドキュメント
 - 設計書：[00](00_overview.md)〜[10](10_diagrams.md)、[12](12_localhost_stage.md)、[adr/](adr/)
-- 外部：llama.cpp `tools/server/README.md`（エンドポイント・`--lora`・`--jinja`）、llama.cpp `common/arg.cpp`（`--list-devices`）、llama.cpp Releases b12125（配布物の名前）、Hugging Face `Qwen/Qwen3.5-9B` モデルカード（推奨サンプリング・思考モード・Apache-2.0）、`unsloth/Qwen3.5-9B-GGUF`（Q4_K_M 5,417MB）
+- 外部：llama.cpp `tools/server/README.md`（エンドポイント・`--lora`・`--jinja`）、llama.cpp `common/arg.cpp`（`--list-devices`）、llama.cpp Releases b12125（配布物の名前）、Hugging Face `Qwen/Qwen3.5-9B` モデルカード（推奨サンプリング・思考モード・Apache-2.0）、`unsloth/Qwen3.5-9B-GGUF`（Q4_K_M 5.7GB）
 - 参考実装：DC-Designer（`desktop/main.ts`・`desktop/updater.ts`・`electron-builder.yml`・`.github/workflows/release-windows.yml`・`docs/adr/ADR-001`〜`005`）
 
 ## このドキュメントで決まったこと

@@ -54,6 +54,7 @@ flowchart LR
 | [ADR-008](adr/ADR-008-localhost-first.md) | 先に localhost で試し、OK が出てから exe にする | 承認 |
 
 ## 最近の変更
+- 2026-11-06：localhost 段階の実装を反映。D-64〜D-68（容量は 10 進、内部の値、システムプロンプト、新しいスレッドで続ける、実装で足した文言）、API-030・031・050・056 の追記、CP-208 以降
 - 2026-11-06：Q-01・Q-09 が決着（D-55, D-56）。AI の回答の Markdown 表示（D-57、CMP-022）、日本語検索（D-58）、localhost 段階の開発環境（D-59）を追加
 - 2026-11-06：開発を2段階に変更。先に localhost で試し、OK が出てから exe にする（[12](12_localhost_stage.md)、[ADR-008](adr/ADR-008-localhost-first.md)、D-49〜D-54）。API-093〜094 と R-14〜R-16 を追加
 - 2026-11-06：[UI 設計書](ui/README.md) v0.1 を追加。Q-05 決着（D-46）、新規作成の形（D-47）、文言の正本（D-48）、`turn.usage` に `tokensPerSecond` を追加

@@ -68,7 +68,7 @@ sequenceDiagram
   W--)R: runtime.progress（完了・cuda）
   U->>R: おすすめモデルを DL
   R->>W: POST /api/downloads（API-055）
-  W->>W: 空き容量 ≥ 5.4GB＋2GB?
+  W->>W: 空き容量 ≥ 5.7GB＋2GB?
   W->>HF: resolve/main/Qwen3.5-9B-Q4_K_M.gguf（Range）
   W--)R: download.progress …
   W->>W: sha256・GGUF 確認 → models、既定プリセット2つ

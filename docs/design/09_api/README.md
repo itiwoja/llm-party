@@ -43,7 +43,7 @@ flowchart LR
 
 共通エラーの形：
 ```json
-{ "error": { "code": "VALIDATION_ERROR", "message": "contextSize はモデルの学習時の文脈長以下にしてください", "details": [{ "field": "contextSize" }] } }
+{ "error": { "code": "VALIDATION_ERROR", "message": "文脈長の範囲外。2048〜65536 で指定", "details": [{ "field": "contextSize" }] } }
 ```
 
 <details>

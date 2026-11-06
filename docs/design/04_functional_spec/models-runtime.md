@@ -91,7 +91,7 @@ flowchart LR
   4. 終わったらサイズと、HF が公開する sha256（LFS の oid）を照合し、GGUF の先頭（マジック・種類）を確かめる → `.part` を外して `models` に登録
 - DL は同時に1つ。2つ目からは `queued` で待つ
 - HF トークン（任意）：ゲート付きリポジトリ用。設定で入れると main が暗号化して保存し（D-06）、worker には起動時にメモリで渡す
-- 初回のおすすめ：`unsloth/Qwen3.5-9B-GGUF` の `Qwen3.5-9B-Q4_K_M.gguf`（5,417MB）（D-33）
+- 初回のおすすめ：`unsloth/Qwen3.5-9B-GGUF` の `Qwen3.5-9B-Q4_K_M.gguf`（5.7GB）（D-33）
 
 ## FR-013：ファイル登録
 〔UC-004〕

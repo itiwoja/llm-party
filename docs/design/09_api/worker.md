@@ -47,8 +47,8 @@ sequenceDiagram
 ## スレッド・ターン
 | ID | メソッド | パス | 概要 | 関連 |
 |---|---|---|---|---|
-| API-030 | GET | `/api/threads?q=` | 一覧・全文検索 | FR-004 |
-| API-031 | POST | `/api/threads` | `{ workspaceId?, presetId }` で作る | FR-004 |
+| API-030 | GET | `/api/threads?q=&cursor=&limit=` | 一覧・全文検索。ページングは共通仕様（D-41） | FR-004 |
+| API-031 | POST | `/api/threads` | `{ workspaceId?, presetId, summaryFromThreadId? }` で作る。`summaryFromThreadId` は「新しいスレッドで続ける」（D-67） | FR-004, FR-006 |
 | API-032 | PATCH | `/api/threads/:id` | `{ title?, autoApprove? }` | FR-004, FR-010 |
 | API-033 | DELETE | `/api/threads/:id` | 削除（動いているターンは止める） | FR-004 |
 | API-034 | GET | `/api/threads/:id/messages` | メッセージ・ターン・ツール呼び出し | FR-004, SCR-001 |
@@ -81,13 +81,13 @@ sequenceDiagram
 ## モデル
 | ID | メソッド | パス | 概要 | 関連 |
 |---|---|---|---|---|
-| API-050 | GET | `/api/models` | モデル一覧（ファイルの有無を確かめて `missing` を付ける） | FR-013, SCR-003 |
+| API-050 | GET | `/api/models` | モデル一覧（ファイルの有無を確かめて `missing` を付ける）。LoRA の一覧も `adapters` で返す | FR-013, SCR-003 |
 | API-051 | POST | `/api/models` | `{ path, mode: "reference" \| "copy", name? }` で登録 | FR-013 |
 | API-052 | DELETE | `/api/models/:id?deleteFile=` | 削除。プリセットで使用中 → 409 `CONFLICT`（`details` にプリセット名） | FR-013 |
 | API-053 | GET | `/api/hf/search?q=` | HF の GGUF リポジトリ検索 | FR-012 |
 | API-054 | GET | `/api/hf/files?repo=` | GGUF ファイル一覧（量子化・サイズ・分割） | FR-012 |
 | API-055 | POST | `/api/downloads` | `{ repo, files[], kind }` で DL を始める（202。容量不足 → 507） | FR-012 |
-| API-056 | GET | `/api/downloads` | DL の一覧と進捗 | FR-012 |
+| API-056 | GET | `/api/downloads` | DL の一覧と進捗。完了した LoRA は `filePath` を返し、画面がベースモデルを選ばせて API-058 で登録する | FR-012 |
 | API-057 | POST | `/api/downloads/:id/cancel` | 取消（`.part` を消す）。`/resume` で手動再開 | FR-012 |
 | API-058 | POST | `/api/adapters` | `{ path, baseModelId, mode, name? }` で LoRA を登録 | FR-013 |
 | API-059 | DELETE | `/api/adapters/:id?deleteFile=` | 削除。使用中 → 409 | FR-013 |
