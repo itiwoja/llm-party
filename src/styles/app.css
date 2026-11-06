@@ -1,0 +1,24 @@
+/* 土台の確認用の最小の見た目。部品は ui/04 に沿って作り直す */
+button, input, select, textarea { font: inherit; color: inherit; }
+button { min-height: var(--control-height); padding: 0 var(--space-3); background: var(--color-surface); border: var(--line-width) solid var(--color-control); border-radius: var(--radius); cursor: pointer; }
+button[type="submit"] { background: var(--button-primary-bg); color: var(--button-primary-fg); border-color: transparent; }
+button:disabled { opacity: 0.5; cursor: default; }
+input, textarea, select { background: var(--color-surface); border: var(--line-width) solid var(--color-control); border-radius: var(--radius); padding: var(--space-2); box-sizing: border-box; }
+.box { display: grid; gap: var(--space-3); max-width: var(--form-max); margin: var(--space-7) auto; padding: 0 var(--space-4); }
+.box h1 { font-size: 20px; margin: 0; }
+.box p { margin: 0; color: var(--color-muted-fg); }
+.layout { display: grid; grid-template-columns: var(--list-width) 1fr; height: 100%; }
+.threads { padding: var(--space-3); border-right: var(--line-width) solid var(--color-line); overflow-y: auto; }
+.threads ul { list-style: none; margin: var(--space-3) 0 0; padding: 0; }
+.threads li button { width: 100%; border: 0; background: none; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.threads li button[aria-current="true"] { background: var(--color-hover); }
+.chat { display: flex; flex-direction: column; height: 100%; min-width: 0; max-width: var(--thread-max); margin: 0 auto; width: 100%; padding: 0 var(--space-4); box-sizing: border-box; }
+.log { flex: 1; overflow-y: auto; padding: var(--space-5) 0; }
+.log article { margin-bottom: var(--space-5); }
+.log article.user { padding: var(--space-3); background: var(--color-hover); border-radius: var(--radius); }
+.content { white-space: pre-wrap; overflow-wrap: anywhere; }
+pre { font-family: var(--font-mono); font-size: 14px; white-space: pre-wrap; color: var(--color-muted-fg); }
+.chat form { display: flex; gap: var(--space-2); align-items: flex-end; }
+.chat textarea { flex: 1; min-height: 72px; resize: vertical; }
+.metrics { margin: var(--space-2) 0 var(--space-3); font-family: var(--font-mono); font-size: 14px; color: var(--color-muted-fg); font-variant-numeric: tabular-nums; }
+.error { color: var(--color-danger); white-space: pre-wrap; }

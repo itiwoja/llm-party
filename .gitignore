@@ -1,0 +1,12 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.vite/
+
+# ローカルのデータ（トークン・DB・ログ）
+data/
+
+*.log
+.env
+.env.*
+!.env.example

@@ -1,0 +1,152 @@
+/* docs/design/ui/03_tokens.md から写したもの。値の正本は設計書 */
+:root {
+  --ink-0:   #FFFFFF;
+  --ink-50:  #F7F7F8;
+  --ink-100: #ECEDEE;
+  --ink-200: #DEDFE2;
+  --ink-400: #9B9EA3;
+  --ink-500: #74777C;
+  --ink-600: #5F6368;
+  --ink-700: #2C2D30;
+  --ink-900: #1A1B1D;
+  --ink-950: #141516;
+
+  --lime-300: #D8F76A;
+  --lime-400: #C8F031;
+  --lime-ink: #15180B;
+  --olive-700: #4F6000;
+  --olive-800: #3F4D00;
+
+  --red-300: #FF7B72;  --red-600: #C4291F;  --red-ink: #14100F;
+  --amber-400: #F0B429;  --amber-700: #8A5A00;
+  --green-300: #6FD08C;  --green-700: #1F7A3D;
+
+  --diff-add-light: #E3F3E7;  --diff-del-light: #FBE6E4;
+  --diff-add-dark:  #16301F;  --diff-del-dark:  #3A1B19;
+
+  --color-bg: var(--ink-50);
+  --color-surface: var(--ink-0);
+  --color-hover: var(--ink-100);
+  --color-fg: var(--ink-900);
+  --color-muted-fg: var(--ink-600);
+  --color-line: var(--ink-200);
+  --color-control: var(--ink-500);
+  --color-primary: var(--olive-700);
+  --color-primary-hover: var(--olive-800);
+  --color-on-primary: var(--ink-0);
+  --color-danger: var(--red-600);
+  --color-on-danger: var(--ink-0);
+  --color-warning: var(--amber-700);
+  --color-success: var(--green-700);
+  --color-diff-add: var(--diff-add-light);
+  --color-diff-del: var(--diff-del-light);
+  --color-focus-ring: var(--olive-700);
+  --color-scrim: rgb(20 21 22 / 0.5);
+  --chart-focus: var(--olive-700);
+  --chart-other: var(--ink-600);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-bg: var(--ink-950);
+    --color-surface: var(--ink-900);
+    --color-hover: var(--ink-700);
+    --color-fg: var(--ink-100);
+    --color-muted-fg: var(--ink-400);
+    --color-line: var(--ink-700);
+    --color-control: var(--ink-500);
+    --color-primary: var(--lime-400);
+    --color-primary-hover: var(--lime-300);
+    --color-on-primary: var(--lime-ink);
+    --color-danger: var(--red-300);
+    --color-on-danger: var(--red-ink);
+    --color-warning: var(--amber-400);
+    --color-success: var(--green-300);
+    --color-diff-add: var(--diff-add-dark);
+    --color-diff-del: var(--diff-del-dark);
+    --color-focus-ring: var(--lime-400);
+    --color-scrim: rgb(0 0 0 / 0.6);
+    --chart-focus: var(--lime-400);
+    --chart-other: var(--ink-400);
+  }
+}
+
+:root[data-theme="dark"] {
+  --color-bg: var(--ink-950);
+  --color-surface: var(--ink-900);
+  --color-hover: var(--ink-700);
+  --color-fg: var(--ink-100);
+  --color-muted-fg: var(--ink-400);
+  --color-line: var(--ink-700);
+  --color-control: var(--ink-500);
+  --color-primary: var(--lime-400);
+  --color-primary-hover: var(--lime-300);
+  --color-on-primary: var(--lime-ink);
+  --color-danger: var(--red-300);
+  --color-on-danger: var(--red-ink);
+  --color-warning: var(--amber-400);
+  --color-success: var(--green-300);
+  --color-diff-add: var(--diff-add-dark);
+  --color-diff-del: var(--diff-del-dark);
+  --color-focus-ring: var(--lime-400);
+  --color-scrim: rgb(0 0 0 / 0.6);
+  --chart-focus: var(--lime-400);
+  --chart-other: var(--ink-400);
+}
+
+:root {
+  --font-sans: "Noto Sans JP", "Yu Gothic UI", "Meiryo", sans-serif;
+  --font-mono: "JetBrains Mono", "Noto Sans JP", "Consolas", monospace;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --rail-width: 48px;
+  --list-width: 280px;
+  --panel-width: 440px;
+  --thread-max: 760px;
+  --form-max: 640px;
+  --row-height: 36px;
+  --control-height: 36px;
+  --control-height-sm: 28px;
+  --icon-size: 18px;
+  --radius: 4px;
+  --radius-lg: 6px;
+  --radius-full: 999px;
+  --line-width: 1px;
+  --focus-width: 2px;
+  --z-sticky: 10;
+  --z-panel: 20;
+  --z-menu: 30;
+  --z-dialog: 40;
+  --z-toast: 50;
+  --duration-fast: 120ms;
+  --duration-normal: 200ms;
+  --duration-slow: 280ms;
+  --duration-spin: 800ms;
+  --duration-pulse: 1200ms;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --button-primary-bg: var(--color-primary);
+  --button-primary-fg: var(--color-on-primary);
+  --rail-active: var(--color-primary);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.7;
+  letter-spacing: 0.02em;
+}
