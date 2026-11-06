@@ -34,11 +34,11 @@ flowchart LR
 ## 共通仕様
 | 項目 | 内容 |
 |---|---|
-| ベース URL | `http://127.0.0.1:<port>/api`（port と token は API-008 で受け取る） |
+| ベース URL | `http://127.0.0.1:<port>/api`（port と token は API-008 で受け取る。localhost 段階は port 8787） |
 | 認証 | `Authorization: Bearer <起動ごとのトークン>`。ない・違う → 401（NFR-011） |
 | 形式 | JSON、UTF-8、camelCase。日時は ISO 8601（UTC） |
 | 一覧 | `?limit=`（既定 50）と `?cursor=`（前の応答の `nextCursor`） |
-| CORS | `app://llm-party` からのみ許可 |
+| CORS | exe 段階は `app://llm-party` からのみ許可。localhost 段階は同一オリジンなので CORS を返さず、Host と Origin を確かめる（[12](../12_localhost_stage.md#接続と認証)） |
 | 長い処理 | 受け付けて 202 を返し、進捗と結果は SSE で知らせる（ターン・DL・ラン・CUDA パック・エンジン読み込み） |
 
 共通エラーの形：
@@ -69,7 +69,8 @@ flowchart LR
 ## エンドポイント一覧（要約）
 | 範囲 | ID | 内容 | 詳細 |
 |---|---|---|---|
-| IPC | API-001〜010 | アプリ情報・ダイアログ・更新・HF トークン・接続先・ログフォルダ | [ipc.md](ipc.md) |
+| IPC | API-001〜010 | アプリ情報・ダイアログ・更新・HF トークン・接続先・ログフォルダ（exe 段階） | [ipc.md](ipc.md) |
+| localhost 用 | API-093〜094 | IPC の代わり（localhost 段階だけ） | [12](../12_localhost_stage.md#ipc-の代わり) |
 | システム・エンジン | API-020〜025 | 死活、GPU 判定、CUDA パック、エンジンの読み込み | [worker.md](worker.md#システムエンジン) |
 | スレッド・ターン | API-030〜042 | スレッド、送信、停止、承認、変更、ワークスペース | [worker.md](worker.md#スレッドターン) |
 | モデル | API-050〜059 | モデル・LoRA・HF 検索・DL | [worker.md](worker.md#モデル) |

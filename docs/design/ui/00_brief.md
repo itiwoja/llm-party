@@ -31,7 +31,7 @@ flowchart LR
 ### 目的と一番してほしい行動
 | 項目 | 内容 | 根拠 |
 |---|---|---|
-| 種類 | Windows デスクトップアプリ（Electron＋React 19） | ../11_tech_spec.md |
+| 種類 | Windows デスクトップアプリ（Electron＋React 19）。先に同じ画面をブラウザの localhost で試す | ../12_localhost_stage.md |
 | 一番してほしい行動 | 指示を送る（対話・エージェント） | R1 回答 |
 | 主な利用者 | P-1 チューナー（本人）、P-2 知人。PC のみ | ../01_requirements.md §4 |
 | 成功の目安 | GGUF 登録から前の版との比較までアプリ内で済む | ../01_requirements.md §2 |
@@ -51,7 +51,7 @@ flowchart LR
 ### 前提
 - テーマ：ライト／ダーク両対応、初期値は OS の設定に従う
 - アクセシビリティ目標：WCAG 2.2 AA（仕様 NFR-032）
-- 技術：Electron 45 / React 19 / Vite / TypeScript（CSS の方式は仕様に指定なし）
+- 技術：Electron 45（exe 段階）/ React 19 / Vite / TypeScript（CSS の方式は仕様に指定なし）
 - 外への通信は Hugging Face と GitHub だけ（仕様 R-07）
 
 ### 決定事項ログ

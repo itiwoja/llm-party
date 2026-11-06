@@ -46,7 +46,7 @@ flowchart LR
 以下は詳細層。
 
 ## FR-001：GPU 判定・実行バックエンド選択
-〔UC-001〕
+〔UC-001〕 exe 段階で作る。localhost 段階は環境変数で手動指定する（D-52、[12](../12_localhost_stage.md#wsl-での違い)）。
 
 - 処理：
   1. 入っている各バックエンドの `llama-server.exe --list-devices` を実行し、見つかったデバイス（名前・VRAM）を集める
@@ -63,7 +63,7 @@ flowchart LR
 - エラー：どのバックエンドも起動しない → `cpu` にして「CPU で動かします（遅くなります）」と表示
 
 ## FR-002：ランタイムパック導入
-〔UC-001〕 CUDA 版の llama-server 一式を追加する。
+〔UC-001〕 exe 段階で作る。CUDA 版の llama-server 一式を追加する。
 
 - 配置：アプリに `runtime-manifest.json`（同梱の llama.cpp のビルド番号、パックの URL・サイズ・sha256）を同梱する。パックは `https://github.com/itiwoja/llm-party/releases/download/runtime-<ビルド番号>/` に置く（CI が ggml-org/llama.cpp の CUDA 版と cudart を1つの zip にまとめて公開する）
 - 処理：

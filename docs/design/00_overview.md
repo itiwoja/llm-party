@@ -3,8 +3,10 @@
 
 > **3行で**
 > 1. LLM-PARTY は、Qwen3.5 9B などの GGUF モデルを手元の Windows PC で動かし、Codex 風の画面で対話・コーディング・評価ができるデスクトップアプリ。
-> 2. 推論は同梱の llama.cpp（llama-server）。チューニングしたモデルや LoRA を読み込んで、プリセット単位で評価セットを流して比べるのが主目的。
+> 2. 推論は llama.cpp（llama-server）。チューニングしたモデルや LoRA を読み込んで、プリセット単位で評価セットを流して比べるのが主目的。
 > 3. アプリ内での学習、Linux / Mac、クラウド API、MCP、Web 検索、画像入力はやらない（[01 §7](01_requirements.md#7-スコープ外wont)）。
+
+**段階**：まず localhost で作って試し、利用者が OK を出してから exe にする（[12](12_localhost_stage.md)）。
 
 ## 🧭 判断してほしいこと
 なし（全体の論点は [README](README.md) に集約）
@@ -19,13 +21,13 @@ flowchart LR
   APP -.モデル検索・DL.-> HF[(Hugging Face)]
   APP -.更新・CUDA パック.-> GH[(GitHub Releases<br/>itiwoja/llm-party)]
 ```
-見てほしいところ：外への通信は Hugging Face と GitHub の2か所だけ。会話の中身は端末の外へ出ない。
+見てほしいところ：図は exe 段階の最終形（localhost 段階は [12](12_localhost_stage.md#全体図)）。外への通信は Hugging Face と GitHub の2か所だけ。会話の中身は端末の外へ出ない。
 
 ## 要点
 - 対象は自分（チューニングして試す人）と、exe を受け取った知人（[01 §4](01_requirements.md#4-利用者ロール)）。
 - 用語は下の [用語集](#用語集) で統一する。特に「プリセット」「評価セット」「ラン」。
 - 決まったことは [決定事項ログ](#決定事項ログ) に1行ずつ。代替案があったものは [adr/](adr/)。
-- exe 化・更新の仕組みは DC-Designer に合わせる（D-01〜D-06）。
+- 開発は2段階：localhost 段階でブラウザから試し、OK が出たら exe 段階へ進む（D-49）。exe 化・更新の仕組みは DC-Designer に合わせる（D-01〜D-06）。
 - ID のたどり方は [トレーサビリティ表](#トレーサビリティ表)。
 
 ---
@@ -50,7 +52,7 @@ flowchart LR
 | In（MVP） | Out（Won't） |
 |---|---|
 | ローカル対話、ワークスペース内のエージェント、3ペイン GUI | アプリ内での学習（LoRA 学習・変換） |
-| HF 検索・DL、ローカル GGUF / LoRA の登録 | Linux / macOS 版、portable / MSI |
+| HF 検索・DL、ローカル GGUF / LoRA の登録 | Linux / macOS 版（WSL の localhost 段階は検証用で配布しない）、portable / MSI |
 | プリセット、評価セット（編集・JSONL 取込/書出・一括実行・3種の採点） | Ollama・クラウド API への接続 |
 | Vulkan / CPU 同梱、CUDA 追加パック | MCP、Web 検索ツール、画像入力 |
 | NSIS インストーラー、GitHub Releases からの更新 | コード署名（v1 は未署名。SignPath は後で） |
@@ -64,6 +66,8 @@ flowchart LR
 | 推論エンジン | engine | 子プロセスとして動く llama-server。同時に1プリセットだけ読み込む |
 | 実行バックエンド | backend | llama-server の種類。`cuda` / `vulkan` / `cpu` |
 | ランタイムパック | runtime pack | 追加 DL する llama-server 一式（CUDA 版）。[TBL-015](08_database.md#tbl-015runtime_packs) |
+| localhost 段階 | localhost stage | Electron なしで、WSL の worker とブラウザで試す最初の段階。[12](12_localhost_stage.md) |
+| exe 段階 | exe stage | localhost 段階で OK が出た後に、Electron に包んで配る段階 |
 | ワークスペース | workspace | エージェントが触ってよいフォルダ。[TBL-005](08_database.md#tbl-005workspaces) |
 | スレッド | thread | 1つの会話。ワークスペースありなら「エージェント」、なしなら「チャット」 |
 | ターン | turn | ユーザーの1回の指示と、それに対するモデルの応答・ツール実行のまとまり |
@@ -128,6 +132,12 @@ flowchart LR
 | D-46 | 画面の言語は日本語のみ | ユーザー | 利用者は自分と知人。文言の二重管理を避ける | NFR-030, ui/08_copy | — |
 | D-47 | スレッドの作成は「新規」1つにまとめ、最初の送信の前にフォルダを選ぶとエージェントになる | ユーザー | 入力欄を主役にする UI 設計に合わせた | FR-004, SCR-001 | — |
 | D-48 | 画面の文言の正本は ui/08_copy.md | ユーザー | 文章の声を体言止めでそろえる | 04 の各メッセージ | — |
+| D-49 | 先に localhost で試し、OK が出てから exe にする。exe の設計は残す | ユーザー | 試して直す手間を減らす | 12, 07 | [ADR-008](adr/ADR-008-localhost-first.md) |
+| D-50 | localhost 段階は WSL で動かし、Windows のブラウザで開く | ユーザー | 今の開発環境のまま進める | 12 | [ADR-008](adr/ADR-008-localhost-first.md) |
+| D-51 | localhost 段階のワークスペース・GGUF の指定はパス入力 | ユーザー | 追加の API が要らない。exe で標準ダイアログに差し替える | FR-007, FR-013, FR-015 | — |
+| D-52 | localhost 段階の GPU は環境変数で手動指定。自動判定・CUDA パックは exe 段階へ | ユーザー | 知人の PC の違いを吸収する機能なので、本人だけの段階では要らない | FR-001, FR-002 | — |
+| D-53 | localhost 段階のポートは 8787 に固定（`LLM_PARTY_PORT` で変更可）。使用中なら起動エラー | ユーザー | 毎回同じ URL で開ける | 12, NFR-011 | — |
+| D-54 | localhost 段階の細部（Claude 判断・見直し可）：トークンは `data/local-token` に保存して使い回し、起動時の URL で画面に渡す。Host と Origin を確かめる。画面は worker から同一オリジンで配る（開発中は Vite をミドルウェアにする）。HF トークンは API-094 で `data/secrets/` に保存。シェルは bash。データは exe 版へ引き継がない。exe 段階へ進む条件の6項目 | Claude 判断 | 固定 URL とトークン認証を両立し、ポートを1つにする | 12 | — |
 
 ### ID体系
 | 接頭辞 | 対象 | ファイル |

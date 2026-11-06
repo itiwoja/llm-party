@@ -6,6 +6,8 @@
 > 2. worker が API・SQLite・エージェント・評価・DL・エンジンの管理を全部持つ。画面は worker の HTTP API と SSE で話し、OS に触る操作だけ main の IPC を使う。
 > 3. 配布は `v*` タグ → GitHub Actions → NSIS → GitHub Releases。CUDA パックは同じリポジトリの `runtime-<ビルド番号>` リリースに置く。
 
+**段階**：ここに書いたのは exe 段階の最終形。先に Electron なしの localhost 段階で作って試す（[ADR-008](adr/ADR-008-localhost-first.md)、[12](12_localhost_stage.md)）。
+
 ## 🧭 判断してほしいこと
 | # | 種類 | 論点 | 選択肢 | おすすめ（理由） | 決まらないと止まるもの |
 |---|---|---|---|---|---|
@@ -28,7 +30,7 @@ flowchart LR
   M -.-> GH[(GitHub Releases)]
   W -.CUDA パック.-> GH
 ```
-見てほしいところ：重い処理（推論・DL・エージェント・評価）はすべて worker 以下にあり、main は窓・更新・秘密・ダイアログだけ。
+見てほしいところ：重い処理（推論・DL・エージェント・評価）はすべて worker 以下にあり、main は窓・更新・秘密・ダイアログだけ。localhost 段階はここから main と preload を除いた形になる。
 
 ## 要点
 - 技術スタックは [技術スタック](#技術スタック)。DC-Designer からの流用と新規を分けた。
@@ -69,6 +71,8 @@ flowchart TB
   W -->|spawn / OpenAI 互換 HTTP| L
   W --> DB
 ```
+worker は Electron に依存させず、起動の入口だけを分ける（utilityProcess / localhost）。画面は `src/platform` の接続層を通して OS の機能を使う（[12](12_localhost_stage.md#ipc-の代わり)）。
+
 | コンテナ | 責務 | 主な技術 |
 |---|---|---|
 | 画面 renderer | 全画面の表示。worker の API と SSE を使う。OS 操作は preload 経由で main に頼む | React 19、Vite、TypeScript |
@@ -163,7 +167,8 @@ flowchart LR
 - アプリのリリースは DC-Designer の `release-windows.yml` と同じ3段（D-05）。build で、`runtime-manifest.json` に書いたビルド番号の llama.cpp（`llama-<ビルド番号>-bin-win-cpu-x64.zip`・`-win-vulkan-x64.zip`）を ggml-org/llama.cpp の Releases から取り、sha256 を確かめてステージに入れる
 - CUDA パックは別のワークフロー。`runtime-<ビルド番号>` タグで `llama-<ビルド番号>-bin-win-cuda-<版>-x64.zip` と `cudart-llama-bin-win-cuda-<版>-x64.zip` を1つにまとめ、sha256 をマニフェストに書く（R-09 の確認が先）
 - llama.cpp の版を上げるときは、先に runtime リリースを出し、マニフェストを更新してからアプリのタグを打つ
-- 環境：開発（WSL。`npm run dev` で worker を tsx・画面を Vite で動かす。開発中に限り、worker は WSL 用の llama-server を起動してよい）/ 本番（インストール版）
+- 環境：localhost 段階（WSL。worker が `http://127.0.0.1:8787` で画面も配る。[12](12_localhost_stage.md#起動のしかた)）/ 本番（インストール版）
+- ここのリリースの仕組みは exe 段階で作る
 
 ## ログ・監視・エラー通知
 - 外への送信はしない（NFR-015）。ログはローカルだけ（FR-021）
@@ -179,6 +184,7 @@ flowchart LR
 | [ADR-005](adr/ADR-005-approval-policy.md) | 読み取り自動・書き込みとコマンドは承認・外は拒否 | 承認 |
 | [ADR-006](adr/ADR-006-auto-compaction.md) | 文脈あふれは自動要約 | 承認 |
 | [ADR-007](adr/ADR-007-update-flow.md) | 更新は起動時確認・手動 DL・手動適用 | 承認 |
+| [ADR-008](adr/ADR-008-localhost-first.md) | 先に localhost で試し、OK が出てから exe にする | 承認 |
 
 ## このドキュメントで決まったこと
 - D-01〜D-07, D-11, D-15, D-18（[00 決定事項ログ](00_overview.md#決定事項ログ)）

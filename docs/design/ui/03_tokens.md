@@ -170,7 +170,7 @@ flowchart LR
 - `--font-sans`：`"Noto Sans JP", "Yu Gothic UI", "Meiryo", sans-serif`。
 - `--font-mono`：`"JetBrains Mono", "Noto Sans JP", "Consolas", monospace`。
 - `--numeric`：`font-variant-numeric: tabular-nums`。数字を出す所すべて。
-- フォントはアプリに同梱し、`app://` から読む。太さは 400 と 700 だけ。`font-display: block`。ライセンス表示は CP-184。
+- フォントはアプリに同梱し、同じオリジンから読む（exe 段階は `app://`、localhost 段階は worker）。太さは 400 と 700 だけ。`font-display: block`。ライセンス表示は CP-184。
 
 ### 余白・レイアウト
 | トークン | 値 | 用途 |

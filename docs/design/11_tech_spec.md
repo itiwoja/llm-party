@@ -6,6 +6,8 @@
 > 2. 比較の単位は「プリセット」、評価の単位は「ラン」。ランはプリセットの中身を写して持つ。
 > 3. 配布と更新は DC-Designer と同じ（`v*` タグ → NSIS → GitHub Releases → electron-updater）。CUDA は追加パック。
 
+**段階**：先に localhost 段階（WSL＋ブラウザ）で作って試し、OK が出てから exe にする（[12](12_localhost_stage.md)）。
+
 ## 🧭 判断してほしいこと
 なし（全体の論点は [README](README.md#-判断してほしいこと) に集約）
 
@@ -21,7 +23,7 @@ flowchart LR
   W -.-> HF[(Hugging Face)]
   M -.-> GH[(GitHub Releases)]
 ```
-見てほしいところ：会話の中身が通るのは画面・worker・llama-server の間（すべて 127.0.0.1）だけ。
+見てほしいところ：図は exe 段階の最終形。会話の中身が通るのは画面・worker・llama-server の間（すべて 127.0.0.1）だけ。
 
 ## 要点
 - 各節は「要点＋リンク」。表の全文は各ドキュメントにある。
@@ -86,23 +88,23 @@ flowchart LR
 - ログ：ローカルに日ごと、14 日、診断 zip は利用者が書き出す（FR-021）
 
 ## 10. 環境・設定
-| 項目 | 開発（WSL） | 本番（インストール版） |
+| 項目 | localhost 段階（WSL） | 本番（インストール版） |
 |---|---|---|
-| 画面 | Vite の開発サーバー | `app://llm-party` |
-| worker | tsx で起動 | utilityProcess（asar の外） |
-| llama-server | WSL 用でもよい（開発専用） | `resources\llama\<ビルド番号>-<cpu\|vulkan>\`、CUDA は `runtime\` |
+| 画面 | worker が `127.0.0.1:8787` で配る（開発中は Vite をミドルウェアに） | `app://llm-party` |
+| worker | tsx または Node で起動 | utilityProcess（asar の外） |
+| llama-server | WSL 用を `LLM_PARTY_LLAMA_BIN` で指定 | `resources\llama\<ビルド番号>-<cpu\|vulkan>\`、CUDA は `runtime\` |
 | データ | リポジトリの `data/` | `%LOCALAPPDATA%\llm-party\` |
 | 更新 | 動かさない | GitHub `itiwoja/llm-party` |
 
 - 同梱する設定：`runtime-manifest.json`（llama.cpp のビルド番号・各パックの URL・サイズ・sha256）、`app-update.yml`（electron-builder が生成）
-- 環境変数（開発用のみ）：`LLM_PARTY_DATA_DIR`、`LLM_PARTY_LLAMA_BIN`（使う llama-server のパス）
+- 環境変数（localhost 段階のみ）：`LLM_PARTY_DATA_DIR`、`LLM_PARTY_LLAMA_BIN`、`LLM_PARTY_BACKEND`、`LLM_PARTY_PORT`（[12](12_localhost_stage.md#起動のしかた)）
 
 ## 11. テスト方針
 | レベル | 観点 |
 |---|---|
 | 単体（Vitest） | 承認ポリシーの判定（パス解決・リンク・ジャンクション）、出力の切り詰め、採点（match / test / manual・正解率）、JSONL の検証、文脈の閾値、状態遷移 |
 | 結合 | 小さな GGUF で llama-server を実際に起動し、ストリーミング・ツール呼び出し・LoRA 倍率・思考 OFF（R-04）を確かめる |
-| E2E（手動） | 初回セットアップ（CUDA あり / なし）、エージェントの承認・却下・取り消し、評価ラン→比較、更新の適用 |
+| E2E（手動） | localhost 段階：[exe 段階へ進む条件](12_localhost_stage.md#exe-段階へ進む条件)。exe 段階：初回セットアップ（CUDA あり / なし）、エージェントの承認・却下・取り消し、評価ラン→比較、更新の適用 |
 | リリース検査 | DC-Designer と同じく、ステージとインストーラーの中身を許可リストで検査（`.node`・llama-server の有無を含む） |
 
 ## 12. リスクと対策
@@ -118,13 +120,16 @@ flowchart LR
 | R-08 | ネイティブモジュールのビルド | asarUnpack と検査 | [07](07_architecture.md) |
 | R-09 | cudart の再配布条件 | 公開前に確認、だめなら公式から直接 DL | [models-runtime](04_functional_spec/models-runtime.md) |
 | R-10 | コマンドはワークスペース外に影響しうる | 承認制、自動承認は明示 ON だけ | [04 README](04_functional_spec/README.md) |
+| R-14 | WSL 用 llama-server を自分で用意する | 手順を最初に確かめて README に書く | [12](12_localhost_stage.md) |
+| R-15 | Windows 固有の動きは exe 段階まで確かめられない | exe 段階の確認に入れる | 同上 |
+| R-16 | 他のサイトから localhost の API を叩かれる | トークン＋Host・Origin の確認 | 同上 |
 
 ## 13. 未決事項・Claude 判断で決めた項目
 - 未決：Q-01, Q-02, Q-06, Q-09（[README](README.md#-判断してほしいこと)）
 - Claude 判断：ADR-002 のうち「子プロセスにする」点、D-45（細部の定石の一覧）。定石：D-33〜D-37, D-39（[00](00_overview.md#決定事項ログ)）
 
 ## 14. 参照ドキュメント
-- 設計書：[00](00_overview.md)〜[10](10_diagrams.md)、[adr/](adr/)
+- 設計書：[00](00_overview.md)〜[10](10_diagrams.md)、[12](12_localhost_stage.md)、[adr/](adr/)
 - 外部：llama.cpp `tools/server/README.md`（エンドポイント・`--lora`・`--jinja`）、llama.cpp `common/arg.cpp`（`--list-devices`）、llama.cpp Releases b12125（配布物の名前）、Hugging Face `Qwen/Qwen3.5-9B` モデルカード（推奨サンプリング・思考モード・Apache-2.0）、`unsloth/Qwen3.5-9B-GGUF`（Q4_K_M 5,417MB）
 - 参考実装：DC-Designer（`desktop/main.ts`・`desktop/updater.ts`・`electron-builder.yml`・`.github/workflows/release-windows.yml`・`docs/adr/ADR-001`〜`005`）
 

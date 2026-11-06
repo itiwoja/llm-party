@@ -15,5 +15,6 @@ electron-updater（GitHub provider、public リポジトリ）で起動ごとに
 | 手動で exe を配る | 仕組みが要らない | 知人が更新しない | 要望に合わない |
 
 ## 影響
+- 更新は exe 段階で作る（[ADR-008](ADR-008-localhost-first.md)）
 - 適用の前に worker に生成・評価・DL を止めさせ、DB を閉じる（`prepareShutdown`）
 - 未署名のため SmartScreen の警告が出る（R-01）

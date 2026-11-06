@@ -16,4 +16,5 @@ Electron 45（main・sandbox の画面・utilityProcess の worker）、electron
 
 ## 影響
 - DC-Designer の `desktop/`・`scripts/build-desktop.mjs`・`release-windows.yml` の考え方を流用できる
+- Electron に包むのは exe 段階。その前に Electron なしの localhost 段階がある（[ADR-008](ADR-008-localhost-first.md)）
 - インストーラーは Electron の分だけ大きい（llama.cpp の Vulkan・CPU 版を足しても 100MB 台の見込み）

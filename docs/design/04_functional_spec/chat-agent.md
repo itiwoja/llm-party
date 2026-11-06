@@ -140,7 +140,7 @@ flowchart TD
 | `search` | 読み取り | pattern（正規表現）, path?, glob? | 一致した行を「パス:行番号: 内容」で返す |
 | `write_file` | 書き込み | path, content | 新規作成または全体の上書き。フォルダがなければ作る |
 | `edit_file` | 書き込み | path, oldText, newText, replaceAll? | `oldText` が1か所だけ一致するときに置換（`replaceAll` なら全部）。0 か所・複数は失敗としてモデルに返す |
-| `run_command` | コマンド | command, cwd? | シェル（Q-06）で実行。cwd はワークスペース内。120 秒で終了（D-23）。終了コードと出力を返す |
+| `run_command` | コマンド | command, cwd? | シェル（Q-06。localhost 段階は bash）で実行。cwd はワークスペース内。120 秒で終了（D-23）。終了コードと出力を返す |
 
 - 出力の上限：1 回 8,000 トークン（D-26）。超えたら先頭と末尾を残し、間に「…N 行省略。startLine / endLine を指定して読めます…」を入れる
 - `run_command` の時間切れ・停止はプロセスツリーごと終了する（`taskkill /T /F` 相当）

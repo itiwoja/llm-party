@@ -9,7 +9,7 @@
 ## 🧭 判断してほしいこと
 | # | 種類 | 論点 | 選択肢 | おすすめ（理由） | 決まらないと止まるもの |
 |---|---|---|---|---|---|
-| Q-06 | 未決 | エージェントのコマンドを動かすシェル | A: Windows PowerShell 5.1 / B: cmd / C: Git Bash（入っていれば） | A（全 Windows 10/11 に入っている。モデルも書き慣れている） | FR-009 run_command |
+| Q-06 | 未決 | exe 段階でエージェントのコマンドを動かすシェル（localhost 段階は bash） | A: Windows PowerShell 5.1 / B: cmd / C: Git Bash（入っていれば） | A（全 Windows 10/11 に入っている。モデルも書き慣れている） | FR-009 run_command |
 | R-05 | リスク | 9B がツール呼び出しを間違える・同じ操作を繰り返す | — | 形式エラーはモデルに返して直させる。40 回上限（BR-03）で止める | FR-008 |
 | R-06 | リスク | 自動要約で大事な指示が落ちる（9B の要約は粗い） | — | システムプロンプトと最初の指示は要約しない（BR-04）。要約前の全文は DB に残し、画面で読める | FR-006 |
 | R-10 | リスク | コマンドはワークスペース外にも影響しうる（パスの検査はファイル系ツールだけに効く） | — | コマンドは既定で承認制。自動承認は利用者がスレッドごとに明示して ON。評価では使い捨てフォルダで動かす | FR-009, FR-010 |
@@ -48,29 +48,31 @@ flowchart LR
 以下は詳細層。
 
 ## 機能一覧
-| ID | 機能名 | 概要 | 関連UC | 優先度 | 詳細 |
-|---|---|---|---|---|---|
-| FR-001 | GPU 判定・実行バックエンド選択 | 起動時に使えるバックエンドを調べ、CUDA → Vulkan → CPU の順に選ぶ | UC-001 | Must | [models-runtime](models-runtime.md#fr-001gpu-判定実行バックエンド選択) |
-| FR-002 | ランタイムパック導入 | CUDA 版 llama-server を DL・検証・展開 | UC-001 | Must | [models-runtime](models-runtime.md#fr-002ランタイムパック導入) |
-| FR-003 | 推論エンジン管理 | llama-server の起動・停止・切替・死活確認 | UC-002, UC-007 | Must | [chat-agent](chat-agent.md#fr-003推論エンジン管理) |
-| FR-004 | スレッド管理 | 作成・一覧・名前変更・削除・検索 | UC-002 | Must | [app](app.md#fr-004スレッド管理) |
-| FR-005 | チャット送信 | ストリーミング・停止・思考の表示 | UC-002 | Must | [chat-agent](chat-agent.md#fr-005チャット送信) |
-| FR-006 | 文脈管理 | トークン数の計測、80% で自動要約 | UC-002, UC-003 | Must | [chat-agent](chat-agent.md#fr-006文脈管理) |
-| FR-007 | ワークスペース選択 | フォルダを選び、スレッドに結びつける | UC-003 | Must | [app](app.md#fr-007ワークスペース選択) |
-| FR-008 | エージェントループ | ツール呼び出しの繰り返し、40 回上限 | UC-003, UC-007 | Must | [chat-agent](chat-agent.md#fr-008エージェントループ) |
-| FR-009 | ツール群 | 一覧・読む・検索・書く・置換・コマンド | UC-003 | Must | [chat-agent](chat-agent.md#fr-009ツール群) |
-| FR-010 | 承認ポリシー | 自動 / 承認 / 拒否の判定 | UC-003 | Must | [chat-agent](chat-agent.md#fr-010承認ポリシー) |
-| FR-011 | 変更記録・差分・取り消し | 書き換え前後の保存、差分表示、元に戻す | UC-003 | Must（取り消しは Should） | [chat-agent](chat-agent.md#fr-011変更記録差分取り消し) |
-| FR-012 | HF 検索・DL | 検索、ファイル一覧、DL（再開・再試行・容量確認） | UC-001, UC-004 | Must | [models-runtime](models-runtime.md#fr-012hf-検索dl) |
-| FR-013 | ファイル登録 | 手元の GGUF / LoRA を登録（参照 / コピー） | UC-004 | Must | [models-runtime](models-runtime.md#fr-013ファイル登録) |
-| FR-014 | プリセット管理 | 作成・編集・複製・削除、Qwen 推奨値 | UC-005 | Must | [models-runtime](models-runtime.md#fr-014プリセット管理) |
-| FR-015 | 評価セット管理 | ケース編集、JSONL 取込・書出 | UC-006 | Must | [eval](eval.md#fr-015評価セット管理) |
-| FR-016 | 評価の実行 | 1 ケースずつ実行、300 秒で不合格、中止 | UC-007 | Must | [eval](eval.md#fr-016評価の実行) |
-| FR-017 | 採点 | match / manual / test | UC-007 | Must | [eval](eval.md#fr-017採点) |
-| FR-018 | 比較・推移 | ランどうしの比較、正解率の推移 | UC-007 | Must | [eval](eval.md#fr-018比較推移) |
-| FR-019 | 更新 | 起動時確認・DL・適用 | UC-008 | Must | [app](app.md#fr-019更新) |
-| FR-020 | 設定 | 置き場・バックエンド・HF トークン・既定値 | UC-001, UC-004 | Must | [app](app.md#fr-020設定) |
-| FR-021 | ログ・診断 | ログ 14 日、診断情報の書き出し | UC-002 | Must | [app](app.md#fr-021ログ診断) |
+「段階」列はその機能を最初に作る段階（[12](../12_localhost_stage.md)）。
+
+| ID | 機能名 | 概要 | 関連UC | 優先度 | 詳細 | 段階 |
+|---|---|---|---|---|---|---|
+| FR-001 | GPU 判定・実行バックエンド選択 | 起動時に使えるバックエンドを調べ、CUDA → Vulkan → CPU の順に選ぶ | UC-001 | Must | [models-runtime](models-runtime.md#fr-001gpu-判定実行バックエンド選択) | exe（localhost は手動指定） |
+| FR-002 | ランタイムパック導入 | CUDA 版 llama-server を DL・検証・展開 | UC-001 | Must | [models-runtime](models-runtime.md#fr-002ランタイムパック導入) | exe |
+| FR-003 | 推論エンジン管理 | llama-server の起動・停止・切替・死活確認 | UC-002, UC-007 | Must | [chat-agent](chat-agent.md#fr-003推論エンジン管理) | localhost |
+| FR-004 | スレッド管理 | 作成・一覧・名前変更・削除・検索 | UC-002 | Must | [app](app.md#fr-004スレッド管理) | localhost |
+| FR-005 | チャット送信 | ストリーミング・停止・思考の表示 | UC-002 | Must | [chat-agent](chat-agent.md#fr-005チャット送信) | localhost |
+| FR-006 | 文脈管理 | トークン数の計測、80% で自動要約 | UC-002, UC-003 | Must | [chat-agent](chat-agent.md#fr-006文脈管理) | localhost |
+| FR-007 | ワークスペース選択 | フォルダを選び、スレッドに結びつける | UC-003 | Must | [app](app.md#fr-007ワークスペース選択) | localhost（パス入力） |
+| FR-008 | エージェントループ | ツール呼び出しの繰り返し、40 回上限 | UC-003, UC-007 | Must | [chat-agent](chat-agent.md#fr-008エージェントループ) | localhost |
+| FR-009 | ツール群 | 一覧・読む・検索・書く・置換・コマンド | UC-003 | Must | [chat-agent](chat-agent.md#fr-009ツール群) | localhost |
+| FR-010 | 承認ポリシー | 自動 / 承認 / 拒否の判定 | UC-003 | Must | [chat-agent](chat-agent.md#fr-010承認ポリシー) | localhost |
+| FR-011 | 変更記録・差分・取り消し | 書き換え前後の保存、差分表示、元に戻す | UC-003 | Must（取り消しは Should） | [chat-agent](chat-agent.md#fr-011変更記録差分取り消し) | localhost |
+| FR-012 | HF 検索・DL | 検索、ファイル一覧、DL（再開・再試行・容量確認） | UC-001, UC-004 | Must | [models-runtime](models-runtime.md#fr-012hf-検索dl) | localhost |
+| FR-013 | ファイル登録 | 手元の GGUF / LoRA を登録（参照 / コピー） | UC-004 | Must | [models-runtime](models-runtime.md#fr-013ファイル登録) | localhost（パス入力） |
+| FR-014 | プリセット管理 | 作成・編集・複製・削除、Qwen 推奨値 | UC-005 | Must | [models-runtime](models-runtime.md#fr-014プリセット管理) | localhost |
+| FR-015 | 評価セット管理 | ケース編集、JSONL 取込・書出 | UC-006 | Must | [eval](eval.md#fr-015評価セット管理) | localhost（パス入力） |
+| FR-016 | 評価の実行 | 1 ケースずつ実行、300 秒で不合格、中止 | UC-007 | Must | [eval](eval.md#fr-016評価の実行) | localhost |
+| FR-017 | 採点 | match / manual / test | UC-007 | Must | [eval](eval.md#fr-017採点) | localhost |
+| FR-018 | 比較・推移 | ランどうしの比較、正解率の推移 | UC-007 | Must | [eval](eval.md#fr-018比較推移) | localhost |
+| FR-019 | 更新 | 起動時確認・DL・適用 | UC-008 | Must | [app](app.md#fr-019更新) | exe |
+| FR-020 | 設定 | 置き場・バックエンド・HF トークン・既定値 | UC-001, UC-004 | Must | [app](app.md#fr-020設定) | localhost（一部 exe） |
+| FR-021 | ログ・診断 | ログ 14 日、診断情報の書き出し | UC-002 | Must | [app](app.md#fr-021ログ診断) | localhost |
 
 ## 権限マトリクス
 ログイン・ロールはない。利用者は全機能を使える。代わりに「エージェントが自分でできること」を [FR-010](chat-agent.md#fr-010承認ポリシー) で制限する。

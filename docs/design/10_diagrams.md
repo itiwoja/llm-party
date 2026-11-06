@@ -49,6 +49,8 @@ DOWNLOADS・RUNTIME_PACKS・SETTINGS は単独のテーブル。
 ## シーケンス図
 
 ### UC-001：初回セットアップ（CUDA あり）
+exe 段階の流れ。localhost 段階は GPU の判定と CUDA パックの手順がない。
+
 ```mermaid
 sequenceDiagram
   actor U as 利用者
@@ -129,6 +131,8 @@ sequenceDiagram
 ```
 
 ### UC-008：更新
+exe 段階の流れ。localhost 段階にはない。
+
 ```mermaid
 sequenceDiagram
   actor U as 利用者

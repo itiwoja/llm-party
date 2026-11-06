@@ -2,7 +2,7 @@
 - プロジェクト：LLM-PARTY ／ 版数：v0.1（2026-11-05） ／ 親：[09 README](README.md)
 
 > **3行で**
-> 1. REST 風の `/api/*` が API-020〜092、通知は SSE の `/api/events`（API-099）。
+> 1. REST 風の `/api/*` が API-020〜094、通知は SSE の `/api/events`（API-099）。
 > 2. 時間のかかる処理（送信・DL・ラン・CUDA パック・エンジン読み込み）は 202 で受け付け、結果はイベントで届く。
 > 3. 全エンドポイントに Bearer トークンが必要（`/api/health` も含む）。
 
@@ -39,7 +39,7 @@ sequenceDiagram
 |---|---|---|---|---|
 | API-020 | GET | `/api/health` | worker の死活 | 全般 |
 | API-021 | GET | `/api/system` | GPU 判定の結果、使用中のバックエンド、CUDA パックの状態、空き容量 | FR-001, SCR-002, SCR-008 |
-| API-022 | POST | `/api/runtime-packs/install` | CUDA パックの導入を始める（202。`runtime.*` イベント）。`DELETE` で削除 | FR-002 |
+| API-022 | POST | `/api/runtime-packs/install` | CUDA パックの導入を始める（202。`runtime.*` イベント）。`DELETE` で削除。exe 段階だけ | FR-002 |
 | API-023 | GET | `/api/engine` | エンジンの状態・読み込み中のプリセット | FR-003, SCR-001 |
 | API-024 | POST | `/api/engine/load` | `{ presetId }` を読み込む（202。`engine` イベント） | FR-003 |
 | API-025 | POST | `/api/engine/unload` | 止める | FR-003 |
@@ -129,9 +129,10 @@ sequenceDiagram
 | API-090 | GET | `/api/settings` | 設定（FR-020 の表） | FR-020 |
 | API-091 | PATCH | `/api/settings` | 一部を更新 | FR-020 |
 | API-092 | POST | `/api/diagnostics/export` | `{ path }` に診断 zip を書く | FR-021 |
+| API-093〜094 | — | `/api/local/*` | localhost 段階だけ有効（[12](../12_localhost_stage.md#ipc-の代わり)） | FR-020, FR-021 |
 
 ## API-099：GET /api/events
-SSE。1本の接続で全種類を流す。切れたら画面がつなぎ直し、`Last-Event-ID` 以降を受け取る（直近のイベントを worker がメモリに持つ）。
+SSE。1本の接続で全種類を流す。切れたら画面がつなぎ直し、`Last-Event-ID` 以降を受け取る（直近のイベントを worker がメモリに持つ）。`EventSource` はヘッダーを付けられないので、画面は `fetch` のストリームで読み、`Authorization` と `Last-Event-ID` を自分で付ける。
 
 <details>
 <summary>イベントの種類（14件）</summary>
