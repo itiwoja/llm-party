@@ -1,4 +1,4 @@
-/** FR-014 の Qwen3.5 公式の推奨値（D-28）。repeat は表に無いので 1.0（既定の対話・コーディングと同じ） */
+/** FR-014 の Qwen3.5 公式の推奨値（D-28）。repeat は表に無いので 1.0。コーディングだけ思考のループを抑えるため 1.05（D-69） */
 export interface Sampling {
   temperature: number;
   topP: number;
@@ -13,7 +13,7 @@ export interface Recommended { name: string; thinking: boolean; sampling: Sampli
 export const QWEN_CODING: Recommended = {
   name: "Qwen3.5 コーディング", // FR-014
   thinking: true,
-  sampling: { temperature: 0.6, topP: 0.95, topK: 20, minP: 0, presencePenalty: 0, repeatPenalty: 1 },
+  sampling: { temperature: 0.6, topP: 0.95, topK: 20, minP: 0, presencePenalty: 0, repeatPenalty: 1.05 },
 };
 export const QWEN_CHAT: Recommended = {
   name: "Qwen3.5 対話", // FR-014

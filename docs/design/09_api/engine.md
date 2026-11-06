@@ -53,7 +53,7 @@ sequenceDiagram
   "stream_options": { "include_usage": true },
   "timings_per_token": true,
   "temperature": 0.6, "top_p": 0.95, "top_k": 20, "min_p": 0.0,
-  "presence_penalty": 0.0, "repeat_penalty": 1.0,
+  "presence_penalty": 0.0, "repeat_penalty": 1.05,
   "lora": [{ "id": 0, "scale": 0.8 }],
   "chat_template_kwargs": { "enable_thinking": true }
 }
