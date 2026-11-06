@@ -82,13 +82,40 @@ flowchart LR
 ## FR-012：HF 検索・DL
 〔UC-001, UC-004〕
 
-- 検索：Hugging Face の `GET /api/models?search=<語>&filter=gguf&sort=downloads&limit=20` を使う。表示はリポジトリ名・DL 数・更新日
-- ファイル一覧：`GET /api/models/<repo>/tree/main` で `.gguf` を並べ、量子化の種類（ファイル名から）とサイズを出す。分割 GGUF（`-00001-of-0000N`）は1つにまとめて表示し、全部を DL する
+- 検索：Hugging Face の `GET /api/models?sort=downloads&limit=50` に、語（`search`）・ジャンル（`pipeline_tag`）・無検閲（`filter=uncensored`）を足して使う。`expand[]` で項目を指定する（指定しないと `lastModified` と `gated` が返らない）。表示はリポジトリ名・ジャンル・ライセンス・DL 数・更新日。語がなくても、ジャンルか無検閲を選べば DL 数の順に一覧できる（D-71）。`expand[]` に `gguf` と `safetensors` を足し、パラメータ数（`gguf.total` か `safetensors.total`）を取る
+- VRAM・RAM で絞る：欄に GB の上限を入れると、目安メモリ（下の式）がその上限以下のものだけ出す。両方入れたら両方を満たすもの。パラメータ数の分からないものは絞るときに外す。HF はサイズで絞れないので、件数の上限 100 で取ってから絞り、50 件に切る。語もジャンルもなくても、上限だけで一覧できる
+- 目安メモリ：Q4_K_M で動かすときの目安（GB）。`パラメータ数 × 0.61 byte × 1.1 + 1GB`。ファイル一覧はファイルのサイズから `サイズ × 1.1 + 1GB` で出す。文脈長（既定 32K、D-22）で増えるので、目安はあくまで粗い見積もり
+- ジャンル：
+
+  | ジャンル | `pipeline_tag` | 補足 |
+  |---|---|---|
+  | すべて | なし | 形式を問わない |
+  | チャット | `text-generation`, `image-text-to-text` | GGUF に絞る（`filter=gguf`）。動かせるのは GGUF だけなので |
+  | 画像生成 | `text-to-image` | |
+  | 映像生成 | `text-to-video` | |
+  | 音楽生成 | `text-to-audio` | |
+  | 音声生成 | `text-to-speech` | |
+  | 文字起こし | `automatic-speech-recognition` | |
+  | Embedding | `feature-extraction`, `sentence-similarity` | |
+
+  `pipeline_tag` は1回に1つしか受けないので、2つあるジャンルは別々に検索し、重複を除いて DL 数の順に混ぜて 50 件に切る。無検閲はジャンルではなくタグなので、スイッチにして各ジャンルと組み合わせられる
+- ファイル一覧：`GET /api/models/<repo>/tree/main` で全ファイルを並べ、モデル本体（`.gguf` `.safetensors` `.ckpt` `.pt` `.pth` `.bin` `.onnx`）を先に出す。量子化の種類（ファイル名から）とサイズを出す。分割の GGUF / safetensors（`-00001-of-0000N`）は1つにまとめて表示し、全部を DL する
+- DL の種類（`kind`）：
+
+  | kind | 対象 | DL の後 |
+  |---|---|---|
+  | `model` | GGUF | 確認して `models` に登録 |
+  | `adapter` | GGUF | 確認して、利用者がベースモデルを選んで登録 |
+  | `image` | 単一の `.safetensors` | 画像生成のモデルとして登録（D-72）。分割・GGUF は取れない |
+  | `file` | 形式を問わない | 保存だけ。チャットのモデルには載せない（D-71）。DL の表に保存先を出す |
+
+  チャットのリポジトリ（`pipeline_tag` が上のチャットの2つか、なし）の GGUF だけ `model` / `adapter` を選べる。それ以外のファイル・リポジトリは `file` になる。実行エンジンはチャットが llama-server、画像生成が sd-server（ADR-009）。映像・音楽・音声・文字起こし・Embedding はアプリ内では動かせないため保存だけ（D-72）
+- リポジトリ全体の DL：`files` を省くと全ファイルを `file` で取る。複数ファイルが揃って初めて動くモデル向け。保存先に同じサイズのファイルがあれば取り直さない
 - DL：
   1. 空き容量が「ファイルサイズ＋2GB」以上か確かめる（BR-05, D-31）。足りなければ始めない
   2. `https://huggingface.co/<repo>/resolve/main/<file>` を `<置き場>\<repo>\<file>.part` に保存する。切れたら `Range` で続きから
   3. 失敗したら自動で 3 回まで再試行（`retrying`）。それでも失敗なら `failed` にして「再開」ボタンを出す
-  4. 終わったらサイズと、HF が公開する sha256（LFS の oid）を照合し、GGUF の先頭（マジック・種類）を確かめる → `.part` を外して `models` に登録
+  4. 終わったらサイズと、HF が公開する sha256（LFS の oid）を照合する。LFS でないファイルに sha256 はないのでサイズだけ。`model` / `adapter` は GGUF の先頭（マジック・種類）も確かめる → `.part` を外して、`model` は `models` に登録
 - DL は同時に1つ。2つ目からは `queued` で待つ
 - HF トークン（任意）：ゲート付きリポジトリ用。設定で入れると main が暗号化して保存し（D-06）、worker には起動時にメモリで渡す
 - 初回のおすすめ：`unsloth/Qwen3.5-9B-GGUF` の `Qwen3.5-9B-Q4_K_M.gguf`（5.7GB）（D-33）

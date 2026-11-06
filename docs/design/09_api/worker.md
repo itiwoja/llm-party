@@ -58,8 +58,10 @@ sequenceDiagram
 | API-038 | POST | `/api/tool-calls/:id/decision` | 承認・却下（下に詳細） | FR-010 |
 | API-039 | GET | `/api/threads/:id/changes` | 変更記録の一覧と前後の中身 | FR-011 |
 | API-040 | POST | `/api/file-changes/:id/revert` | `{ force?: boolean }` で取り消し。編集済みで force なし → 409 `CONFLICT` | FR-011 |
-| API-041 | GET | `/api/workspaces` | 使ったワークスペース | FR-007 |
-| API-042 | POST | `/api/workspaces` | `{ path }` を検証して登録。だめなら `PATH_NOT_ALLOWED` | FR-007 |
+| API-041 | GET | `/api/workspaces` | 一覧から外していないワークスペース（画面の「プロジェクト」） | FR-007 |
+| API-042 | POST | `/api/workspaces` | `{ path }` を検証して登録。だめなら `PATH_NOT_ALLOWED`。外したものは一覧へ戻す | FR-007 |
+| API-043 | PATCH | `/api/workspaces/:id` | `{ name?, instructions?, defaultPresetId?, autoApprove? }`。後ろの3つは `null` で未指定に戻す | FR-007 |
+| API-044 | DELETE | `/api/workspaces/:id` | 一覧から外す（行は消さない。スレッドもファイルも残す）。204 | FR-007 |
 
 ### API-035：POST /api/threads/:id/turns
 - リクエスト：
@@ -84,10 +86,10 @@ sequenceDiagram
 | API-050 | GET | `/api/models` | モデル一覧（ファイルの有無を確かめて `missing` を付ける）。LoRA の一覧も `adapters` で返す | FR-013, SCR-003 |
 | API-051 | POST | `/api/models` | `{ path, mode: "reference" \| "copy", name? }` で登録 | FR-013 |
 | API-052 | DELETE | `/api/models/:id?deleteFile=` | 削除。プリセットで使用中 → 409 `CONFLICT`（`details` にプリセット名） | FR-013 |
-| API-053 | GET | `/api/hf/search?q=` | HF の GGUF リポジトリ検索 | FR-012 |
-| API-054 | GET | `/api/hf/files?repo=` | GGUF ファイル一覧（量子化・サイズ・分割） | FR-012 |
-| API-055 | POST | `/api/downloads` | `{ repo, files[], kind }` で DL を始める（202。容量不足 → 507） | FR-012 |
-| API-056 | GET | `/api/downloads` | DL の一覧と進捗。完了した LoRA は `filePath` を返し、画面がベースモデルを選ばせて API-058 で登録する | FR-012 |
+| API-053 | GET | `/api/hf/search?q=&genre=&uncensored=&vram=&ram=` | HF のリポジトリ検索。`genre` は `all` / `chat` / `image` / `video` / `music` / `speech` / `transcribe` / `embedding`。`q` が空でも `genre`・`uncensored=true`・`vram`・`ram` のどれかがあれば一覧する（どれもなければ 400）。`vram`・`ram` は GB の上限（1〜1024、省略か空は指定なし）。`pipelineTag`・`license`・`params`・`memoryGb`（Q4 の目安）も返す | FR-012 |
+| API-054 | GET | `/api/hf/files?repo=` | 全ファイルの一覧（量子化・サイズ・分割）。モデル本体が先 | FR-012 |
+| API-055 | POST | `/api/downloads` | `{ repo, files[]?, kind }` で DL を始める（202。容量不足 → 507）。`kind` は `model` / `adapter` / `file`。`model` / `adapter` は `.gguf` だけ。`files` を省くとリポジトリ全体（`file` だけ） | FR-012 |
+| API-056 | GET | `/api/downloads` | DL の一覧と進捗。完了した LoRA は `filePath` を返し、画面がベースモデルを選ばせて API-058 で登録する。完了した `file` は `savedDir` を返す | FR-012 |
 | API-057 | POST | `/api/downloads/:id/cancel` | 取消（`.part` を消す）。`/resume` で手動再開 | FR-012 |
 | API-058 | POST | `/api/adapters` | `{ path, baseModelId, mode, name? }` で LoRA を登録 | FR-013 |
 | API-059 | DELETE | `/api/adapters/:id?deleteFile=` | 削除。使用中 → 409 | FR-013 |
@@ -99,6 +101,16 @@ sequenceDiagram
 | API-061 | POST | `/api/presets` | 作成（`{ name, modelId, adapters[], sampling, systemPrompt, thinking, contextSize }`） | FR-014 |
 | API-062 | PATCH | `/api/presets/:id` | 編集 | FR-014 |
 | API-063 | DELETE | `/api/presets/:id` | 削除（ランは残る） | FR-014 |
+
+## 画像生成（D-72）
+
+| ID | メソッド | パス | 内容 | 対応 |
+|---|---|---|---|---|
+| API-095 | POST | `/api/threads/:id/images` | `{ modelId, prompt, width?, height?, steps?, seed? }` を受けて 202 `{ status: "running" }`。結果は SSE の `image` イベント（`{ threadId, status: "completed", imageId }` または `{ threadId, status: "failed", error }`）で届く。画像モデル（`use: image`）だけを受ける | FR-012, D-72 |
+| API-096 | GET | `/api/images/:id` | 生成した PNG を返す（`dataDir/images` の中だけ） | FR-012, D-72 |
+
+- 生成したものは `messages` に `role = image` で入る。内容は JSON（`imageId`・`prompt`・`modelName`・`width`・`height`）。履歴の文脈には入らない
+- 同時に1枚。チャットの生成中・評価中は断る（BUSY）
 
 ## 評価
 | ID | メソッド | パス | 概要 | 関連 |

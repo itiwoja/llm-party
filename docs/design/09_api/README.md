@@ -72,7 +72,7 @@ flowchart LR
 | IPC | API-001〜010 | アプリ情報・ダイアログ・更新・HF トークン・接続先・ログフォルダ（exe 段階） | [ipc.md](ipc.md) |
 | localhost 用 | API-093〜094 | IPC の代わり（localhost 段階だけ） | [12](../12_localhost_stage.md#ipc-の代わり) |
 | システム・エンジン | API-020〜025 | 死活、GPU 判定、CUDA パック、エンジンの読み込み | [worker.md](worker.md#システムエンジン) |
-| スレッド・ターン | API-030〜042 | スレッド、送信、停止、承認、変更、ワークスペース | [worker.md](worker.md#スレッドターン) |
+| スレッド・ターン | API-030〜044 | スレッド、送信、停止、承認、変更、ワークスペース | [worker.md](worker.md#スレッドターン) |
 | モデル | API-050〜059 | モデル・LoRA・HF 検索・DL | [worker.md](worker.md#モデル) |
 | プリセット | API-060〜063 | CRUD | [worker.md](worker.md#プリセット) |
 | 評価 | API-070〜082 | 評価セット・取込・書出・ラン・採点・推移 | [worker.md](worker.md#評価) |

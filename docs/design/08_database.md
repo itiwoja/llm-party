@@ -140,10 +140,10 @@ LoRA の GGUF。主なカラム：`id`, `base_model_id`, `path`
 主なカラム：`preset_id`, `adapter_id`, `scale`。PK は（preset_id, adapter_id）。preset は CASCADE、adapter は RESTRICT（使用中の LoRA は消せない）。`sort_order` で並び順。
 
 ### TBL-005：workspaces
-主なカラム：`id`, `path`（実体パス・UNIQUE）, `name`（フォルダ名）, `created_at`, `last_used_at`
+主なカラム：`id`, `path`（実体パス・UNIQUE）, `name`（表示名。初期値はフォルダ名）, `created_at`, `last_used_at`, `hidden_at`（一覧から外した日時）, `instructions`（プロジェクトの指示）, `default_preset_id`（FK → presets、SET NULL）, `auto_approve`（0/1、NULL は設定 `defaultAutoApprove` に従う）。後ろの4つは v2 で追加
 
 ### TBL-006：threads
-主なカラム：`id`, `title`, `workspace_id`（NULL ならチャット。FK → workspaces、SET NULL はしない・RESTRICT）, `last_preset_id`（FK → presets、SET NULL）, `auto_approve`（0/1、既定は設定値）, `created_at`, `updated_at`。全文検索用に `threads_fts`（title とメッセージ本文、`tokenize='trigram'`）を持つ。2文字以下の語は `threads_fts` を使わず `LIKE` で探す（D-58）
+主なカラム：`id`, `title`, `workspace_id`（NULL ならチャット。FK → workspaces、SET NULL はしない・RESTRICT）, `last_preset_id`（FK → presets、SET NULL）, `auto_approve`（0/1、既定はプロジェクトの値、なければ設定値）, `created_at`, `updated_at`。全文検索用に `threads_fts`（title とメッセージ本文、`tokenize='trigram'`）を持つ。2文字以下の語は `threads_fts` を使わず `LIKE` で探す（D-58）
 
 ### TBL-017：turns
 主なカラム：`id`, `thread_id`（CASCADE）, `preset_id`（SET NULL）, `status`（04 の値）, `step_count`, `step_limit`（既定 40）, `prompt_tokens`, `completion_tokens`, `started_at`, `finished_at`, `error`
@@ -224,7 +224,7 @@ LoRA の GGUF。主なカラム：`id`, `base_model_id`, `path`
 主なカラム：`id`, `eval_run_id`（CASCADE）, `eval_case_id`（SET NULL。ケースを消しても結果は残す）, `case_name`, `status`（04 の値）, `answer`（最終応答）, `transcript`（JSON：メッセージとツール呼び出し）, `test_output`, `score`（1〜5）, `reviewed_at`, `prompt_tokens`, `completion_tokens`, `tokens_per_sec`, `duration_ms`
 
 ### TBL-014：downloads
-主なカラム：`id`, `kind`（`model` / `adapter`）, `hf_repo`, `files`（JSON：ファイル名・サイズ・sha256）, `dest_dir`, `status`（04 の値）, `received_bytes`, `total_bytes`, `retry_count`, `error`, `result_id`（できた models.id）, `created_at`, `updated_at`
+主なカラム：`id`, `kind`（`model` / `adapter` / `file`。`file` は保存だけで `result_id` は空）, `hf_repo`, `files`（JSON：ファイル名・サイズ・sha256）, `dest_dir`, `status`（04 の値）, `received_bytes`, `total_bytes`, `retry_count`, `error`, `result_id`（できた models.id）, `created_at`, `updated_at`
 
 ### TBL-015：runtime_packs
 主なカラム：`id`, `backend`（`cuda`）, `cuda_version`, `llama_build`, `path`, `sha256`, `installed_at`

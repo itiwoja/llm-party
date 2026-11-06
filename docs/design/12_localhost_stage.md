@@ -63,6 +63,7 @@ WSL で動かすのは検証のためで、Linux 版の配布ではない。D-19
 | 環境変数 | 既定 | 説明 |
 |---|---|---|
 | `LLM_PARTY_LLAMA_BIN` | なし（必須） | 使う llama-server のパス |
+| `LLM_PARTY_SD_BIN` | なし（画像生成だけ使えない） | 使う sd-server のパス（ADR-009） |
 | `LLM_PARTY_BACKEND` | `cuda` | 表示と記録に使うバックエンド名（`cuda` / `vulkan` / `cpu`） |
 | `LLM_PARTY_PORT` | `8787` | 待ち受けポート |
 | `LLM_PARTY_DATA_DIR` | リポジトリの `data/` | データの置き場。`data/` は Git に入れない |

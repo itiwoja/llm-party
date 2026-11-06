@@ -43,4 +43,5 @@ flowchart LR
 5. [04_components](04_components.md) → [06_motion](06_motion.md) → [07_responsive_a11y](07_responsive_a11y.md) → [09_icon](09_icon.md)
 
 ## 最近の変更
-- なし（v0.1 初版、2026-11-06）
+- 2026-11-06：サイドバーを「整理された一覧」に変更（D-30〜D-32、[変更レポート](changes/2026-11-06-sidebar-list.md)）
+- v0.1 初版（2026-11-06）

@@ -73,7 +73,7 @@ flowchart LR
 | REQ-001 | ローカルの GGUF モデルとストリーミングで対話できる（思考モードの表示を含む） | Must | 普段使い | localhost |
 | REQ-002 | 選んだフォルダ（ワークスペース）の中で、ファイルの読み書き・検索・コマンド実行をするエージェントに作業を頼める。書き込みとコマンドは承認制 | Must | コーディング用途 | localhost |
 | REQ-003 | Codex 風の3ペイン画面（スレッド一覧 / 会話 / 差分・端末出力） | Must | 見た目の要望 | localhost |
-| REQ-004 | Hugging Face の GGUF を検索・DL でき、手元の GGUF と LoRA（GGUF 形式）を登録できる | Must | チューニングしたモデルを試す | localhost |
+| REQ-004 | Hugging Face のモデルをジャンルで絞って検索・DL でき、手元の GGUF と LoRA（GGUF 形式）を登録できる。チャットで動かせるのは GGUF だけで、ほかは保存まで | Must | チューニングしたモデルを試す | localhost |
 | REQ-005 | モデル・LoRA と倍率・生成設定・システムプロンプト・思考モード・文脈長を「プリセット」として保存し切り替えられる | Must | 比較の単位 | localhost |
 | REQ-006 | 評価セットをアプリ内で作り、JSONL で取込・書出できる。プリセットを選んで一括実行し、文字列一致/正規表現・人手・テストコマンドで採点し、ランどうしの比較と推移を見られる | Must | 主目的 | localhost |
 | REQ-007 | GPU に合わせて実行バックエンドを選ぶ。Vulkan・CPU は同梱、CUDA は NVIDIA の人だけ追加 DL | Must | 知人の PC がバラバラ | exe（localhost は手動指定） |
