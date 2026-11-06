@@ -5,6 +5,7 @@ import { createServer } from "node:net";
 import path from "node:path";
 import type { EventBus } from "./events";
 import { ApiError } from "./http-error";
+import { GENERATION_SLOTS } from "./generation-slot";
 
 export type EngineState = "stopped" | "starting" | "ready" | "failed";
 
@@ -39,7 +40,7 @@ export function buildArgs(spec: EngineSpec, backend: EngineOptions["backend"], p
     "--host", "127.0.0.1",
     "--port", String(port),
     "--api-key", apiKey,
-    "--parallel", "1",
+    "--parallel", String(GENERATION_SLOTS),
     "--jinja",
     "--no-webui",
   ];
@@ -60,8 +61,13 @@ function freePort(): Promise<number> {
   });
 }
 
+/** 読み込みの同一性。同じ key なら llama-server を読み直さず、生成の枠を一緒に持てる */
+export function loadKey(spec: Pick<EngineSpec, "modelPath" | "contextSize" | "adapterPaths">): string {
+  return JSON.stringify([spec.modelPath, spec.contextSize, spec.adapterPaths]);
+}
+
 function sameLoad(a: EngineSpec, b: EngineSpec): boolean {
-  return a.modelPath === b.modelPath && a.contextSize === b.contextSize && a.adapterPaths.join("\n") === b.adapterPaths.join("\n");
+  return loadKey(a) === loadKey(b);
 }
 
 /** llama-server を子プロセスとして1つだけ動かす（FR-003, BR-01） */

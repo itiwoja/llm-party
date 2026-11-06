@@ -174,7 +174,7 @@ describe("評価の実行（fake-llama）", () => {
 
   it("待ちのランを中止すると流れずに cancelled", async () => {
     const set = await makeSet([chat("一", contains("こん"))]);
-    const hold = await worker.context.slot.acquire(new AbortController().signal);
+    const hold = await worker.context.slot.acquire(new AbortController().signal, "test");
     const [runId] = await start(set.id);
     expect((await worker.api(`/eval-runs/${runId}/cancel`, { body: {} })).body.status).toBe("cancelled");
     hold();
@@ -317,7 +317,7 @@ describe("評価の実行（fake-llama）", () => {
   it("実行中は別プリセットの送信が BUSY で、同じプリセットはケースの合間に通る", async () => {
     const set = await makeSet([chat("一", contains("こん")), chat("二", contains("こん"))]);
     const thread = await worker.api("/threads", { body: { presetId: presetA } });
-    const hold = await worker.context.slot.acquire(new AbortController().signal);
+    const hold = await worker.context.slot.acquire(new AbortController().signal, "test");
     const [runId] = await start(set.id, [presetA]);
     expect(worker.context.slot.evalPresetId).toBe(presetA);
 
@@ -337,7 +337,7 @@ describe("評価の実行（fake-llama）", () => {
 
   it("プリセットを後で変えても、ランは作った時点の中身で流れる", async () => {
     const set = await makeSet([chat("一", contains("こん"))]);
-    const hold = await worker.context.slot.acquire(new AbortController().signal);
+    const hold = await worker.context.slot.acquire(new AbortController().signal, "test");
     const [runId] = await start(set.id, [presetA]);
     const changed = await worker.api(`/presets/${presetA}`, { method: "PATCH", body: { systemPrompt: "変えた", sampling: { ...SAMPLING, temperature: 0.1 } } });
     expect(changed.status).toBe(200);

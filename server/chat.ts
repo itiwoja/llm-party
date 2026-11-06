@@ -8,9 +8,9 @@ import { runAgentLoop, STEP_LIMIT, type AgentHost, type Decision } from "./agent
 import { agentSystemPrompt } from "./agent/prompt";
 import { streamCompletion, type ChatMessage, type Generation } from "./agent/stream";
 import { toolDefinitions } from "./agent/tools";
-import type { EngineManager } from "./engine";
+import { loadKey, type EngineManager } from "./engine";
 import type { EventBus } from "./events";
-import type { GenerationSlot } from "./generation-slot";
+import { GENERATION_SLOTS, type GenerationSlot } from "./generation-slot";
 import { ApiError } from "./http-error";
 import type { Store } from "./store";
 import { sha256 } from "./store/changes";
@@ -26,6 +26,9 @@ const CONTEXT_EXCEEDED = /exceeds the available context size/;
 interface Active {
   turnId: string;
   threadId: string;
+  workspaceId: string | null;
+  /** 読み込みの同一性。違う読み込みのターンは同時に動かさない */
+  loadKey: string;
   abort: AbortController;
   done: Promise<void>;
   /** 承認待ちのツール呼び出し（FR-010） */
@@ -42,45 +45,66 @@ export interface ChatOptions {
 }
 
 /**
- * FR-005・FR-008。生成は同時に1つだけ（D-60, D-63）。
+ * FR-005・FR-008。生成は同時に GENERATION_SLOTS 本まで（D-60 の改訂）。
+ * 同じスレッド・同じワークスペースのターンは1つだけ（D-36）。読み込みが違うターンは待たせず断る。
  * 承認待ち・上限待ちの間もこのターンが枠を持ち続けるので、その間の送信は BUSY になる
  */
 export class ChatService {
-  private active: Active | null = null;
+  /** 動いているターン（turnId → 状態） */
+  private active = new Map<string, Active>();
 
   constructor(private store: Store, private engine: EngineManager, private bus: EventBus, private slot: GenerationSlot, private options: ChatOptions) {}
 
   send(threadId: string, presetId: string, content: string): { turnId: string; status: "running" } {
-    if (!this.store.threads.get(threadId)) throw new ApiError("NOT_FOUND", "スレッドがありません");
+    const thread = this.store.threads.get(threadId);
+    if (!thread) throw new ApiError("NOT_FOUND", "スレッドがありません");
     if (!this.store.presets.get(presetId)) throw new ApiError("NOT_FOUND", "プリセットがありません");
-    if (this.active) throw new ApiError("BUSY", "別の生成が動いています");
     if (this.slot.evalPresetId && this.slot.evalPresetId !== presetId) throw new ApiError("BUSY", "評価の実行中です");
+
+    const key = this.keyOf(presetId);
+    const running = [...this.active.values()];
+    const sameOwner = running.some((a) => a.threadId === threadId || (thread.workspaceId !== null && a.workspaceId === thread.workspaceId));
+    if (sameOwner || running.length >= GENERATION_SLOTS) throw new ApiError("BUSY", "別の生成が動いています");
+    if (running.some((a) => a.loadKey !== key)) throw new ApiError("BUSY", "別のモデル・文脈長の生成が動いています");
 
     const turnId = this.store.threads.beginTurn(threadId, presetId, content);
     const abort = new AbortController();
-    const done = this.run(turnId, threadId, presetId, abort.signal).finally(() => {
-      this.active = null;
+    const entry: Active = { turnId, threadId, workspaceId: thread.workspaceId, loadKey: key, abort, done: Promise.resolve() };
+    this.active.set(turnId, entry);
+    entry.done = this.run(turnId, threadId, presetId, abort.signal).finally(() => {
+      this.active.delete(turnId);
     });
-    this.active = { turnId, threadId, abort, done };
     return { turnId, status: "running" };
+  }
+
+  /** プリセットの読み込みの key（枠を一緒に持てるかの判定に使う） */
+  private keyOf(presetId: string): string {
+    const preset = this.store.presets.get(presetId)!;
+    const model = this.store.models.get(preset.modelId)!;
+    return loadKey({
+      modelPath: model.path,
+      contextSize: preset.contextSize,
+      adapterPaths: this.store.presets.adapters(presetId).map((adapter) => adapter.path),
+    });
   }
 
   /** 生成が動いているか（画像生成の開始を断るのに使う） */
   get busy(): boolean {
-    return this.active !== null;
+    return this.active.size > 0;
   }
 
   cancel(turnId: string): void {
-    if (this.active?.turnId !== turnId || this.active.stepWait) throw new ApiError("CONFLICT", "このターンは動いていません");
-    this.active.abort.abort();
+    const active = this.active.get(turnId);
+    if (!active || active.stepWait) throw new ApiError("CONFLICT", "このターンは動いていません");
+    active.abort.abort();
   }
 
   /** API-038：承認・却下 */
   decide(toolCallId: string, decision: Decision["decision"], note?: string): { status: "running" | "rejected" } {
     const call = this.store.agent.toolCall(toolCallId);
     if (!call) throw new ApiError("NOT_FOUND", "ツール呼び出しがありません");
-    const pending = this.active?.pending;
-    if (!pending || pending.toolCallId !== toolCallId) throw new ApiError("CONFLICT", "承認待ちではありません");
+    const pending = this.pendingOf(toolCallId);
+    if (!pending) throw new ApiError("CONFLICT", "承認待ちではありません");
     const approved = decision !== "reject";
     if (!this.store.agent.decide(toolCallId, approved ? "running" : "rejected", note)) {
       throw new ApiError("CONFLICT", "承認待ちではありません");
@@ -92,9 +116,10 @@ export class ChatService {
 
   /** API-037：40 回上限の後の「続ける / やめる」 */
   continueTurn(turnId: string, action: "continue" | "stop"): { status: "running" | "completed" } {
-    const wait = this.active?.turnId === turnId ? this.active.stepWait : undefined;
-    if (!wait) throw new ApiError("CONFLICT", "上限で止まっていません");
-    this.active!.stepWait = undefined;
+    const active = this.active.get(turnId);
+    const wait = active?.stepWait;
+    if (!active || !wait) throw new ApiError("CONFLICT", "上限で止まっていません");
+    active.stepWait = undefined;
     if (action === "continue") {
       const turn = this.store.threads.turn(turnId)!;
       this.store.threads.setStepLimit(turnId, turn.stepCount + STEP_LIMIT);
@@ -106,7 +131,7 @@ export class ChatService {
 
   /** 承認待ちの書き込みの差分。画面を開き直したときにカードへ戻す */
   pendingPreview(toolCallId: string): string | undefined {
-    return this.active?.pending?.toolCallId === toolCallId ? this.active.pending.preview : undefined;
+    return this.pendingOf(toolCallId)?.preview;
   }
 
   /** API-039：変更記録。ファイルごとに、取り消していない変更をまとめた差分と、1回ずつの差分を返す */
@@ -176,18 +201,22 @@ export class ChatService {
   /** FR-004：動いているターンを先に止めてから消す */
   async deleteThread(threadId: string): Promise<void> {
     if (!this.store.threads.get(threadId)) throw new ApiError("NOT_FOUND", "スレッドがありません");
-    if (this.active?.threadId === threadId) {
-      this.active.abort.abort();
-      await this.active.done;
-    }
+    const running = [...this.active.values()].filter((a) => a.threadId === threadId);
+    for (const a of running) a.abort.abort();
+    await Promise.all(running.map((a) => a.done));
     this.store.threads.delete(threadId);
   }
 
   /** 動いているターンを止めて、終わるのを待つ（終了時） */
   async shutdown(): Promise<void> {
-    const active = this.active;
-    active?.abort.abort();
-    await active?.done;
+    const running = [...this.active.values()];
+    for (const a of running) a.abort.abort();
+    await Promise.all(running.map((a) => a.done));
+  }
+
+  /** 承認待ちのツール呼び出しの状態（どのターンのものかを探す） */
+  private pendingOf(toolCallId: string): Active["pending"] {
+    return [...this.active.values()].find((a) => a.pending?.toolCallId === toolCallId)?.pending;
   }
 
   private async run(turnId: string, threadId: string, presetId: string, signal: AbortSignal): Promise<void> {
@@ -197,6 +226,8 @@ export class ChatService {
     const thread = this.store.threads.get(threadId)!;
     const workspace = thread.workspaceId ? this.store.agent.workspace(thread.workspaceId) : null;
     const { sampling, thinking, contextSize } = preset;
+    // llama-server は -c を枠の数で割って使うので、1本ぶんの文脈で数える
+    const slotContext = Math.floor(contextSize / GENERATION_SLOTS);
 
     const system = [preset.systemPrompt, workspace ? agentSystemPrompt(workspace.path) : "", workspace?.instructions].filter(Boolean).join("\n\n");
     const samplingBody = {
@@ -266,9 +297,9 @@ export class ChatService {
     /** 1回の生成。assistant メッセージを作り、差分を流し、止まっても途中までを保存する */
     const generate = async (history: ChatMessage[]): Promise<Generation> => {
       let used = await measure(history);
-      if (needsCompaction(used, contextSize) && (await compact(history))) used = await measure(history);
+      if (needsCompaction(used, slotContext) && (await compact(history))) used = await measure(history);
       // 要約しても入らないなら送らない（CP-050。画面は error がこの文かどうかで判別する）
-      if (isContextFull(used, contextSize)) throw new ApiError("CONFLICT", CONTEXT_FULL);
+      if (isContextFull(used, slotContext)) throw new ApiError("CONFLICT", CONTEXT_FULL);
 
       const messageId = this.store.threads.addMessage({ threadId, turnId, role: "assistant", content: "" });
       let content = "";
@@ -297,7 +328,7 @@ export class ChatService {
                 usedTokens: usage
                   ? usage.prompt_tokens + usage.completion_tokens
                   : (chunk.timings?.cache_n ?? 0) + (chunk.timings?.prompt_n ?? 0) + (chunk.timings?.predicted_n ?? 0),
-                contextSize,
+                contextSize: slotContext,
                 tokensPerSecond: chunk.timings?.predicted_per_second,
               });
             }
@@ -319,7 +350,7 @@ export class ChatService {
     let release: (() => void) | undefined;
     try {
       // 評価のケースが動いていたら、その合間まで待つ（FR-016）
-      release = await this.slot.acquire(signal);
+      release = await this.slot.acquire(signal, this.keyOf(presetId));
       await this.engine.load({
         presetId,
         modelPath: model.path,
@@ -394,7 +425,7 @@ export class ChatService {
         }
       },
       awaitDecision: async (record) => {
-        const active = this.active!;
+        const active = this.active.get(turnId)!;
         store.threads.setTurnStatus(turnId, "awaiting_approval");
         const decision = await wait<Decision>(
           (resolve) => {
@@ -418,7 +449,7 @@ export class ChatService {
       onFileChange: (record, change) => store.changes.record({ toolCallId: record.id, threadId, path: change.path, before: change.before, after: change.after }),
       onStep: (stepCount) => store.threads.setStepCount(turnId, stepCount),
       awaitContinue: async (stepCount) => {
-        const active = this.active!;
+        const active = this.active.get(turnId)!;
         store.threads.setTurnStatus(turnId, "step_limit");
         bus.publish("turn.stepLimit", { turnId, stepCount });
         return wait<"continue" | "stop">(

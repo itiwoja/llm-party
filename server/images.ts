@@ -48,7 +48,7 @@ export class ImageService {
   }
 
   private async run(threadId: string, model: { id: string; name: string; path: string; parts: ImageParts | null }, input: ImageRequest): Promise<void> {
-    const release = await this.slot.acquire(new AbortController().signal);
+    const release = await this.slot.acquire(new AbortController().signal, "image");
     try {
       await this.engine.stop();
       await this.image.load({ path: model.path, parts: model.parts });

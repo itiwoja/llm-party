@@ -29,7 +29,7 @@ describe("変更記録・差分・取り消し（FR-011）", () => {
     const model = path.join(worker.dir, "model.gguf");
     writeGguf(model);
     const registered = await worker.api("/models", { body: { path: model, mode: "reference" } });
-    const preset = await worker.api("/presets", { body: { name: "対話", modelId: registered.body.id, sampling: SAMPLING, thinking: false, contextSize: 4096, systemPrompt: "" } });
+    const preset = await worker.api("/presets", { body: { name: "対話", modelId: registered.body.id, sampling: SAMPLING, thinking: false, contextSize: 8192, systemPrompt: "" } });
     const workspace = await worker.api("/workspaces", { body: { path: ws } });
     const thread = await worker.api("/threads", { body: { presetId: preset.body.id, workspaceId: workspace.body.id } });
     await worker.api(`/threads/${thread.body.id}`, { method: "PATCH", body: { autoApprove: true } });
@@ -142,7 +142,7 @@ describe("変更記録・差分・取り消し（FR-011）", () => {
     const model = path.join(worker.dir, "m.gguf");
     writeGguf(model);
     const registered = await worker.api("/models", { body: { path: model, mode: "reference" } });
-    const preset = await worker.api("/presets", { body: { name: "対話", modelId: registered.body.id, sampling: SAMPLING, thinking: false, contextSize: 4096, systemPrompt: "" } });
+    const preset = await worker.api("/presets", { body: { name: "対話", modelId: registered.body.id, sampling: SAMPLING, thinking: false, contextSize: 8192, systemPrompt: "" } });
     expect((await worker.api("/threads", { body: { presetId: preset.body.id } })).body.autoApprove).toBe(false);
     worker.context.db.prepare("INSERT INTO settings (key, value) VALUES ('defaultAutoApprove', 'true')").run();
     expect((await worker.api("/threads", { body: { presetId: preset.body.id } })).body.autoApprove).toBe(true);

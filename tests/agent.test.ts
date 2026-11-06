@@ -54,7 +54,7 @@ describe("エージェント（fake-llama）", () => {
     writeGguf(file);
     const model = await worker.api("/models", { body: { path: file, mode: "reference" } });
     const preset = await worker.api("/presets", {
-      body: { name: "対話", modelId: model.body.id, sampling: SAMPLING, thinking: false, contextSize: 4096, systemPrompt: "短く答える" },
+      body: { name: "対話", modelId: model.body.id, sampling: SAMPLING, thinking: false, contextSize: 8192, systemPrompt: "短く答える" },
     });
     let workspaceId: string | undefined;
     if (workspacePath) {
@@ -372,7 +372,7 @@ describe("ワークスペース（API-041, 042）", () => {
     const file = path.join(worker.dir, "model.gguf");
     writeGguf(file);
     const model = await worker.api("/models", { body: { path: file, mode: "reference" } });
-    const preset = await worker.api("/presets", { body: { name: "p", modelId: model.body.id, sampling: SAMPLING, thinking: false, contextSize: 4096 } });
+    const preset = await worker.api("/presets", { body: { name: "p", modelId: model.body.id, sampling: SAMPLING, thinking: false, contextSize: 8192 } });
     const ws = await worker.api("/workspaces", { body: { path: scratch.dir } });
     expect(ws.body).toMatchObject({ instructions: null, defaultPresetId: null, autoApprove: null });
     const url = `/workspaces/${ws.body.id}`;
@@ -401,7 +401,7 @@ describe("ワークスペース（API-041, 042）", () => {
     const file = path.join(worker.dir, "model.gguf");
     writeGguf(file);
     const model = await worker.api("/models", { body: { path: file, mode: "reference" } });
-    const preset = await worker.api("/presets", { body: { name: "p", modelId: model.body.id, sampling: SAMPLING, thinking: false, contextSize: 4096 } });
+    const preset = await worker.api("/presets", { body: { name: "p", modelId: model.body.id, sampling: SAMPLING, thinking: false, contextSize: 8192 } });
     const ws = await worker.api("/workspaces", { body: { path: scratch.dir } });
     const thread = await worker.api("/threads", { body: { presetId: preset.body.id, workspaceId: ws.body.id } });
     await worker.api(`/threads/${thread.body.id}`, { method: "PATCH", body: { title: "残す会話" } });
@@ -423,7 +423,7 @@ describe("ワークスペース（API-041, 042）", () => {
     const file = path.join(worker.dir, "model.gguf");
     writeGguf(file);
     const model = await worker.api("/models", { body: { path: file, mode: "reference" } });
-    const preset = await worker.api("/presets", { body: { name: "p", modelId: model.body.id, sampling: SAMPLING, thinking: false, contextSize: 4096 } });
+    const preset = await worker.api("/presets", { body: { name: "p", modelId: model.body.id, sampling: SAMPLING, thinking: false, contextSize: 8192 } });
     expect((await worker.api("/threads", { body: { presetId: preset.body.id, workspaceId: "none" } })).status).toBe(404);
     const ws = await worker.api("/workspaces", { body: { path: scratch.dir } });
     const thread = await worker.api("/threads", { body: { presetId: preset.body.id, workspaceId: ws.body.id } });

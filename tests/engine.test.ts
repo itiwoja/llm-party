@@ -8,9 +8,9 @@ import { FAKE_LLAMA, tempDir, waitForEvent } from "./helpers";
 const SPEC: EngineSpec = { presetId: "p1", modelPath: "/m.gguf", contextSize: 32768, adapterPaths: [] };
 
 describe("buildArgs", () => {
-  it("--parallel 1 で 127.0.0.1 だけに開く（D-60）", () => {
+  it("--parallel は枠の数で 127.0.0.1 だけに開く（D-60 改訂）", () => {
     const args = buildArgs(SPEC, "cuda", 1234, "key").join(" ");
-    expect(args).toContain("--parallel 1");
+    expect(args).toContain("--parallel 2");
     expect(args).toContain("--host 127.0.0.1 --port 1234 --api-key key");
     expect(args).toContain("-ngl auto");
     expect(args).toContain("--jinja");

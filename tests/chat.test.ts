@@ -10,11 +10,11 @@ async function setup(worker: TestWorker, thinking = false) {
   const model = await worker.api("/models", { body: { path: file, mode: "reference" } });
   expect(model.status).toBe(201);
   const preset = await worker.api("/presets", {
-    body: { name: "対話", modelId: model.body.id, sampling: SAMPLING, thinking, contextSize: 4096, systemPrompt: "短く答える" },
+    body: { name: "対話", modelId: model.body.id, sampling: SAMPLING, thinking, contextSize: 8192, systemPrompt: "短く答える" },
   });
   expect(preset.status).toBe(201);
   const thread = await worker.api("/threads", { body: { presetId: preset.body.id } });
-  return { presetId: preset.body.id as string, threadId: thread.body.id as string };
+  return { presetId: preset.body.id as string, threadId: thread.body.id as string, modelId: model.body.id as string };
 }
 
 const finished = (worker: TestWorker, turnId: string) =>
@@ -200,5 +200,57 @@ describe("入力の検証", () => {
       body: { name: "x", modelId: model.body.id, sampling: SAMPLING, thinking: false, contextSize: 8192 },
     });
     expect(res.status).toBe(400);
+  });
+});
+
+describe("同時に2本まで（D-60 改訂）", () => {
+  let worker: TestWorker;
+  beforeEach(async () => { worker = await startWorker(); });
+  afterEach(async () => {
+    await worker.close();
+    vi.unstubAllEnvs();
+  });
+
+  it("別のスレッドなら2本が同時に動き、3本目は BUSY", async () => {
+    vi.stubEnv("FAKE_LLAMA_MODE", "slow");
+    const { presetId, threadId } = await setup(worker);
+    const second = await worker.api("/threads", { body: { presetId } });
+    const third = await worker.api("/threads", { body: { presetId } });
+
+    const first = await worker.api(`/threads/${threadId}/turns`, { body: { presetId, content: "一つ目" } });
+    const two = await worker.api(`/threads/${second.body.id}/turns`, { body: { presetId, content: "二つ目" } });
+    // 一つ目が動いたままで二つ目が通る（直列なら BUSY になる）
+    expect(two.status).toBe(202);
+    const over = await worker.api(`/threads/${third.body.id}/turns`, { body: { presetId, content: "三つ目" } });
+    expect(over).toMatchObject({ status: 409, body: { error: { code: "BUSY" } } });
+
+    await worker.api(`/turns/${first.body.turnId}/cancel`, { body: {} });
+    await worker.api(`/turns/${two.body.turnId}/cancel`, { body: {} });
+    await finished(worker, first.body.turnId);
+    await finished(worker, two.body.turnId);
+  });
+
+  it("同じスレッドの二つ目は BUSY（同じワークスペースも同様）", async () => {
+    vi.stubEnv("FAKE_LLAMA_MODE", "slow");
+    const { presetId, threadId } = await setup(worker);
+    const first = await worker.api(`/threads/${threadId}/turns`, { body: { presetId, content: "一つ目" } });
+    const again = await worker.api(`/threads/${threadId}/turns`, { body: { presetId, content: "二つ目" } });
+    expect(again.body.error.code).toBe("BUSY");
+    await worker.api(`/turns/${first.body.turnId}/cancel`, { body: {} });
+    await finished(worker, first.body.turnId);
+  });
+
+  it("読み込みの違う（文脈長が違う）プリセットは、動いている間は BUSY で、読み直さない", async () => {
+    vi.stubEnv("FAKE_LLAMA_MODE", "slow");
+    const { presetId, threadId, modelId } = await setup(worker);
+    const other = await worker.api("/presets", {
+      body: { name: "別の文脈", modelId, sampling: SAMPLING, thinking: false, contextSize: 4096 },
+    });
+    const thread = await worker.api("/threads", { body: { presetId: other.body.id } });
+    const first = await worker.api(`/threads/${threadId}/turns`, { body: { presetId, content: "一つ目" } });
+    const mismatch = await worker.api(`/threads/${thread.body.id}/turns`, { body: { presetId: other.body.id, content: "別" } });
+    expect(mismatch).toMatchObject({ status: 409, body: { error: { code: "BUSY", message: "別のモデル・文脈長の生成が動いています" } } });
+    await worker.api(`/turns/${first.body.turnId}/cancel`, { body: {} });
+    await finished(worker, first.body.turnId);
   });
 });

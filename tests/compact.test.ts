@@ -82,7 +82,7 @@ describe("自動要約（fake-llama）", () => {
     writeGguf(file);
     const model = await worker.api("/models", { body: { path: file, mode: "reference" } });
     const preset = await worker.api("/presets", {
-      body: { name: "対話", modelId: model.body.id, sampling: SAMPLING, thinking: true, contextSize: 4096, systemPrompt: "短く答える" },
+      body: { name: "対話", modelId: model.body.id, sampling: SAMPLING, thinking: true, contextSize: 8192, systemPrompt: "短く答える" },
     });
     const workspace = workspacePath ? (await worker.api("/workspaces", { body: { path: workspacePath } })).body.id : undefined;
     const thread = await worker.api("/threads", { body: { presetId: preset.body.id, workspaceId: workspace } });

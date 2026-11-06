@@ -324,7 +324,7 @@ export class EvalService {
     for (;;) {
       let release: () => void;
       try {
-        release = await this.options.slot.acquire(signal);
+        release = await this.options.slot.acquire(signal, "eval");
       } catch {
         return "cancelled";
       }

@@ -67,7 +67,9 @@ export function ThreadsPage() {
   const [changes, setChanges] = useState<FileChange[]>([]);
   const [live, setLive] = useState<Record<string, string>>({});
   const [input, setInput] = useState("");
-  const [turn, setTurn] = useState<{ id: string; threadId: string } | null>(null);
+  // 動いているターン（同時に2本まで）。表示中のスレッドのものが turn
+  const [running, setRunning] = useState<{ id: string; threadId: string }[]>([]);
+  const turn = running.find((r) => r.threadId === threadId) ?? null;
   const [stepWait, setStepWait] = useState(false);
   const [usage, setUsage] = useState<Usage>({ percent: null, tokensPerSecond: null });
   const [error, setError] = useState("");
@@ -143,13 +145,10 @@ export function ThreadsPage() {
       const used = last.promptTokens + (last.completionTokens ?? 0);
       setUsage((current) => (current.percent === null ? { ...current, percent: (used / size) * 100 } : current));
     }
-    if (last && ACTIVE_TURN.includes(last.status)) {
-      setTurn({ id: last.id, threadId: id });
-      setStepWait(last.status === "step_limit");
-    } else if (turnRef.current?.threadId === id && (!last || !detail.turns.some((t) => t.id === turnRef.current?.id && ACTIVE_TURN.includes(t.status)))) {
-      setTurn(null);
-      setStepWait(false);
-    }
+    const activeNow = last && ACTIVE_TURN.includes(last.status) ? last : null;
+    setRunning((list) => [...list.filter((r) => r.threadId !== id), ...(activeNow ? [{ id: activeNow.id, threadId: id }] : [])]);
+    if (activeNow) setStepWait(activeNow.status === "step_limit");
+    else if (turnRef.current?.threadId === id) setStepWait(false);
   }, []);
 
   const loadChanges = useCallback(async (id: string) => {
@@ -251,6 +250,8 @@ export function ThreadsPage() {
   useServerEvent(({ event, data }) => {
     const active = turnRef.current;
     const here = active && active.threadId === threadRef.current ? active : null;
+    // 終わったターンは、どのスレッドのものでも一覧から外す
+    if (event === "turn.finished") setRunning((list) => list.filter((r) => r.id !== data.turnId));
     if (event === "turn.delta" && here && data.turnId === here.id) {
       const entry = pending.current.get(data.messageId) ?? { content: "", reasoning: "", turnId: here.id };
       entry.content += data.content ?? "";
@@ -289,7 +290,6 @@ export function ThreadsPage() {
     } else if (event === "turn.finished" && active && data.turnId === active.id) {
       if (frame.current) cancelAnimationFrame(frame.current);
       flush();
-      setTurn(null);
       setStepWait(false);
       setLive({});
       // 文脈満杯は入力欄の下に出す（ターンの error から導く）
@@ -355,7 +355,7 @@ export function ThreadsPage() {
         return;
       }
       const started = await api<{ turnId: string }>(`/threads/${id}/turns`, { presetId, content });
-      setTurn({ id: started.turnId, threadId: id });
+      setRunning((list) => [...list.filter((r) => r.threadId !== id), { id: started.turnId, threadId: id }]);
       setInput("");
       if (id !== threadId) navigate(`/threads/${id}`, true);
       await loadDetail(id);
@@ -421,7 +421,7 @@ export function ThreadsPage() {
 
   const generating = turn !== null && turn.threadId === threadId;
   const contextSize = presets.find((p) => p.id === presetId)?.contextSize;
-  const runningIds = new Set(turn ? [turn.threadId] : []);
+  const runningIds = new Set(running.map((r) => r.threadId));
   const lastTurn = turns.at(-1);
   const contextFull = !generating && lastTurn?.status === "failed" && lastTurn.error === PG1.contextFull;
   const turnError = !generating && lastTurn?.status === "failed" && lastTurn.error && !contextFull ? lastTurn.error : "";
