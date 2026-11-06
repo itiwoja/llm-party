@@ -13,24 +13,24 @@ interface SelectProps {
   /** ラベル。visible なら欄の上に出し、false なら読み上げ専用 */
   label: string;
   hideLabel?: boolean;
-  /** 見出しの大きさで出す（メインのプリセット名） */
-  title?: boolean;
+  /** 枠なしの小さい形で出す（入力欄の右下のプリセット選択）。メニューは右端にそろえる */
+  compact?: boolean;
   disabled?: boolean;
 }
 
 /** CMP-015（セレクト）。プリセット名などは等幅にしない */
-export function SelectField({ value, onValueChange, options, label, hideLabel, title, disabled }: SelectProps) {
+export function SelectField({ value, onValueChange, options, label, hideLabel, compact, disabled }: SelectProps) {
   const id = useId();
   return (
     <div className="field">
       <label id={id} className={hideLabel ? "sr-only" : "field-label"}>{label}</label>
       <Select.Root value={value} onValueChange={onValueChange} disabled={disabled}>
-        <Select.Trigger className={`select-trigger${title ? " select-title" : ""}`} aria-labelledby={id}>
+        <Select.Trigger className={`select-trigger${compact ? " select-compact" : ""}`} aria-labelledby={id}>
           <Select.Value />
           <Select.Icon><ChevronDown aria-hidden /></Select.Icon>
         </Select.Trigger>
         <Select.Portal>
-          <Select.Content className="menu select-content" position="popper" sideOffset={4}>
+          <Select.Content className="menu select-content" position="popper" sideOffset={4} align={compact ? "end" : "start"}>
             <Select.Viewport>
               {options.map((o) => (
                 <Select.Item key={o.value} value={o.value} className="menu-item select-item">

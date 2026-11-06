@@ -65,6 +65,11 @@ export class ChatService {
     return { turnId, status: "running" };
   }
 
+  /** 生成が動いているか（画像生成の開始を断るのに使う） */
+  get busy(): boolean {
+    return this.active !== null;
+  }
+
   cancel(turnId: string): void {
     if (this.active?.turnId !== turnId || this.active.stepWait) throw new ApiError("CONFLICT", "このターンは動いていません");
     this.active.abort.abort();
@@ -193,7 +198,7 @@ export class ChatService {
     const workspace = thread.workspaceId ? this.store.agent.workspace(thread.workspaceId) : null;
     const { sampling, thinking, contextSize } = preset;
 
-    const system = [preset.systemPrompt, workspace ? agentSystemPrompt(workspace.path) : ""].filter(Boolean).join("\n\n");
+    const system = [preset.systemPrompt, workspace ? agentSystemPrompt(workspace.path) : "", workspace?.instructions].filter(Boolean).join("\n\n");
     const samplingBody = {
       temperature: sampling.temperature,
       top_p: sampling.topP,

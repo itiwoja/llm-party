@@ -3,6 +3,8 @@ export interface ModelItem {
   id: string;
   name: string;
   path: string;
+  /** チャット（llama-server）か画像生成（sd-server）か */
+  use: "chat" | "image";
   source: "local_ref" | "local_copy" | "hf";
   architecture: string;
   quantization: string | null;
@@ -21,14 +23,15 @@ export interface AdapterItem {
   missing: boolean;
 }
 
-export interface HfRepo { repo: string; downloads: number; updatedAt: string | null; createdAt: string | null; gated: boolean }
-export interface HfFile { name: string; quantization: string | null; sizeBytes: number; split: boolean; complete: boolean; parts: { name: string; sizeBytes: number }[] }
+export interface HfRepo { repo: string; downloads: number; updatedAt: string | null; createdAt: string | null; gated: boolean; pipelineTag: string | null; license: string | null; params: number | null; memoryGb: number | null }
+export interface HfFile { name: string; quantization: string | null; sizeBytes: number; split: boolean; complete: boolean; parts: { name: string; sizeBytes: number }[]; memoryGb: number }
 
 export type DownloadStatus = "queued" | "downloading" | "retrying" | "verifying" | "completed" | "failed" | "cancelled";
 
 export interface DownloadItem {
   id: string;
-  kind: "model" | "adapter";
+  /** file は保存だけ。チャットのモデルには登録されない */
+  kind: "model" | "adapter" | "file";
   repo: string;
   files: { name: string; sizeBytes: number }[];
   status: DownloadStatus;
@@ -38,6 +41,8 @@ export interface DownloadItem {
   resultId: string | null;
   /** 完了した LoRA の保存先 */
   filePath?: string;
+  /** 完了した保存だけの DL の置き場 */
+  savedDir?: string;
 }
 
 export const isActive = (status: DownloadStatus) => status !== "completed" && status !== "failed" && status !== "cancelled";

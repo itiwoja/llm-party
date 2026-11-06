@@ -34,7 +34,8 @@ export function PresetsPage() {
       api.get<{ defaultContextSize: number }>("/settings"),
     ]);
     setPresets(list.items);
-    setModels(modelData.items);
+    // 画像モデルはチャットのプリセットに使えない
+    setModels(modelData.items.filter((model) => model.use !== "image"));
     setAdapters(modelData.adapters);
     setDefaultContextSize(settings.defaultContextSize);
   }, []);

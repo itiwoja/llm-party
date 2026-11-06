@@ -110,6 +110,7 @@ describe("エージェント（fake-llama）", () => {
 
     // 2 回目の生成には assistant の tool_calls と tool の結果が並ぶ。ツールと作業フォルダの説明も付く
     const [first, second] = requests(worker);
+    expect(first.messages[0].content).not.toContain("プロジェクトの決まり");
     expect(first.tools.map((t: any) => t.function.name)).toHaveLength(6);
     expect(first.messages[0].content).toContain(ws);
     expect(first.messages[0].content).toContain("短く答える");
@@ -118,11 +119,14 @@ describe("エージェント（fake-llama）", () => {
       { role: "tool", tool_call_id: "call_1", content: expect.stringContaining("作成しました") },
     ]);
 
-    // 次の指示でも履歴に残る
+    // 次の指示でも履歴に残る。プロジェクトの指示はシステムプロンプトの後ろに足す
+    const { workspaceId } = (await worker.api(`/threads`)).body.items[0];
+    await worker.api(`/workspaces/${workspaceId}`, { method: "PATCH", body: { instructions: "プロジェクトの決まり" } });
     script([{ content: "次" }]);
     const again = await send(threadId, presetId, "続き");
     await finished(worker, again);
     const last = requests(worker).at(-1);
+    expect(last.messages[0].content).toMatch(/短く答える[\s\S]*プロジェクトの決まり$/);
     expect(last.messages.map((m: any) => m.role)).toEqual(["system", "user", "assistant", "tool", "assistant", "user"]);
   });
 
@@ -362,6 +366,57 @@ describe("ワークスペース（API-041, 042）", () => {
     const nested = path.join(scratch.dir, "p");
     mkdirSync(nested);
     expect((await worker.api("/workspaces", { body: { path: nested } })).status).toBe(201);
+  });
+
+  it("プロジェクトの設定を保存し、新しいスレッドの自動承認に効く（API-043）", async () => {
+    const file = path.join(worker.dir, "model.gguf");
+    writeGguf(file);
+    const model = await worker.api("/models", { body: { path: file, mode: "reference" } });
+    const preset = await worker.api("/presets", { body: { name: "p", modelId: model.body.id, sampling: SAMPLING, thinking: false, contextSize: 4096 } });
+    const ws = await worker.api("/workspaces", { body: { path: scratch.dir } });
+    expect(ws.body).toMatchObject({ instructions: null, defaultPresetId: null, autoApprove: null });
+    const url = `/workspaces/${ws.body.id}`;
+
+    const saved = await worker.api(url, { method: "PATCH", body: { name: "  本体 ", instructions: " 日本語で ", defaultPresetId: preset.body.id, autoApprove: true } });
+    expect(saved.body).toMatchObject({ name: "本体", instructions: "日本語で", defaultPresetId: preset.body.id, autoApprove: true });
+    const thread = await worker.api("/threads", { body: { presetId: preset.body.id, workspaceId: ws.body.id } });
+    expect(thread.body).toMatchObject({ autoApprove: true, workspaceName: "本体" });
+
+    // null は設定に従う。空の指示は未設定に戻す。名前を送らなければ変えない
+    const reset = await worker.api(url, { method: "PATCH", body: { instructions: "  ", autoApprove: null } });
+    expect(reset.body).toMatchObject({ name: "本体", instructions: null, autoApprove: null });
+    expect((await worker.api("/threads", { body: { presetId: preset.body.id, workspaceId: ws.body.id } })).body.autoApprove).toBe(false);
+
+    expect((await worker.api(url, { method: "PATCH", body: { defaultPresetId: "none" } })).status).toBe(404);
+    expect((await worker.api(url, { method: "PATCH", body: { name: " " } })).status).toBe(400);
+    expect((await worker.api("/workspaces/none", { method: "PATCH", body: { name: "x" } })).status).toBe(404);
+
+    // プリセットを消すと既定だけ外れる
+    await worker.api(url, { method: "PATCH", body: { defaultPresetId: preset.body.id } });
+    expect((await worker.api(`/presets/${preset.body.id}`, { method: "DELETE" })).status).toBe(204);
+    expect((await worker.api("/workspaces")).body.items[0].defaultPresetId).toBeNull();
+  });
+
+  it("外したプロジェクトは一覧と検索から消え、登録し直すとスレッドごと戻る（API-044）", async () => {
+    const file = path.join(worker.dir, "model.gguf");
+    writeGguf(file);
+    const model = await worker.api("/models", { body: { path: file, mode: "reference" } });
+    const preset = await worker.api("/presets", { body: { name: "p", modelId: model.body.id, sampling: SAMPLING, thinking: false, contextSize: 4096 } });
+    const ws = await worker.api("/workspaces", { body: { path: scratch.dir } });
+    const thread = await worker.api("/threads", { body: { presetId: preset.body.id, workspaceId: ws.body.id } });
+    await worker.api(`/threads/${thread.body.id}`, { method: "PATCH", body: { title: "残す会話" } });
+    const chat = await worker.api("/threads", { body: { presetId: preset.body.id } });
+
+    expect((await worker.api(`/workspaces/${ws.body.id}`, { method: "DELETE" })).status).toBe(204);
+    expect((await worker.api("/workspaces")).body.items).toEqual([]);
+    expect((await worker.api("/threads")).body.items.map((t: any) => t.id)).toEqual([chat.body.id]);
+    expect((await worker.api(`/threads?q=${encodeURIComponent("残す会話")}`)).body.items).toEqual([]);
+    expect((await worker.api("/threads", { body: { presetId: preset.body.id, workspaceId: ws.body.id } })).status).toBe(404);
+
+    const again = await worker.api("/workspaces", { body: { path: scratch.dir } });
+    expect(again.body).toMatchObject({ id: ws.body.id, hiddenAt: null });
+    expect((await worker.api("/threads")).body.items.map((t: any) => t.id)).toContain(thread.body.id);
+    expect((await worker.api("/workspaces/none", { method: "DELETE" })).status).toBe(404);
   });
 
   it("スレッドの作成は存在するワークスペースだけ。一覧にワークスペース名が出る", async () => {

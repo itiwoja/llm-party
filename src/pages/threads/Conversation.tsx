@@ -3,6 +3,7 @@ import { Collapsible } from "../../components/Collapsible";
 import { Markdown } from "../../components/Markdown";
 import { CP, MISSING_COPY } from "../../copy";
 import { PG1 } from "./copy";
+import { ImageMessage } from "./ImageMessage";
 import { ToolCard, type Decide } from "./ToolCard";
 import type { ThreadMessage, ToolCall } from "./types";
 
@@ -90,7 +91,9 @@ export function Conversation({ messages, toolCalls, error, onDecide, footer }: P
           }
           return (
             <article key={m.id} className={`message message-${m.role}`}>
-              {m.role === "user" ? (
+              {m.role === "image" ? (
+                <ImageMessage content={m.content} />
+              ) : m.role === "user" ? (
                 <div className="user-text">{m.content}</div>
               ) : (
                 <>

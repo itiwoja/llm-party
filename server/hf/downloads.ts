@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { createReadStream, existsSync, mkdirSync, readSync, openSync, closeSync, statSync } from "node:fs";
-import { open, rename, rm, statfs } from "node:fs/promises";
+import { open, rename, rm, statfs, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { EventBus } from "../events";
 import { readGguf } from "../gguf";
@@ -8,7 +8,8 @@ import { ApiError } from "../http-error";
 import type { Store } from "../store";
 import type { DownloadRecord } from "../store/downloads";
 import { HfClient, RetryableError } from "./client";
-import { assertFileName, assertRepo, expandSelection, insideDir, quantOf } from "./names";
+import { readSafetensors } from "../safetensors";
+import { assertFileName, assertGguf, assertRepo, assertSafetensors, expandSelection, insideDir, quantOf } from "./names";
 
 export interface DownloadOptions {
   store: Store;
@@ -21,6 +22,8 @@ export interface DownloadOptions {
 const MAX_RETRIES = 3;
 /** 空きに足す余白（BR-05, D-31）。2GB を 2×1024³ バイトとして扱う */
 const FREE_MARGIN = 2_000_000_000;
+/** 完了した DL のプリセットの文脈長の上限（学習時の文脈長がこれより短ければそちら） */
+const DEFAULT_CONTEXT = 32768;
 
 export const INTERRUPTED_MESSAGE = "中断されました";
 const BROKEN_MESSAGE = "ファイル破損。再試行で取り直し";
@@ -93,23 +96,40 @@ export class DownloadService {
     return this.options.store.downloads.list();
   }
 
-  /** 空き容量と、ゲートの有無を確かめてから待ち行列に入れる */
-  async create(input: { repo: string; files: string[]; kind: "model" | "adapter" }): Promise<DownloadRecord> {
+  /**
+   * 空き容量と、ゲートの有無を確かめてから待ち行列に入れる。
+   * files を省くとリポジトリ全体を取る（保存だけの file に限る）
+   */
+  async create(input: { repo: string; files?: string[]; kind: DownloadRecord["kind"] }): Promise<DownloadRecord> {
     const { store } = this.options;
     assertRepo(input.repo);
-    input.files.forEach((file) => assertFileName(file));
-    const selected = expandSelection(input.files, await this.client.listGguf(input.repo));
+    input.files?.forEach((file) => assertFileName(file));
+    if (input.kind === "image") {
+      if (!input.files || input.files.length !== 1) throw new ApiError("VALIDATION_ERROR", "入力が正しくありません", [{ field: "files" }]);
+      assertSafetensors(input.files[0]);
+    } else if (input.kind !== "file") {
+      if (!input.files) throw new ApiError("VALIDATION_ERROR", "入力が正しくありません", [{ field: "files" }]);
+      input.files.forEach((file) => assertGguf(file));
+    }
+    const tree = await this.client.listFiles(input.repo);
+    const selected = input.files ? expandSelection(input.files, tree) : tree;
+    if (selected.length === 0) throw new ApiError("VALIDATION_ERROR", "ファイルが見つかりません", [{ field: "files" }]);
+    // 全体を取るときの名前は HF から来る。保存先の外へ出る形が混ざらないよう同じ検査を通す
+    selected.forEach((file) => assertFileName(file.path));
     const destDir = insideDir(store.downloads.modelsDir(this.options.dataDir), input.repo);
     selected.forEach((file) => insideDir(destDir, file.path));
     // 登録済みのファイルを取り直しても models.create が衝突するだけなので、入口で断る
-    if (store.downloads.isRegistered(input.kind, insideDir(destDir, selected[0].path))) {
+    if (input.kind !== "file" && store.downloads.isRegistered(input.kind, insideDir(destDir, selected[0].path))) {
       throw new ApiError("CONFLICT", "このファイルは登録済みです");
     }
 
-    // ゲート付きは始める前に分かるよう、先頭の1バイトだけ取ってみる
+    // ゲート付きは始める前に分かるよう、先頭の1バイトだけ取ってみる。空のファイルは Range が通らないので避ける
+    const probeFile = selected.find((file) => file.size > 0);
     try {
-      const probe = await this.client.check(await this.client.fetch(this.client.resolveUrl(input.repo, selected[0].path), { headers: { Range: "bytes=0-0" } }));
-      await probe.body?.cancel();
+      if (probeFile) {
+        const probe = await this.client.check(await this.client.fetch(this.client.resolveUrl(input.repo, probeFile.path), { headers: { Range: "bytes=0-0" } }));
+        await probe.body?.cancel();
+      }
     } catch (error) {
       if (error instanceof RetryableError) throw new ApiError("UPSTREAM_ERROR", error.message);
       throw error;
@@ -253,11 +273,38 @@ export class DownloadService {
       const final = target(file.name);
       const part = `${final}.part`;
       if (!existsSync(part)) continue; // 前の回で外し終えている
-      await this.verify(job, part, file);
+      await this.verify(job, part, file, record.kind === "model" || record.kind === "adapter");
       toRename.push(final);
     }
+    const total = record.files.reduce((sum, file) => sum + file.size, 0);
+    // 保存だけの DL は形式を問わないので、GGUF としての確認も登録もしない
+    if (record.kind === "file") {
+      for (const final of toRename) await rename(`${final}.part`, final);
+      this.set(job.id, { status: "completed", receivedBytes: total });
+      return;
+    }
+
     const first = target(record.files[0].name);
     const firstFile = existsSync(`${first}.part`) ? `${first}.part` : first;
+    if (record.kind === "image") {
+      // 画像モデルは safetensors として確かめて登録する。GGUF の検査は通さない
+      let info: ReturnType<typeof readSafetensors>;
+      try {
+        info = readSafetensors(firstFile);
+      } catch (error) {
+        await Promise.all(toRename.map((final) => rm(`${final}.part`, { force: true })));
+        throw error;
+      }
+      for (const final of toRename) await rename(`${final}.part`, final);
+      const name = info.name ?? path.basename(first, ".safetensors");
+      const model = store.models.create({
+        name, path: first, source: "hf", architecture: "safetensors",
+        quantization: null, sizeBytes: total, trainContext: null, use: "image",
+      });
+      store.downloads.setModelRepo(model.id, record.repo);
+      this.set(job.id, { status: "completed", receivedBytes: total, resultId: model.id });
+      return;
+    }
     const info = readGguf(firstFile);
     const expected = record.kind === "model" ? "model" : "adapter";
     if (info.type !== expected) {
@@ -266,7 +313,6 @@ export class DownloadService {
     }
     for (const final of toRename) await rename(`${final}.part`, final);
 
-    const total = record.files.reduce((sum, file) => sum + file.size, 0);
     // LoRA は登録しない。ベースモデルは利用者が選び、画面が POST /api/adapters を呼ぶ
     let resultId: string | null = null;
     if (record.kind === "model") {
@@ -277,18 +323,27 @@ export class DownloadService {
       });
       store.downloads.setModelRepo(model.id, record.repo);
       resultId = model.id;
+      // すぐチャットで使えるように、対話の既定値のプリセットを1つ作る。作れなくてもモデルの登録は残す
+      try {
+        store.presets.create({
+          name: model.name, modelId: model.id, thinking: false, contextSize: Math.min(info.trainContext ?? DEFAULT_CONTEXT, DEFAULT_CONTEXT),
+          sampling: { temperature: 0.8, topP: 0.95, topK: 40, minP: 0.05, presencePenalty: 0, repeatPenalty: 1 },
+        });
+      } catch {
+        // 同じ名前のプリセットがある等。登録したモデルはそのまま使える
+      }
     }
     this.set(job.id, { status: "completed", receivedBytes: total, resultId });
   }
 
-  /** サイズ・sha256・GGUF の先頭を確かめる。壊れていれば .part を消して失敗にする */
-  private async verify(job: Job, part: string, file: { name: string; size: number; sha256: string | null }): Promise<void> {
+  /** サイズ・sha256 を確かめる（checkGguf なら GGUF の先頭も）。壊れていれば .part を消して失敗にする */
+  private async verify(job: Job, part: string, file: { name: string; size: number; sha256: string | null }, checkGguf: boolean): Promise<void> {
     const broken = async (message: string): Promise<never> => {
       await rm(part, { force: true });
       throw new ApiError("UPSTREAM_ERROR", message);
     };
     if (statSync(part).size !== file.size) return broken(BROKEN_MESSAGE);
-    if (!hasMagic(part)) {
+    if (checkGguf && !hasMagic(part)) {
       await rm(part, { force: true });
       throw new ApiError("INVALID_GGUF", "GGUF ファイルではありません");
     }
@@ -303,6 +358,8 @@ export class DownloadService {
       existing = 0;
     }
     if (existing === size) {
+      // 空のファイルは取りに行かないが、.part がないと完成させられない
+      if (size === 0) await writeFile(part, "");
       job.received += size;
       return;
     }

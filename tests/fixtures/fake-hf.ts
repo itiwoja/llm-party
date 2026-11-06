@@ -30,6 +30,11 @@ export interface FakeRepo {
   files: FakeFile[];
   /** 付けるとゲート付き。resolve は Bearer がこの値のときだけ通る */
   gatedToken?: string;
+  pipelineTag?: string;
+  /** 検索の filter が見るタグ。既定は gguf */
+  tags?: string[];
+  /** パラメータ数。expand[]=gguf か safetensors を頼まれたときに返す（本物と同じく、頼まないと返らない） */
+  params?: number;
 }
 
 export interface FakeHf {
@@ -48,6 +53,10 @@ export interface FakeHf {
   cdnRequests: { url: string; authorization?: string; range?: string }[];
   close(): Promise<void>;
 }
+
+/** どのリポジトリにもある LFS でないファイル */
+const README: FakeFile = { path: "README.md", data: Buffer.from("# fake repo") };
+const fileIn = (repo: FakeRepo | undefined, name: string) => [...(repo?.files ?? []), README].find((item) => item.path === name);
 
 const sha = (data: Buffer) => createHash("sha256").update(data).digest("hex");
 
@@ -79,9 +88,20 @@ export async function startFakeHf(repos: Record<string, FakeRepo> = {}): Promise
     const url = new URL(req.url ?? "/", "http://x");
     if (url.pathname === "/api/models") {
       const q = url.searchParams.get("search") ?? "";
-      const items = [...fake.repos.keys()].filter((repo) => repo.includes(q)).map((repo, index) => ({
-        id: repo, downloads: 1000 - index, lastModified: "2026-11-01T00:00:00.000Z", createdAt: "2026-10-01T00:00:00.000Z", gated: Boolean(fake.repos.get(repo)!.gatedToken),
-      }));
+      const tag = url.searchParams.get("pipeline_tag");
+      const filters = url.searchParams.getAll("filter");
+      const tagsOf = (repo: string) => fake.repos.get(repo)!.tags ?? ["gguf"];
+      const items = [...fake.repos.keys()]
+        .filter((repo) => repo.includes(q) && (!tag || fake.repos.get(repo)!.pipelineTag === tag) && filters.every((filter) => tagsOf(repo).includes(filter)))
+        .map((repo) => ({
+          id: repo, downloads: 1000 - [...fake.repos.keys()].indexOf(repo), createdAt: "2026-10-01T00:00:00.000Z",
+          pipeline_tag: fake.repos.get(repo)!.pipelineTag, tags: [...tagsOf(repo), "license:mit"],
+          // 本物と同じく、頼まないと返らない
+          ...(url.searchParams.getAll("expand[]").includes("lastModified") ? { lastModified: "2026-11-01T00:00:00.000Z" } : {}),
+          ...(url.searchParams.getAll("expand[]").includes("gated") ? { gated: Boolean(fake.repos.get(repo)!.gatedToken) } : {}),
+          ...(url.searchParams.getAll("expand[]").includes("gguf") && fake.repos.get(repo)!.params ? { gguf: { total: fake.repos.get(repo)!.params } } : {}),
+          ...(url.searchParams.getAll("expand[]").includes("safetensors") && fake.repos.get(repo)!.params ? { safetensors: { total: fake.repos.get(repo)!.params } } : {}),
+        }));
       return json(res, items);
     }
     const tree = /^\/api\/models\/([^/]+\/[^/]+)\/tree\/main$/.exec(url.pathname);
@@ -90,7 +110,7 @@ export async function startFakeHf(repos: Record<string, FakeRepo> = {}): Promise
       if (!repo) return void res.writeHead(404).end();
       const entries = [
         { type: "directory", path: "sub" },
-        { type: "file", path: "README.md", size: 10 },
+        { type: "file", path: README.path, size: README.data.length, oid: "git-oid" },
         ...repo.files.map((file) => ({
           type: "file", path: file.path, size: 135, oid: "git-oid",
           lfs: { oid: file.oid ?? sha(file.data), size: file.reportedSize ?? file.data.length, pointerSize: 135 },
@@ -107,7 +127,7 @@ export async function startFakeHf(repos: Record<string, FakeRepo> = {}): Promise
     const resolve = /^\/([^/]+\/[^/]+)\/resolve\/main\/(.+)$/.exec(url.pathname);
     if (resolve) {
       const repo = fake.repos.get(resolve[1]);
-      const file = repo?.files.find((item) => item.path === decodeURIComponent(resolve[2]));
+      const file = fileIn(repo, decodeURIComponent(resolve[2]));
       if (!repo || !file) return void res.writeHead(404).end();
       if (repo.gatedToken && req.headers.authorization !== `Bearer ${repo.gatedToken}`) return void res.writeHead(401).end();
       if (fake.behavior.failures > 0) {
@@ -123,7 +143,7 @@ export async function startFakeHf(repos: Record<string, FakeRepo> = {}): Promise
   const cdn = createServer((req, res) => {
     fake.cdnRequests.push(note(req));
     const match = /^\/blob\/([^/]+)\/(.+)$/.exec(req.url ?? "");
-    const file = match && fake.repos.get(decodeURIComponent(match[1]))?.files.find((item) => item.path === decodeURIComponent(match[2]));
+    const file = match && fileIn(fake.repos.get(decodeURIComponent(match[1])), decodeURIComponent(match[2]));
     if (!file) return void res.writeHead(404).end();
     const range = /^bytes=(\d+)-/.exec(req.headers.range ?? "");
     let start = 0;

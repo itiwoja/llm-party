@@ -45,7 +45,15 @@ export interface ToolCall {
   preview?: string;
 }
 
-export interface Workspace { id: string; path: string; name: string }
+/** プロジェクト（TBL-005）。autoApprove の null は設定に従う */
+export interface Workspace {
+  id: string;
+  path: string;
+  name: string;
+  instructions: string | null;
+  defaultPresetId: string | null;
+  autoApprove: boolean | null;
+}
 
 /** API-039（TBL-009）。応答の形は未確定なので、読む側で欠けを許す */
 export interface FileChange {

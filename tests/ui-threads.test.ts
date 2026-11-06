@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { stripAnsi } from "../src/pages/threads/ansi";
 import { classifyDiff, countChanges, unifiedDiff } from "../src/pages/threads/diff";
+import { groupThreads } from "../src/pages/threads/group";
+import type { ThreadInfo, Workspace } from "../src/pages/threads/types";
 
 describe("PG-001 の差分と端末の部品", () => {
   it("新規作成の差分は --- /dev/null で始まり、全行が追加", () => {
@@ -21,5 +23,15 @@ describe("PG-001 の差分と端末の部品", () => {
   it("HTML はそのまま文字として扱い、ANSI は取り除く", () => {
     expect(classifyDiff("+<b>x</b>")[0]).toEqual({ kind: "add", text: "<b>x</b>" });
     expect(stripAnsi("\u001b[31mred\u001b[0m\r\nok\u001b]0;title\u0007")).toBe("red\nok");
+  });
+});
+
+describe("SEC-001-02 のプロジェクト分け", () => {
+  it("スレッドをプロジェクトに分け、フォルダなしはチャットに入れる。空のプロジェクトも残す", () => {
+    const thread = (id: string, workspaceId: string | null) => ({ id, workspaceId }) as ThreadInfo;
+    const project = (id: string) => ({ id }) as Workspace;
+    const { groups, chats } = groupThreads([thread("t1", "a"), thread("t2", null), thread("t3", "a")], [project("a"), project("b")]);
+    expect(groups.map((g) => [g.project.id, g.threads.map((t) => t.id)])).toEqual([["a", ["t1", "t3"]], ["b", []]]);
+    expect(chats.map((t) => t.id)).toEqual(["t2"]);
   });
 });

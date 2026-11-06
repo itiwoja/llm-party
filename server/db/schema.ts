@@ -220,4 +220,28 @@ export const MIGRATIONS: string[] = [
     DELETE FROM threads_fts WHERE source_id = old.id;
   END;
   `,
+  // v2：作業フォルダをプロジェクトとして設定できるようにする（TBL-005）。auto_approve の NULL は設定 defaultAutoApprove に従う
+  `
+  ALTER TABLE workspaces ADD COLUMN hidden_at TEXT;
+  ALTER TABLE workspaces ADD COLUMN instructions TEXT;
+  ALTER TABLE workspaces ADD COLUMN default_preset_id TEXT REFERENCES presets(id) ON DELETE SET NULL;
+  ALTER TABLE workspaces ADD COLUMN auto_approve INTEGER;
+  `,
+  // v3：画像生成（D-72）。models.kind で画像モデルを区別し、生成結果は images に持つ。
+  // スレッドの履歴には role = 'image' で入れるので、チャットの文脈（user / assistant / summary だけを読む）には入らない
+  `
+  ALTER TABLE models ADD COLUMN kind TEXT NOT NULL DEFAULT 'chat';
+  CREATE TABLE images (
+    id TEXT PRIMARY KEY,
+    thread_id TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+    model_name TEXT NOT NULL,
+    prompt TEXT NOT NULL,
+    width INTEGER NOT NULL,
+    height INTEGER NOT NULL,
+    steps INTEGER NOT NULL,
+    seed INTEGER NOT NULL,
+    path TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  `,
 ];

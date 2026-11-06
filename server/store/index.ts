@@ -4,6 +4,7 @@ import { AgentStore } from "./agent";
 import { ChangeStore } from "./changes";
 import { DownloadStore } from "./downloads";
 import { EvalStore } from "./eval";
+import { ImageStore } from "./images";
 import { ModelStore } from "./models";
 import { PresetStore } from "./presets";
 import { SettingStore } from "./settings";
@@ -24,6 +25,7 @@ export class Store {
   readonly changes: ChangeStore;
   readonly evals: EvalStore;
   readonly settings: SettingStore;
+  readonly images: ImageStore;
 
   constructor(db: Db) {
     this.models = new ModelStore(db);
@@ -35,5 +37,6 @@ export class Store {
     this.changes = new ChangeStore(db);
     this.evals = new EvalStore(db);
     this.settings = new SettingStore(db);
+    this.images = new ImageStore(db);
   }
 }

@@ -12,6 +12,8 @@ export interface ModelInput {
   name: string;
   path: string;
   source: "local_ref" | "local_copy" | "hf";
+  /** チャット用（llama-server）か画像生成用（sd-server）か。DB の列は kind */
+  use?: "chat" | "image";
   architecture: string;
   quantization: string | null;
   sizeBytes: number;
@@ -19,12 +21,12 @@ export interface ModelInput {
 }
 
 interface ModelRow {
-  id: string; name: string; path: string; source: string; architecture: string;
+  id: string; name: string; path: string; source: string; kind: string; architecture: string;
   quantization: string | null; size_bytes: number; train_context: number | null; created_at: string;
 }
 
 const toModel = (row: ModelRow) => ({
-  id: row.id, name: row.name, path: row.path, source: row.source, architecture: row.architecture,
+  id: row.id, name: row.name, path: row.path, source: row.source, use: row.kind, architecture: row.architecture,
   quantization: row.quantization, sizeBytes: row.size_bytes, trainContext: row.train_context, createdAt: row.created_at,
 });
 
@@ -44,9 +46,9 @@ export class ModelStore {
     const id = ulid();
     const time = now();
     try {
-      this.db.prepare(`INSERT INTO models (id, name, path, source, architecture, quantization, size_bytes, train_context, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-        .run(id, input.name, input.path, input.source, input.architecture, input.quantization, input.sizeBytes, input.trainContext, time, time);
+      this.db.prepare(`INSERT INTO models (id, name, path, source, kind, architecture, quantization, size_bytes, train_context, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .run(id, input.name, input.path, input.source, input.use ?? "chat", input.architecture, input.quantization, input.sizeBytes, input.trainContext, time, time);
     } catch (error) {
       if (isUniqueError(error)) throw new ApiError("CONFLICT", "このファイルは登録済みです");
       throw error;

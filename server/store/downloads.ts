@@ -13,7 +13,8 @@ export interface DownloadFile {
 
 export interface DownloadRecord {
   id: string;
-  kind: "model" | "adapter";
+  /** file は保存だけ。チャットのモデルにはならない（形式を問わない） */
+  kind: "model" | "adapter" | "image" | "file";
   repo: string;
   files: DownloadFile[];
   destDir: string;
@@ -108,8 +109,8 @@ export class DownloadStore {
   }
 
   /** そのファイルが models / adapters に登録済みか（再 DL を入口で 409 にする） */
-  isRegistered(kind: DownloadRecord["kind"], file: string): boolean {
-    return this.db.prepare(`SELECT 1 FROM ${kind === "model" ? "models" : "adapters"} WHERE path = ?`).get(file) !== undefined;
+  isRegistered(kind: "model" | "adapter" | "image", file: string): boolean {
+    return this.db.prepare(`SELECT 1 FROM ${kind === "adapter" ? "adapters" : "models"} WHERE path = ?`).get(file) !== undefined;
   }
 
   /** models.create は hf_repo を受けないので、できたモデルに由来のリポジトリを足す */

@@ -1,5 +1,7 @@
 import { ApiError } from "../http-error";
+import { GENRES, GGUF_ONLY_GENRES, type Genre } from "./genres";
 import { assertRepo, encodePath, type TreeFile } from "./names";
+import { estimateQ4Gb, fits, type MemoryLimit } from "./memory";
 import { readHfToken } from "./token";
 
 /** 切れた・混んでいるなど、待てば直るかもしれない失敗 */
@@ -8,7 +10,18 @@ export class RetryableError extends Error {}
 const MAX_REDIRECTS = 5;
 /** tree の続きを辿る回数の上限（暴走防止） */
 const MAX_TREE_PAGES = 100;
-const SEARCH_LIMIT = 20;
+const SEARCH_LIMIT = 50;
+/** VRAM・RAM で絞るときは、絞った後も結果が残るよう多めに取る（HF はサイズで絞れない） */
+const FILTER_FETCH_LIMIT = 100;
+/** 検索で使う項目。指定しないと lastModified と gated が返らない。指定すると既定の項目も消えるので全部書く */
+const SEARCH_FIELDS = ["downloads", "lastModified", "createdAt", "gated", "pipeline_tag", "tags", "gguf", "safetensors"];
+
+/** GGUF か safetensors のパラメータ数から、パラメータ数と Q4 の目安を取る */
+function sizeOf(item: { gguf?: { total?: unknown }; safetensors?: { total?: unknown } }): Pick<HfRepo, "params" | "memoryGb"> {
+  const total = item.gguf?.total ?? item.safetensors?.total;
+  const params = typeof total === "number" && total > 0 ? total : null;
+  return { params, memoryGb: params === null ? null : estimateQ4Gb(params) };
+}
 
 export const GATED_MESSAGE = "ゲート付きリポジトリ。設定で HF トークンが必要";
 const CONNECT_MESSAGE = "Hugging Face に接続不可。「あとで」で先へ";
@@ -19,6 +32,19 @@ export interface HfRepo {
   updatedAt: string | null;
   createdAt: string | null;
   gated: boolean;
+  pipelineTag: string | null;
+  /** `license:` タグの値。HF に無ければ null */
+  license: string | null;
+  /** パラメータ数（GGUF か safetensors の値）。分からなければ null */
+  params: number | null;
+  /** Q4_K_M で動かすときの目安メモリ（GB）。params が null なら null */
+  memoryGb: number | null;
+}
+
+export interface HfSearch extends Partial<MemoryLimit> {
+  query: string;
+  genre: Genre;
+  uncensored: boolean;
 }
 
 /** HF との通信。トークンは HF 自身のオリジンにだけ付け、リダイレクト先（CDN）には送らない */
@@ -75,9 +101,27 @@ export class HfClient {
     }
   }
 
-  async search(query: string): Promise<HfRepo[]> {
+  /** ジャンルと語で探す。pipeline_tag が複数のジャンルは検索ごとの結果を DL 数の順に混ぜる */
+  async search({ query, genre, uncensored, vram = null, ram = null }: HfSearch): Promise<HfRepo[]> {
+    const tags: readonly (string | null)[] = GENRES[genre].length > 0 ? GENRES[genre] : [null];
+    const filters = [...(GGUF_ONLY_GENRES.includes(genre) ? ["gguf"] : []), ...(uncensored ? ["uncensored"] : [])];
+    const limit = vram === null && ram === null ? SEARCH_LIMIT : FILTER_FETCH_LIMIT;
+    const results = await Promise.all(tags.map((tag) => this.searchOne(query, tag, filters, limit)));
+    const merged = new Map(results.flat().map((repo) => [repo.repo, repo]));
+    return [...merged.values()]
+      .filter((repo) => fits(repo.memoryGb, { vram, ram }))
+      .sort((a, b) => b.downloads - a.downloads)
+      .slice(0, SEARCH_LIMIT);
+  }
+
+  private async searchOne(query: string, pipelineTag: string | null, filters: string[], limit: number): Promise<HfRepo[]> {
     const url = new URL("/api/models", this.baseUrl);
-    url.search = new URLSearchParams({ search: query, filter: "gguf", sort: "downloads", limit: String(SEARCH_LIMIT) }).toString();
+    const params = new URLSearchParams({ sort: "downloads", limit: String(limit) });
+    if (query) params.set("search", query);
+    if (pipelineTag) params.set("pipeline_tag", pipelineTag);
+    for (const filter of filters) params.append("filter", filter); // filter を重ねると AND になる
+    for (const field of SEARCH_FIELDS) params.append("expand[]", field);
+    url.search = params.toString();
     const { body } = await this.json(url);
     if (!Array.isArray(body)) throw new ApiError("UPSTREAM_ERROR", CONNECT_MESSAGE);
     return body.map((item) => ({
@@ -86,11 +130,14 @@ export class HfClient {
       updatedAt: item.lastModified ?? null,
       createdAt: item.createdAt ?? null,
       gated: Boolean(item.gated),
+      pipelineTag: item.pipeline_tag ?? null,
+      license: (item.tags as string[] | undefined)?.find((tag) => tag.startsWith("license:"))?.slice("license:".length) ?? null,
+      ...sizeOf(item),
     }));
   }
 
-  /** .gguf だけを返す。tree は続きがあるので Link ヘッダーの next を最後まで辿る */
-  async listGguf(repo: string): Promise<TreeFile[]> {
+  /** リポジトリの全ファイル。tree は続きがあるので Link ヘッダーの next を最後まで辿る */
+  async listFiles(repo: string): Promise<TreeFile[]> {
     assertRepo(repo);
     const files: TreeFile[] = [];
     let url: URL | null = new URL(`/api/models/${encodePath(repo)}/tree/main?recursive=true`, this.baseUrl);
@@ -98,7 +145,7 @@ export class HfClient {
       const { body, link } = await this.json(url);
       if (!Array.isArray(body)) throw new ApiError("UPSTREAM_ERROR", CONNECT_MESSAGE);
       for (const entry of body) {
-        if (entry.type !== "file" || !String(entry.path).toLowerCase().endsWith(".gguf")) continue;
+        if (entry.type !== "file") continue;
         files.push({ path: entry.path, size: Number(entry.lfs?.size ?? entry.size), sha256: entry.lfs?.oid ?? null });
       }
       const next: string | undefined = link?.split(",").map((part) => /<([^>]+)>;\s*rel="next"/.exec(part)?.[1]).find(Boolean);

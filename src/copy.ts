@@ -17,12 +17,10 @@ export const CP = {
   instructionPlaceholder: "手元のモデルに指示", // CP-021
   send: "送信", // CP-022
   stop: "停止", // CP-023
-  contextLabel: "文脈", // CP-026
+  contextLabel: "Context", // CP-026
   toolLabel: "ツール", // CP-027
   newThread: "新規", // CP-028
-  searchThreads: "スレッドを検索", // CP-029
   noThreads: "スレッドなし。入力欄から開始", // CP-030
-  noThreadResults: "検索結果なし。語を変えて再検索", // CP-031
   renameThread: "名前を変更", // CP-032
   confirmDeleteThread: (title: string) => `「${title}」を削除。会話は戻せない。作業フォルダのファイルは残る`, // CP-033
   thinking: "思考", // CP-034

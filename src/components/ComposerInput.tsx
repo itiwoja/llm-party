@@ -26,7 +26,7 @@ export const ComposerInput = forwardRef<HTMLTextAreaElement, Props>(function Com
 
   return (
     <div className="field">
-      <label className="field-label" htmlFor={rest.id}>{label}</label>
+      <label className="sr-only" htmlFor={rest.id}>{label}</label>
       <textarea
         ref={inner}
         rows={1}

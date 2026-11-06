@@ -21,7 +21,8 @@ export function threadRoutes({ store, chat }: Context): Router {
       req.body,
     );
     if (!store.presets.get(presetId)) throw new ApiError("NOT_FOUND", "プリセットがありません");
-    if (workspaceId && !store.agent.workspace(workspaceId)) throw new ApiError("NOT_FOUND", "ワークスペースがありません");
+    const project = workspaceId ? store.agent.workspace(workspaceId) : null;
+    if (workspaceId && (!project || project.hiddenAt)) throw new ApiError("NOT_FOUND", "ワークスペースがありません");
     // FR-006「新しいスレッドで続ける」。設計の API-031 にない追加の引数（要約を最初のメッセージにする）
     if (summaryFromThreadId) {
       if (!store.threads.get(summaryFromThreadId)) throw new ApiError("NOT_FOUND", "スレッドがありません");

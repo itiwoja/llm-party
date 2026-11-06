@@ -2,7 +2,7 @@ import { useSyncExternalStore } from "react";
 
 /** 01_ia のルート。ハッシュだけで切り替える（URL の #token= は main.tsx が先に読み取って消す） */
 export type Route =
-  | { page: "threads"; id?: string }
+  | { page: "threads"; id?: string; projectId?: string }
   | { page: "setup" }
   | { page: "models" }
   | { page: "presets"; id?: string }
@@ -20,7 +20,10 @@ export function parseRoute(hash: string): Route {
     case "evals": return second && third === "compare" ? { page: "compare", id: second } : { page: "evals", id: second || undefined };
     case "runs": return second ? { page: "runs", id: second } : { page: "evals" };
     case "settings": return { page: "settings" };
-    default: return { page: "threads", id: first === "threads" ? second || undefined : undefined };
+    default:
+      // #/threads/new/<id>：そのプロジェクトで新しいスレッドを始める入力画面
+      if (first === "threads" && second === "new" && third) return { page: "threads", id: undefined, projectId: third };
+      return { page: "threads", id: first === "threads" ? second || undefined : undefined };
   }
 }
 

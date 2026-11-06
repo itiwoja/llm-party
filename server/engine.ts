@@ -23,6 +23,8 @@ export interface EngineOptions {
   bus: EventBus;
   loadTimeoutMs?: number;
   stopGraceMs?: number;
+  /** 読み込みの前に呼ぶ。画像生成の sd-server を止めて VRAM を空けるのに使う */
+  beforeLoad?: () => Promise<void>;
 }
 
 const POLL_MS = 500;
@@ -149,6 +151,7 @@ export class EngineManager {
       this.presetId = spec.presetId;
       return;
     }
+    await this.options.beforeLoad?.();
     if (!this.options.bin) {
       this.setState("failed", "LLM_PARTY_LLAMA_BIN が設定されていません");
       throw new ApiError("ENGINE_FAILED", "LLM_PARTY_LLAMA_BIN が設定されていません");

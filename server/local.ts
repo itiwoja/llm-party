@@ -14,7 +14,7 @@ const token = loadOrCreateToken(config.dataDir);
 const logsDir = path.join(config.dataDir, "logs");
 logger.init(logsDir);
 pruneLogs(logsDir);
-const context = createContext({ bin: config.llamaBin, backend: config.backend, dataDir: config.dataDir });
+const context = createContext({ bin: config.llamaBin, backend: config.backend, dataDir: config.dataDir, sdBin: config.sdBin });
 const app = createApp({ port: config.port, token, context, extraRoutes: localRoutes });
 const server = createServer(app);
 
@@ -49,6 +49,7 @@ server.listen(config.port, "127.0.0.1", () => {
   logger.info(`起動 port=${config.port} backend=${config.backend}`);
   console.log(`LLM-PARTY: http://127.0.0.1:${config.port}/#token=${token}`);
   if (!config.llamaBin) console.warn("LLM_PARTY_LLAMA_BIN が未設定です。モデルを読み込むときに失敗します");
+  if (!config.sdBin) console.warn("LLM_PARTY_SD_BIN が未設定です。画像生成は使えません");
 });
 
 // Ctrl+C で生成を止めて DB を閉じ、llama-server も止める（12 WSL での違い）

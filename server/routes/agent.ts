@@ -41,6 +41,24 @@ export function agentRoutes({ store, chat, dataDir }: Context): Router {
     if (!real) throw new ApiError("PATH_NOT_ALLOWED", "このフォルダは作業フォルダに不可。別のフォルダを選択");
     res.status(201).json(store.agent.registerWorkspace(real, path.basename(real)));
   });
+  // プロジェクトの設定（API-043）と一覧から外す操作（API-044）
+  api.patch("/workspaces/:id", (req, res) => {
+    const patch = parse(z.object({
+      name: z.string().trim().min(1).optional(),
+      instructions: z.string().nullable().optional(),
+      defaultPresetId: z.string().min(1).nullable().optional(),
+      autoApprove: z.boolean().nullable().optional(),
+    }), req.body);
+    if (!store.agent.workspace(req.params.id)) throw new ApiError("NOT_FOUND", "ワークスペースがありません");
+    if (patch.defaultPresetId && !store.presets.get(patch.defaultPresetId)) throw new ApiError("NOT_FOUND", "プリセットがありません");
+    store.agent.updateWorkspace(req.params.id, { ...patch, instructions: patch.instructions === undefined ? undefined : patch.instructions?.trim() || null });
+    res.json(store.agent.workspace(req.params.id));
+  });
+  api.delete("/workspaces/:id", (req, res) => {
+    if (!store.agent.workspace(req.params.id)) throw new ApiError("NOT_FOUND", "ワークスペースがありません");
+    store.agent.hideWorkspace(req.params.id);
+    res.status(204).end();
+  });
 
   return api;
 }

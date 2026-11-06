@@ -9,6 +9,7 @@ import { FAKE_LLAMA, startWorker, type TestWorker } from "./helpers";
 const small = ggufBytes({ padding: 200_000 });
 const partA = ggufBytes({ padding: 50_000 });
 const partB = ggufBytes({ padding: 70_000 });
+const payload = Buffer.alloc(30_000, 5);
 let hf: FakeHf;
 let worker: TestWorker;
 
@@ -44,6 +45,15 @@ beforeEach(async () => {
         { path: "lora-adapter.gguf", data: ggufBytes({ type: "adapter" }) },
         { path: "notgguf.gguf", data: Buffer.from("this is not a gguf file".repeat(100)) },
         { path: "mmproj-F16.gguf", data: ggufBytes({ type: "clip" }) },
+      ],
+    },
+    "acme/sdxl": {
+      files: [
+        { path: "model.safetensors", data: payload },
+        { path: "text_encoder/model-00001-of-00002.safetensors", data: payload },
+        { path: "text_encoder/model-00002-of-00002.safetensors", data: payload },
+        { path: "empty.txt", data: Buffer.alloc(0) },
+        { path: "broken.safetensors", data: payload, oid: "0".repeat(64) },
       ],
     },
   });
@@ -143,6 +153,65 @@ describe("DL の完了とモデル登録", () => {
     const res = await worker.api("/downloads", body(["tiny-Q4_K_M.gguf"]));
     await find(res.body.id, "completed");
     expect(existsSync(path.join(custom, "acme/tiny-GGUF/tiny-Q4_K_M.gguf"))).toBe(true);
+  });
+});
+
+describe("保存だけの DL（file）", () => {
+  it("GGUF でなくても保存し、モデルには登録しない。置き場を返す", async () => {
+    const created = await worker.api("/downloads", body(["model.safetensors"], "acme/sdxl", "file"));
+    expect(created.status).toBe(202);
+    const done = await find(created.body.id, "completed");
+    expect(done.savedDir).toBe(path.join(models(), "acme", "sdxl"));
+    expect(done.resultId).toBeNull();
+    expect(readFileSync(path.join(models(), "acme/sdxl/model.safetensors"))).toEqual(payload);
+    expect(worker.context.store.models.list()).toEqual([]);
+  });
+
+  it("GGUF のファイルでも file なら登録しない", async () => {
+    const created = await worker.api("/downloads", body(["tiny-Q4_K_M.gguf"], "acme/tiny-GGUF", "file"));
+    await find(created.body.id, "completed");
+    expect(worker.context.store.models.list()).toEqual([]);
+  });
+
+  it("分割の safetensors は仲間ごと取る", async () => {
+    const created = await worker.api("/downloads", body(["text_encoder/model-00002-of-00002.safetensors"], "acme/sdxl", "file"));
+    await find(created.body.id, "completed");
+    expect(existsSync(path.join(models(), "acme/sdxl/text_encoder/model-00001-of-00002.safetensors"))).toBe(true);
+    expect(existsSync(path.join(models(), "acme/sdxl/text_encoder/model-00002-of-00002.safetensors"))).toBe(true);
+  });
+
+  it("sha256 が合わなければ失敗する", async () => {
+    const created = await worker.api("/downloads", body(["broken.safetensors"], "acme/sdxl", "file"));
+    await find(created.body.id, "failed");
+    expect(existsSync(path.join(models(), "acme/sdxl/broken.safetensors"))).toBe(false);
+  });
+
+  it("files を省くとリポジトリ全体を取る（サブフォルダ・LFS でないもの・空のファイルも）", async () => {
+    hf.repos.get("acme/sdxl")!.files.pop(); // 壊れたファイルは除く
+    const created = await worker.api("/downloads", { body: { repo: "acme/sdxl", kind: "file" } });
+    expect(created.status).toBe(202);
+    const done = await find(created.body.id, "completed");
+    expect(done.files.map((file: any) => file.name).sort()).toEqual([
+      "README.md", "empty.txt", "model.safetensors", "text_encoder/model-00001-of-00002.safetensors", "text_encoder/model-00002-of-00002.safetensors",
+    ]);
+    const root = path.join(models(), "acme/sdxl");
+    expect(readFileSync(path.join(root, "README.md"), "utf8")).toBe("# fake repo");
+    expect(readFileSync(path.join(root, "empty.txt")).length).toBe(0);
+    expect(existsSync(path.join(root, "model.safetensors.part"))).toBe(false);
+  });
+
+  it("途中で失敗しても再開で続きから取り、取り終えたファイルは取り直さない", async () => {
+    hf.repos.get("acme/sdxl")!.files.pop();
+    // 先頭の README で1つ、model.safetensors で再試行の上限まで切る
+    hf.behavior.cuts = [1000, 1000, 1000, 1000, 1000];
+    const created = await worker.api("/downloads", { body: { repo: "acme/sdxl", kind: "file" } });
+    await find(created.body.id, "failed");
+    const before = hf.cdnRequests.length;
+    await worker.api(`/downloads/${created.body.id}/resume`, { method: "POST" });
+    await find(created.body.id, "completed");
+    // 残りは model.safetensors の続きと text_encoder の2つだけ。README は取り終えている
+    expect(hf.cdnRequests.length - before).toBe(3);
+    expect(readFileSync(path.join(models(), "acme/sdxl/model.safetensors"))).toEqual(payload);
   });
 });
 

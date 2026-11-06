@@ -12,10 +12,10 @@ function seededStore() {
 }
 
 describe("DB の版上げ", () => {
-  it("空の DB に 17 テーブルを作る", () => {
+  it("空の DB に 18 テーブルを作る", () => {
     const { db } = seededStore();
     const tables = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'threads_fts%'").all();
-    expect(tables).toHaveLength(17);
+    expect(tables).toHaveLength(18);
     expect(db.pragma("user_version", { simple: true })).toBe(MIGRATIONS.length);
     expect(db.pragma("foreign_keys", { simple: true })).toBe(1);
   });

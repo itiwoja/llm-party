@@ -31,17 +31,21 @@ const toMessage = (row: MessageRow) => ({
 export class ThreadStore {
   constructor(private db: Db) {}
 
-  /** auto_approve の既定は設定 defaultAutoApprove（TBL-016, API-031） */
+  /** auto_approve の既定はプロジェクトの値、なければ設定 defaultAutoApprove（TBL-005, TBL-016, API-031） */
   create(presetId: string | null, workspaceId: string | null = null, title = "") {
     const id = ulid();
     const time = now();
     this.db.prepare("INSERT INTO threads (id, title, workspace_id, last_preset_id, auto_approve, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
-      .run(id, title, workspaceId, presetId, this.autoApproveDefault() ? 1 : 0, time, time);
+      .run(id, title, workspaceId, presetId, this.autoApproveDefault(workspaceId) ? 1 : 0, time, time);
     return this.get(id)!;
   }
 
   /** settings は別担当の store.settings が持つ。ここでは値を読むだけ（JSON の真偽値。なければ OFF） */
-  private autoApproveDefault(): boolean {
+  private autoApproveDefault(workspaceId: string | null): boolean {
+    const project = workspaceId
+      ? this.db.prepare("SELECT auto_approve FROM workspaces WHERE id = ?").get(workspaceId) as { auto_approve: number | null } | undefined
+      : undefined;
+    if (project && project.auto_approve !== null) return project.auto_approve === 1;
     const row = this.db.prepare("SELECT value FROM settings WHERE key = 'defaultAutoApprove'").get() as { value: string } | undefined;
     try {
       return row ? JSON.parse(row.value) === true : false;
@@ -91,7 +95,8 @@ export class ThreadStore {
 
   /** 更新の新しい順。カーソルは「updated_at|id」（D-41） */
   list({ q, limit = 50, cursor }: { q?: string; limit?: number; cursor?: string }) {
-    const where: string[] = [];
+    // 外したプロジェクトのスレッドは一覧にも検索にも出さない
+    const where = ["(workspace_id IS NULL OR workspace_id NOT IN (SELECT id FROM workspaces WHERE hidden_at IS NOT NULL))"];
     const params: unknown[] = [];
     const term = q?.trim();
     if (term) {

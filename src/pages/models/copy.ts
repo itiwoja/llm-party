@@ -47,4 +47,29 @@ export const PG3_MISSING = {
   kindLabel: "種類", // DL する前に model / adapter を選ぶラジオの名前
   incomplete: "分割ファイルがそろっていない", // complete:false の DL 不可の理由
   linkToSettings: "設定", // CP-096 の後ろに付ける設定への入口（CP-005 の語）
+  genre: "ジャンル", // CP-285 検索の絞り込みと、結果の列
+  genres: {
+    all: "すべて",
+    chat: "チャット",
+    image: "画像生成",
+    video: "映像生成",
+    music: "音楽生成",
+    speech: "音声生成",
+    transcribe: "文字起こし",
+    embedding: "Embedding",
+  }, // CP-286
+  uncensored: "無検閲のみ", // CP-287
+  colLicense: "ライセンス", // CP-288
+  saveOnly: "チャットでは動かせないモデル。置き場に保存するだけ", // CP-289
+  imageHint: "単一の .safetensors は画像生成のモデルとして登録。分割したファイルと GGUF は保存するだけ",
+  fileCount: (n: number) => `${n} ファイル`, // CP-291
+  savedTo: "保存先", // CP-292
+  vram: "VRAM まで（GB）", // CP-309
+  ram: "RAM まで（GB）", // CP-310
+  colMemory: "目安メモリ", // CP-311
+  memoryHint: "目安は Q4_K_M で計算（文脈が長いと増える）。パラメータ数の分からないモデルは外す", // CP-312
+  colStrength: "強さ", // HF 検索結果の列。強さはパラメータ数で測る（HF は性能の点数を返さない）
+  modelsOnlyHint: "モデル（GGUF）だけを表示。画像の入力部（mmproj）と量子化の計算用（imatrix）は外す", // 同
+  noModelFile: "GGUF のモデルがない。チャットでは動かせない", // 同
+  strengthHint:"強さは パラメータ数 で比べる。バーは今の結果の中で一番大きいモデルを 100% とする。パラメータ数の分からないモデルは末尾", // 同
 } as const;

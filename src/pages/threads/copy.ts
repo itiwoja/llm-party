@@ -1,5 +1,11 @@
 /** PG-001 の文言。正本は docs/design/ui/08_copy.md（CP-ID をそのまま写す。言い換えない） */
 export const PG1 = {
+  imageMode: "画像", // 画像生成に切り替えるボタン
+  imageModel: "画像モデル", // 画像モデルの選択（読み上げ名）
+  noImageModel: "画像モデルがありません。モデル画面で取ってください",
+  imageGenerating: "画像を生成しています…",
+  imageLoading: "画像を読み込んでいます",
+  imageLoadFailed: "画像を表示できません",
   pickFolder: "フォルダを選択", // CP-024
   workspace: (name: string) => `作業フォルダ：${name}`, // CP-025
   summarized: (n: number) => `要約済み（${n} 件）`, // CP-035
@@ -28,6 +34,22 @@ export const PG1 = {
   noChanges: "変更なし", // CP-057
   noCommands: "コマンド実行なし", // CP-058
   pathNotAllowed: "このフォルダは作業フォルダに不可。別のフォルダを選択", // CP-059
+  projects: "プロジェクト", // CP-293
+  addProject: "プロジェクトを追加", // CP-294
+  chats: "チャット", // CP-296
+  newProjectThread: "新しいスレッド", // CP-297
+  projectSettings: "プロジェクト設定", // CP-298
+  hideProject: "一覧から外す", // CP-299
+  confirmHideProject: (name: string) => `「${name}」を一覧から外す。会話とファイルは残り、同じフォルダの追加で戻る`, // CP-300
+  projectName: "名前", // CP-301
+  projectInstructions: "プロジェクトの指示", // CP-302
+  projectInstructionsHint: "このプロジェクトのスレッドでシステムプロンプトに足す", // CP-303
+  projectPreset: "既定のプリセット", // CP-304
+  projectPresetNone: "指定なし", // CP-305
+  projectAutoApprove: "新しいスレッドの自動承認", // CP-179
+  autoApproveInherit: "設定に従う", // CP-306
+  autoApproveOn: "オン", // CP-307
+  autoApproveOff: "オフ", // CP-308
   close: "閉じる", // CP-011
   cancel: "キャンセル", // CP-006
   bandApproval: (n: number) => `承認待ち ${n} 件`, // CP-013

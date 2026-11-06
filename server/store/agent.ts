@@ -4,6 +4,7 @@ import { now } from "./shared";
 
 interface WorkspaceRow {
   id: string; path: string; name: string; created_at: string; last_used_at: string | null;
+  hidden_at: string | null; instructions: string | null; default_preset_id: string | null; auto_approve: number | null;
 }
 
 interface ToolCallRow {
@@ -13,6 +14,8 @@ interface ToolCallRow {
 
 const toWorkspace = (row: WorkspaceRow) => ({
   id: row.id, path: row.path, name: row.name, createdAt: row.created_at, lastUsedAt: row.last_used_at,
+  hiddenAt: row.hidden_at, instructions: row.instructions, defaultPresetId: row.default_preset_id,
+  autoApprove: row.auto_approve === null ? null : row.auto_approve === 1,
 });
 
 const toToolCall = (row: ToolCallRow) => {
@@ -34,8 +37,9 @@ export type ToolCallStatus = "pending_approval" | "running" | "denied" | "reject
 export class AgentStore {
   constructor(private db: Db) {}
 
+  /** 左の一覧に出すプロジェクト。外したものは出さない */
   workspaces() {
-    return (this.db.prepare("SELECT * FROM workspaces ORDER BY COALESCE(last_used_at, created_at) DESC, id DESC").all() as WorkspaceRow[]).map(toWorkspace);
+    return (this.db.prepare("SELECT * FROM workspaces WHERE hidden_at IS NULL ORDER BY COALESCE(last_used_at, created_at) DESC, id DESC").all() as WorkspaceRow[]).map(toWorkspace);
   }
 
   workspace(id: string) {
@@ -43,13 +47,32 @@ export class AgentStore {
     return row ? toWorkspace(row) : null;
   }
 
-  /** 実体のパスで登録する。同じパスは使い回す（FR-007） */
+  /** 実体のパスで登録する。同じパスは使い回し、外してあれば一覧へ戻す（FR-007） */
   registerWorkspace(realPath: string, name: string) {
     const found = this.db.prepare("SELECT * FROM workspaces WHERE path = ?").get(realPath) as WorkspaceRow | undefined;
-    if (found) return toWorkspace(found);
+    if (found) {
+      if (found.hidden_at) this.db.prepare("UPDATE workspaces SET hidden_at = NULL WHERE id = ?").run(found.id);
+      return this.workspace(found.id)!;
+    }
     const id = ulid();
     this.db.prepare("INSERT INTO workspaces (id, path, name, created_at) VALUES (?, ?, ?, ?)").run(id, realPath, name, now());
     return this.workspace(id)!;
+  }
+
+  /** API-043。autoApprove の null は設定 defaultAutoApprove に従う */
+  updateWorkspace(id: string, patch: { name?: string; instructions?: string | null; defaultPresetId?: string | null; autoApprove?: boolean | null }): void {
+    const update = (column: string, value: unknown) => this.db.prepare(`UPDATE workspaces SET ${column} = ? WHERE id = ?`).run(value, id);
+    this.db.transaction(() => {
+      if (patch.name !== undefined) update("name", patch.name);
+      if (patch.instructions !== undefined) update("instructions", patch.instructions);
+      if (patch.defaultPresetId !== undefined) update("default_preset_id", patch.defaultPresetId);
+      if (patch.autoApprove !== undefined) update("auto_approve", patch.autoApprove === null ? null : patch.autoApprove ? 1 : 0);
+    })();
+  }
+
+  /** API-044。一覧から外すだけで、スレッドは残す。同じフォルダを登録し直すと戻る */
+  hideWorkspace(id: string): void {
+    this.db.prepare("UPDATE workspaces SET hidden_at = ? WHERE id = ?").run(now(), id);
   }
 
   touchWorkspace(id: string): void {

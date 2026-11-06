@@ -7,14 +7,13 @@ import { CP } from "../../copy";
 import { PG3 } from "./copy";
 import { ErrorLine } from "./ErrorLine";
 import { errorMessage } from "./format";
-import { DownloadsTab } from "./DownloadsTab";
 import { HfTab } from "./HfTab";
 import { LocalTab } from "./LocalTab";
 import type { AdapterItem, ModelItem } from "./types";
 import { useDownloads } from "./useDownloads";
 import "./models.css";
 
-/** PG-003 モデル（管理の型）。タブ：手元のモデル / LoRA / Hugging Face を探す / DL */
+/** PG-003 モデル（管理の型）。タブ：手元のモデル（DL の行を含む） / LoRA / Hugging Face を探す */
 export function ModelsPage() {
   const { reloadModels } = useAppData();
   const [tab, setTab] = useState("models");
@@ -53,10 +52,9 @@ export function ModelsPage() {
           value={tab}
           onValueChange={setTab}
           tabs={[
-            { value: "models", label: PG3.tabModels, content: <LocalTab kind="model" models={models} adapters={adapters} onChanged={changed} /> },
-            { value: "adapters", label: PG3.tabAdapters, content: <LocalTab kind="adapter" models={models} adapters={adapters} onChanged={changed} /> },
-            { value: "hf", label: PG3.tabHf, content: <HfTab onStarted={() => { changed(); setTab("downloads"); }} /> },
-            { value: "downloads", label: PG3.tabDownloads, content: <DownloadsTab items={downloads.items} etaSeconds={downloads.etaSeconds} models={models} adapters={adapters} onChanged={changed} /> },
+            { value: "models", label: PG3.tabModels, content: <LocalTab kind="model" models={models} adapters={adapters} downloads={downloads.items} etaSeconds={downloads.etaSeconds} onChanged={changed} /> },
+            { value: "adapters", label: PG3.tabAdapters, content: <LocalTab kind="adapter" models={models} adapters={adapters} downloads={downloads.items} etaSeconds={downloads.etaSeconds} onChanged={changed} /> },
+            { value: "hf", label: PG3.tabHf, content: <HfTab onStarted={() => { changed(); setTab("models"); }} /> },
           ]}
         />
       </div>

@@ -23,6 +23,7 @@ export function engineRoutes({ store, engine, bus }: Context): Router {
     const preset = store.presets.get(presetId);
     if (!preset) throw new ApiError("NOT_FOUND", "プリセットがありません");
     const model = store.models.get(preset.modelId)!;
+    if (model.use === "image") throw new ApiError("VALIDATION_ERROR", "画像モデルはチャットでは読み込めません", [{ field: "presetId" }]);
     engine
       .load({
         presetId,

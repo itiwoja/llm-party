@@ -11,6 +11,8 @@ svg.lucide, .btn svg, .icon-btn svg { width: var(--icon-size); height: var(--ico
 
 /* 共通の状態：focus-visible */
 :focus-visible { outline: var(--focus-width) solid var(--color-focus-ring); outline-offset: var(--focus-width); }
+/* 文字を打つ欄はキャレットが出るのでリングを付けない（設計書 04 CMP-005） */
+.input:focus-visible, .search-input:focus-visible { outline: none; }
 
 /* CMP-001 ボタン */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); min-height: var(--control-height); padding: 0 var(--space-4); border: var(--line-width) solid transparent; border-radius: var(--radius); background: transparent; cursor: pointer; white-space: nowrap; transition: background-color var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-out); }
@@ -46,7 +48,7 @@ svg.lucide, .btn svg, .icon-btn svg { width: var(--icon-size); height: var(--ico
 .search-clear { position: absolute; right: 4px; }
 
 /* CMP-004 一覧の行 */
-.rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.rows { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; }
 .row { position: relative; display: flex; align-items: center; min-height: var(--row-height); border-radius: var(--radius); }
 .row[data-selected]::before { content: ""; position: absolute; left: 0; top: 4px; bottom: 4px; width: 2px; background: var(--color-primary); border-radius: 1px; }
 .row[data-selected] { background: var(--color-hover); }
@@ -54,8 +56,10 @@ svg.lucide, .btn svg, .icon-btn svg { width: var(--icon-size); height: var(--ico
 .row-link { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-height: var(--row-height); padding: 0 var(--space-3); color: var(--color-fg); text-decoration: none; font-size: 14px; border-radius: var(--radius); transition: transform var(--duration-fast) var(--ease-out); }
 .row-link:active { transform: scale(0.97); }
 .row-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.row-more { opacity: 0; margin-right: 4px; }
+/* … は右端に重ねて出し、その間だけ印を隠す。普段は幅を取らないのでタイトルが広く使える */
+.row-more { position: absolute; top: 0; bottom: 0; right: 4px; margin-block: auto; opacity: 0; }
 .row:hover .row-more, .row:focus-within .row-more, .row-more[data-state="open"] { opacity: 1; }
+.row:has(.row-more):is(:hover, :focus-within) .row-title ~ *, .row:has(.row-more[data-state="open"]) .row-title ~ * { visibility: hidden; }
 .row-editing { padding: 0 var(--space-1); }
 
 /* ドット */
@@ -89,8 +93,11 @@ svg.lucide, .btn svg, .icon-btn svg { width: var(--icon-size); height: var(--ico
 /* CMP-015 選択部品 */
 .select-trigger { display: inline-flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-height: var(--control-height); padding: 0 var(--space-3); background: var(--color-surface); border: var(--line-width) solid var(--color-control); border-radius: var(--radius); cursor: pointer; font-family: var(--font-sans); }
 .select-trigger svg { width: 16px; height: 16px; color: var(--color-muted-fg); }
-.select-title { font-size: 20px; font-weight: 700; line-height: 1.4; border-color: transparent; background: transparent; padding: 0 var(--space-2); }
-.select-title:hover { background: var(--color-hover); }
+.select-compact { max-width: 100%; min-height: var(--control-height-sm); font-size: 14px; border-color: transparent; background: transparent; padding: 0 var(--space-2); }
+.select-compact:hover:not(:disabled) { background: var(--color-hover); }
+.select-compact:disabled { cursor: default; color: var(--color-muted-fg); }
+.select-compact > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.select-compact > span:last-child { display: inline-flex; flex: none; }
 .select-item { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
 .select-check { color: var(--color-primary); display: inline-flex; }
 /* ダイアログの中でも背面幕の下に隠れないよう、ダイアログより上に出す */
@@ -139,6 +146,11 @@ svg.lucide, .btn svg, .icon-btn svg { width: var(--icon-size); height: var(--ico
 /* CMP-008 数字の1行 */
 .metrics { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4); margin: var(--space-2) 0 var(--space-3); font-size: 14px; line-height: 1.6; color: var(--color-muted-fg); }
 .metrics-item { display: inline-flex; align-items: center; gap: var(--space-2); }
+.context-ring { width: 16px; height: 16px; flex: none; transform: rotate(-90deg); }
+.context-ring circle { fill: none; stroke-width: 2.5; }
+.context-ring-track { stroke: var(--color-line); }
+.context-ring-value { stroke: var(--color-primary); }
+.context-ring-warning .context-ring-value { stroke: var(--color-warning); }
 
 /* CMP-009 状態の帯 */
 .band { display: flex; align-items: center; gap: var(--space-3); min-height: var(--control-height); padding: var(--space-1) var(--space-4); background: var(--color-surface); border-bottom: var(--line-width) solid var(--color-line); font-size: 14px; }
@@ -201,14 +213,27 @@ svg.lucide, .btn svg, .icon-btn svg { width: var(--icon-size); height: var(--ico
 @media (max-width: 1279px) { .panel { position: absolute; top: 0; right: 0; bottom: 0; z-index: var(--z-panel); } }
 
 /* PG-001 */
-.thread-head { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) 0 0; }
+.thread-head { display: flex; align-items: center; padding: var(--space-3) 0 0; }
 .head-context { font-size: 14px; color: var(--color-muted-fg); }
 .log { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-4) 0; }
 .log-inner { display: grid; gap: var(--space-5); }
 .user-text { padding: var(--space-3); background: var(--color-hover); border-radius: var(--radius); white-space: pre-wrap; overflow-wrap: anywhere; }
 .reasoning { margin: var(--space-1) 0 var(--space-3); padding-left: var(--space-3); border-left: 2px solid var(--color-line); color: var(--color-muted-fg); font-size: 14px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
-.composer-form { padding-top: var(--space-3); display: flex; align-items: flex-end; gap: var(--space-2); }
-.composer-form .field { flex: 1; }
+/* 入力・フォルダ・数字・プリセット・送信を1つの枠にまとめる */
+.composer-form { margin: var(--space-3) 0; padding: var(--space-2); background: var(--color-surface); border: var(--line-width) solid var(--color-control); border-radius: var(--radius-lg); }
+.composer-form .composer { min-height: 0; padding: var(--space-1) var(--space-2); background: transparent; border: 0; }
+.composer-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-1) var(--space-3); margin-top: var(--space-1); }
+.composer-foot .metrics { margin: 0; gap: var(--space-3); }
+.composer-info { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.composer-info .icon-btn { margin-right: calc(var(--space-2) * -1); }
+.composer-model { display: flex; align-items: center; gap: var(--space-2); min-width: 0; margin-left: auto; }
+.composer-send { background: var(--button-primary-bg); color: var(--button-primary-fg); }
+@media (hover: hover) { .composer-send:hover:not(:disabled) { background: var(--color-primary-hover); color: var(--button-primary-fg); } }
+.composer-send:disabled { background: var(--color-hover); color: var(--color-muted-fg); cursor: default; }
+.composer-stop { color: var(--color-danger); }
+.composer-stop:hover:not(:disabled) { color: var(--color-danger); }
+.composer-stop:disabled { color: var(--color-muted-fg); cursor: default; }
+.composer-stop svg { fill: currentColor; }
 @media (prefers-reduced-motion: reduce) {
   .spin, .dot-pulse { animation: none; }
   .btn, .row-link, .collapsible-arrow, .switch-thumb { transition: none; }

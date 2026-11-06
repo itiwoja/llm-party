@@ -1,12 +1,25 @@
 /* PG-003 モデル。値は tokens.css のトークンだけ */
 .models-main { display: grid; gap: var(--space-4); align-content: start; }
 .models-toolbar { display: flex; justify-content: flex-end; padding: var(--space-3) 0; }
+.models-filters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4); padding-top: var(--space-3); }
 .models-search { padding: var(--space-3) 0; max-width: var(--form-max); }
+.models-memory { width: 10em; }
+.models-note { margin: 0; font-size: 14px; color: var(--color-muted-fg); }
 .models-files { display: grid; gap: var(--space-3); margin-top: var(--space-5); }
 .models-path { margin: 0; font-size: 14px; color: var(--color-muted-fg); overflow-wrap: anywhere; }
+/* ファイル名の違う部分を太く、全体の名前を小さく添える（モデルが多いとき何が違うか分かるように） */
+.hf-file-name { display: grid; gap: var(--space-1); min-width: 14em; }
+.hf-file-label { font-weight: 600; overflow-wrap: anywhere; }
+.hf-file-full { font-size: 12px; color: var(--color-muted-fg); overflow-wrap: anywhere; }
 .models-missing { color: var(--color-danger); }
 .models-dl-status { display: grid; gap: var(--space-1); min-width: 160px; }
 .models-actions { display: flex; justify-content: flex-end; gap: var(--space-2); }
 .link-btn { padding: 0; background: none; border: 0; color: var(--color-primary); cursor: pointer; text-align: left; }
 .link-btn:hover { text-decoration: underline; }
 .table .models-actions { white-space: nowrap; }
+.models-nowrap { white-space: nowrap; }
+.models-main .table th { white-space: nowrap; }
+/* 強さのバー（HF 検索）。色は tokens.css のトークンだけ */
+.strength { display: inline-flex; align-items: center; gap: var(--space-2); min-width: 9em; }
+.strength-track { display: block; flex: 1; min-width: 5em; height: 8px; border-radius: var(--radius-full); background: var(--color-line); overflow: hidden; }
+.strength-fill { display: block; height: 100%; border-radius: var(--radius-full); background: var(--color-primary); }

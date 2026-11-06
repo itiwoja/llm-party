@@ -12,6 +12,7 @@ let worker: TestWorker;
 beforeEach(async () => {
   hf = await startFakeHf({
     "acme/tiny-GGUF": {
+      params: 9e9,
       files: [
         { path: "tiny-Q4_K_M.gguf", data },
         { path: "tiny-Q8_0.gguf", data },
@@ -22,6 +23,13 @@ beforeEach(async () => {
     },
     "acme/lonely-GGUF": { files: [{ path: "lonely-Q4_K_M-00002-of-00003.gguf", data }, { path: "lonely-Q4_K_M-00003-of-00003.gguf", data }] },
     "acme/gated-GGUF": { gatedToken: "hf_secret", files: [{ path: "g-Q4_K_M.gguf", data }] },
+    "acme/chat-GGUF": { pipelineTag: "text-generation", params: 3e9, files: [{ path: "c-Q4_K_M.gguf", data }] },
+    "acme/chat-raw": { pipelineTag: "text-generation", tags: [], files: [] },
+    "acme/vision-GGUF": { pipelineTag: "image-text-to-text", params: 13e9, files: [{ path: "v-Q4_K_M.gguf", data }] },
+    "acme/sdxl": { pipelineTag: "text-to-image", tags: ["diffusers"], files: [{ path: "model-00001-of-00002.safetensors", data }, { path: "model-00002-of-00002.safetensors", data }, { path: "vae/config.json", data: Buffer.from("{}") }] },
+    "acme/sdxl-uncensored": { pipelineTag: "text-to-image", tags: ["diffusers", "uncensored"], files: [] },
+    "acme/embed-a": { pipelineTag: "feature-extraction", tags: [], files: [] },
+    "acme/embed-b": { pipelineTag: "sentence-similarity", tags: [], files: [] },
   });
   worker = await startWorker(FAKE_LLAMA, { hfBaseUrl: hf.baseUrl, extraRoutes: localRoutes });
 });
@@ -36,14 +44,89 @@ describe("API-053 検索", () => {
     const res = await worker.api("/hf/search?q=tiny");
     expect(res.status).toBe(200);
     expect(res.body.items).toEqual([
-      { repo: "acme/tiny-GGUF", downloads: 1000, updatedAt: "2026-11-01T00:00:00.000Z", createdAt: "2026-10-01T00:00:00.000Z", gated: false },
+      { repo: "acme/tiny-GGUF", downloads: 1000, updatedAt: "2026-11-01T00:00:00.000Z", createdAt: "2026-10-01T00:00:00.000Z", gated: false, pipelineTag: null, license: "mit", params: 9e9, memoryGb: 7 },
     ]);
     const search = new URL(`http://x${hf.hfRequests.at(-1)!.url}`).searchParams;
-    expect(Object.fromEntries(search)).toEqual({ search: "tiny", filter: "gguf", sort: "downloads", limit: "20" });
+    expect(search.get("search")).toBe("tiny");
+    expect(search.get("limit")).toBe("50");
+    expect(search.getAll("filter")).toEqual([]);
   });
 
-  it("空の語は 400", async () => {
+  it("語もジャンルもなければ 400", async () => {
     expect((await worker.api("/hf/search?q=")).status).toBe(400);
+  });
+
+  it("ゲート付きかどうかが分かる", async () => {
+    const res = await worker.api("/hf/search?q=gated");
+    expect(res.body.items[0].gated).toBe(true);
+  });
+
+  it("知らないジャンルは 400", async () => {
+    expect((await worker.api("/hf/search?genre=nope")).status).toBe(400);
+  });
+
+  const repos = (res: { body: any }) => res.body.items.map((item: any) => item.repo);
+
+  it("ジャンルだけで一覧できる（語は送らない）", async () => {
+    expect(repos(await worker.api("/hf/search?genre=image"))).toEqual(["acme/sdxl", "acme/sdxl-uncensored"]);
+    const search = new URL(`http://x${hf.hfRequests.at(-1)!.url}`).searchParams;
+    expect(search.get("pipeline_tag")).toBe("text-to-image");
+    expect(search.has("search")).toBe(false);
+  });
+
+  it("ジャンルと語は両方効く", async () => {
+    expect(repos(await worker.api("/hf/search?q=uncensored&genre=image"))).toEqual(["acme/sdxl-uncensored"]);
+  });
+
+  it("無検閲はタグの絞り込みで、ジャンルと組み合わせられる", async () => {
+    expect(repos(await worker.api("/hf/search?genre=image&uncensored=true"))).toEqual(["acme/sdxl-uncensored"]);
+    expect(repos(await worker.api("/hf/search?uncensored=true"))).toEqual(["acme/sdxl-uncensored"]);
+  });
+
+  it("pipeline_tag が2つのジャンルは2回探して DL 数の順に混ぜる", async () => {
+    expect(repos(await worker.api("/hf/search?genre=embedding"))).toEqual(["acme/embed-a", "acme/embed-b"]);
+  });
+
+  it("チャットのジャンルは動かせる GGUF だけ", async () => {
+    expect(repos(await worker.api("/hf/search?genre=chat"))).toEqual(["acme/chat-GGUF", "acme/vision-GGUF"]);
+  });
+
+  describe("VRAM・RAM で絞る（目安は Q4_K_M で計算）", () => {
+    // 語を「acme/」にすると全部の候補が対象になる（パラメータ数がないものは絞ると外れる）
+    it("VRAM の上限を超えるものは外す。パラメータ数が分からないものも外す", async () => {
+      expect(repos(await worker.api("/hf/search?q=acme/&vram=8"))).toEqual(["acme/tiny-GGUF", "acme/chat-GGUF"]);
+    });
+
+    it("RAM も同じく効く。両方あれば両方を満たすものだけ", async () => {
+      expect(repos(await worker.api("/hf/search?q=acme/&ram=8"))).toEqual(["acme/tiny-GGUF", "acme/chat-GGUF"]);
+      expect(repos(await worker.api("/hf/search?q=acme/&vram=8&ram=5"))).toEqual(["acme/chat-GGUF"]);
+    });
+
+    it("語もジャンルもなくても、VRAM か RAM だけで一覧できる", async () => {
+      expect((await worker.api("/hf/search?vram=8")).status).toBe(200);
+      expect(repos(await worker.api("/hf/search?vram=6"))).toEqual(["acme/chat-GGUF"]);
+    });
+
+    it("ジャンルと組み合わせられる", async () => {
+      expect(repos(await worker.api("/hf/search?genre=chat&vram=8"))).toEqual(["acme/chat-GGUF"]);
+      expect(repos(await worker.api("/hf/search?genre=chat&vram=2"))).toEqual([]);
+    });
+
+    it("絞るときは多めに取ってから絞る（HF の件数上限 100）", async () => {
+      await worker.api("/hf/search?q=acme/&vram=8");
+      expect(new URL(`http://x${hf.hfRequests.at(-1)!.url}`).searchParams.get("limit")).toBe("100");
+    });
+
+    it("上限は正の数だけ。0・負・数字でない値は 400", async () => {
+      expect((await worker.api("/hf/search?vram=0")).status).toBe(400);
+      expect((await worker.api("/hf/search?ram=-1")).status).toBe(400);
+      expect((await worker.api("/hf/search?vram=abc")).status).toBe(400);
+    });
+
+    it("空欄は指定なし。空欄だけなら語もジャンルもないので 400", async () => {
+      expect((await worker.api("/hf/search?vram=")).status).toBe(400);
+      expect((await worker.api("/hf/search?q=tiny&vram=")).status).toBe(200);
+    });
   });
 
   it("HF が落ちていれば 502", async () => {
@@ -60,7 +143,7 @@ describe("API-054 ファイル一覧", () => {
     const res = await worker.api("/hf/files?repo=acme/tiny-GGUF");
     expect(res.status).toBe(200);
     const byName = Object.fromEntries(res.body.items.map((item: any) => [item.name, item]));
-    expect(Object.keys(byName).sort()).toEqual(["sub/tiny-Q2_K.gguf", "tiny-BF16-00001-of-00002.gguf", "tiny-Q4_K_M.gguf", "tiny-Q8_0.gguf"]);
+    expect(Object.keys(byName).sort()).toEqual(["README.md", "sub/tiny-Q2_K.gguf", "tiny-BF16-00001-of-00002.gguf", "tiny-Q4_K_M.gguf", "tiny-Q8_0.gguf"]);
     expect(byName["tiny-BF16-00001-of-00002.gguf"]).toMatchObject({ split: true, complete: true, quantization: "BF16", sizeBytes: data.length * 2 });
     expect(byName["tiny-BF16-00001-of-00002.gguf"].parts.map((part: any) => part.name)).toEqual([
       "tiny-BF16-00001-of-00002.gguf", "tiny-BF16-00002-of-00002.gguf",
@@ -72,9 +155,15 @@ describe("API-054 ファイル一覧", () => {
   it("tree が複数ページでも全部集める（Link の next を辿る）", async () => {
     hf.behavior.treePageSize = 2;
     const res = await worker.api("/hf/files?repo=acme/tiny-GGUF");
-    expect(res.body.items).toHaveLength(4);
+    expect(res.body.items).toHaveLength(5);
     const pages = hf.hfRequests.filter((request) => request.url.includes("/tree/main"));
     expect(pages.length).toBeGreaterThan(1);
+  });
+
+  it("GGUF 以外も出す。分割の safetensors もまとめ、モデル本体を先に並べる", async () => {
+    const res = await worker.api("/hf/files?repo=acme/sdxl");
+    expect(res.body.items.map((item: any) => item.name)).toEqual(["model-00001-of-00002.safetensors", "README.md", "vae/config.json"]);
+    expect(res.body.items[0]).toMatchObject({ split: true, complete: true, sizeBytes: data.length * 2 });
   });
 
   it("先頭がない分割は complete: false", async () => {
@@ -91,10 +180,21 @@ describe("API-054 ファイル一覧", () => {
 });
 
 describe("入力の検査（パストラバーサル）", () => {
-  const bad = ["../evil.gguf", "/etc/x.gguf", "a/../../x.gguf", "x.txt", "a\\b.gguf", "a//b.gguf", ""];
+  const bad = ["../evil.gguf", "/etc/x.gguf", "a/../../x.gguf", "a\\b.gguf", "a//b.gguf", ""];
   it.each(bad)("ファイル名 %j を拒否する", async (file) => {
-    const res = await worker.api("/downloads", { body: { repo: "acme/tiny-GGUF", files: [file], kind: "model" } });
-    expect(res.status).toBe(400);
+    for (const kind of ["model", "file"]) {
+      const res = await worker.api("/downloads", { body: { repo: "acme/tiny-GGUF", files: [file], kind } });
+      expect(res.status).toBe(400);
+    }
+  });
+  it("model と adapter は GGUF 以外を受けない", async () => {
+    for (const kind of ["model", "adapter"]) {
+      const res = await worker.api("/downloads", { body: { repo: "acme/tiny-GGUF", files: ["README.md"], kind } });
+      expect(res.status).toBe(400);
+    }
+  });
+  it("リポジトリ全体は保存だけの file に限る", async () => {
+    expect((await worker.api("/downloads", { body: { repo: "acme/tiny-GGUF", kind: "model" } })).status).toBe(400);
   });
   it.each(["../x/y", "acme/../x", "/abs/x", "acme", "a b/c"])("repo %j を拒否する", async (repo) => {
     const res = await worker.api("/downloads", { body: { repo, files: ["tiny-Q4_K_M.gguf"], kind: "model" } });

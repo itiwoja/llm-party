@@ -4,6 +4,8 @@ export interface LocalConfig {
   port: number;
   dataDir: string;
   llamaBin: string | null;
+  /** sd-server（画像生成）の場所。未設定なら画像生成は使えない */
+  sdBin: string | null;
   backend: "cuda" | "vulkan" | "cpu";
 }
 
@@ -21,6 +23,7 @@ export function loadLocalConfig(env: NodeJS.ProcessEnv = process.env): LocalConf
     port,
     dataDir: path.resolve(env.LLM_PARTY_DATA_DIR ?? "data"),
     llamaBin: env.LLM_PARTY_LLAMA_BIN || null,
+    sdBin: env.LLM_PARTY_SD_BIN || null,
     backend,
   };
 }

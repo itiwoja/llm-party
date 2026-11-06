@@ -1,7 +1,25 @@
 /* PG-001：ツールカード・承認カード・差分・端末・右パネル */
-.row-mark { display: inline-flex; align-items: center; gap: var(--space-2); min-width: 0; color: var(--color-muted-fg); }
-.row-workspace { font-size: 13px; max-width: 8em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.row-kind { width: 14px; height: 14px; flex: none; }
+.row-mark { display: inline-flex; align-items: center; gap: var(--space-2); flex: none; color: var(--color-muted-fg); }
+.list-section { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-1); }
+/* 「チャット」の矢印は、見出しにカーソルを合わせた時だけ出す */
+.chats-section .collapsible-arrow { opacity: 0; }
+.chats-section .collapsible:hover .collapsible-arrow, .chats-section .collapsible-trigger:focus-visible .collapsible-arrow { opacity: 1; }
+.chats-section { margin-top: var(--space-6); }
+.list-heading { display: flex; align-items: center; justify-content: space-between; min-height: var(--control-height-sm); }
+.list-heading h2, .list-section-title { margin: 0; font-size: 13px; font-weight: 400; color: var(--color-muted-fg); }
+.list-section .empty { margin: var(--space-1) 0 var(--space-2) var(--space-5); font-size: 13px; }
+.list-section .rows { padding-left: var(--space-3); }
+.project .rows { padding-left: var(--space-5); }
+.collapsible-head { display: flex; align-items: center; min-width: 0; }
+.collapsible-head .collapsible-trigger { flex: 1; min-width: 0; }
+.project + .project { margin-top: var(--space-3); }
+.project[data-selected] .project-name { color: var(--color-fg); font-weight: 500; }
+.project-name { display: inline-flex; align-items: center; gap: var(--space-1); min-width: 0; color: var(--color-fg); font-size: var(--text-small, 14px); }
+.project-name svg { width: 16px; height: 16px; flex: none; color: var(--color-muted-fg); }
+.project-name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.project-actions { display: inline-flex; flex: none; opacity: 0; }
+.project .collapsible-head:is(:hover, :focus-within) .project-actions, .project-actions:has([data-state="open"]) { opacity: 1; }
+.project-form { display: grid; gap: var(--space-3); }
 .head-panel { margin-left: auto; }
 
 .tool-card { border: var(--line-width) solid var(--color-line); border-radius: var(--radius-lg); padding: 0 var(--space-3); background: var(--color-surface); }
@@ -24,8 +42,10 @@
 .step-limit { padding: var(--space-3); border: var(--line-width) solid var(--color-line); border-radius: var(--radius-lg); background: var(--color-surface); }
 .step-limit p { margin: 0; }
 .context-full { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding-top: var(--space-2); }
-.workspace-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); padding-top: var(--space-2); }
-.workspace-name { font-size: 14px; color: var(--color-muted-fg); overflow-wrap: anywhere; }
+.workspace-error { padding-top: var(--space-2); }
+.workspace-name { display: inline-flex; align-items: center; gap: var(--space-1); min-width: 0; max-width: 16em; font-size: 14px; color: var(--color-muted-fg); }
+.workspace-name svg { width: 16px; height: 16px; }
+.workspace-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .summary-body { padding: var(--space-2) 0 var(--space-2) var(--space-3); border-left: 2px solid var(--color-line); color: var(--color-muted-fg); font-size: 14px; }
 
 /* CMP-010 差分 */
@@ -66,3 +86,10 @@
 .tool-card, .tool-card .collapsible { min-width: 0; }
 .tool-card .collapsible-trigger { min-width: 0; overflow: hidden; }
 .tool-card .collapsible-arrow { flex: none; }
+
+/* 画像生成（D-72） */
+.image-message { margin: 0; display: grid; gap: 6px; }
+.image-message img { max-width: 100%; height: auto; border-radius: 8px; }
+.image-message figcaption { color: var(--muted, #666); font-size: 0.875rem; white-space: pre-wrap; }
+.image-message-state { color: var(--muted, #666); font-size: 0.875rem; }
+.composer-note { color: var(--muted, #666); font-size: 0.8125rem; align-self: center; }

@@ -1,4 +1,4 @@
-import { PanelRight } from "lucide-react";
+import { ArrowUp, Folder, Image as ImageIcon, PanelRight, Square } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiRequestError } from "../../api";
 import { useAppData, useBand, useServerEvent } from "../../app-data";
@@ -29,6 +29,8 @@ const ENGINE_STATUS: Record<EngineState, { tone: "ok" | "busy" | "error" | "idle
 
 /** D-24：1 指示のツール呼び出しの上限（まだターンがないときの表示用） */
 const STEP_LIMIT = 40;
+/** 左の一覧はプロジェクトごとに分けるので、API の上限（200）まで読む */
+const THREAD_LIST_LIMIT = 200;
 const ACTIVE_TURN: TurnInfo["status"][] = ["running", "awaiting_approval", "step_limit"];
 
 interface Usage { percent: number | null; tokensPerSecond: number | null }
@@ -52,10 +54,12 @@ function toChange(raw: Record<string, any>): FileChange {
 export function ThreadsPage() {
   const route = useRoute();
   const threadId = route.page === "threads" ? route.id : undefined;
+  /** 新しいスレッドの入力画面で選んでいるプロジェクト */
+  const projectId = route.page === "threads" ? route.projectId : undefined;
   const { presets, engine } = useAppData();
 
   const [threads, setThreads] = useState<ThreadInfo[]>([]);
-  const [query, setQuery] = useState("");
+  const [projects, setProjects] = useState<Workspace[]>([]);
   const [presetId, setPresetId] = useState("");
   const [messages, setMessages] = useState<ThreadMessage[]>([]);
   const [toolCalls, setToolCalls] = useState<ToolCall[]>([]);
@@ -69,25 +73,28 @@ export function ThreadsPage() {
   const [error, setError] = useState("");
   const [truncated, setTruncated] = useState(false);
   const [looped, setLooped] = useState(false);
-  const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [workspaceError, setWorkspaceError] = useState("");
   const [panelOpen, setPanelOpen] = useState(false);
   const [panelTab, setPanelTab] = useState("diff");
   const [evalProgress, setEvalProgress] = useState<{ done: number; total: number } | null>(null);
+  /** 画像モード：入力を画像の生成に回す（D-72）。画像モデルは画像モデルだけを並べる */
+  const [imageMode, setImageMode] = useState(false);
+  const [imageModels, setImageModels] = useState<{ value: string; label: string }[]>([]);
+  const [imageModelId, setImageModelId] = useState("");
+  const [imageBusy, setImageBusy] = useState(false);
 
   const composer = useRef<HTMLTextAreaElement>(null);
   const turnRef = useRef(turn);
   turnRef.current = turn;
   const threadRef = useRef(threadId);
   threadRef.current = threadId;
-  const queryRef = useRef(query);
-  queryRef.current = query;
   const toolCallsRef = useRef(toolCalls);
   toolCallsRef.current = toolCalls;
   const listSeq = useRef(0);
 
   const thread = threads.find((t) => t.id === threadId);
   const isAgent = Boolean(thread?.workspaceId);
+  const project = projects.find((p) => p.id === projectId);
   const pendingCalls = useMemo(() => toolCalls.filter((c) => c.status === "pending_approval"), [toolCalls]);
 
   useBand("truncated", truncated ? { kind: "warning", message: CP.truncated } : null);
@@ -97,9 +104,13 @@ export function ThreadsPage() {
 
   const loadThreads = useCallback(async () => {
     const seq = ++listSeq.current;
-    const q = queryRef.current.trim();
-    const { items } = await api<{ items: ThreadInfo[] }>(`/threads${q ? `?q=${encodeURIComponent(q)}` : ""}`);
+    const { items } = await api<{ items: ThreadInfo[] }>(`/threads?limit=${THREAD_LIST_LIMIT}`);
     if (seq === listSeq.current) setThreads(items);
+  }, []);
+
+  const loadProjects = useCallback(async () => {
+    const { items } = await api<{ items: Workspace[] }>("/workspaces");
+    setProjects(items);
   }, []);
 
   /** messages・turns・toolCalls から画面を戻す。動いているターンもここで見つける（開き直し） */
@@ -143,18 +154,19 @@ export function ThreadsPage() {
     }
   }, []);
 
-  useEffect(() => { void loadThreads().catch(() => undefined); }, [loadThreads, query]);
+  useEffect(() => { void loadThreads().catch(() => undefined); }, [loadThreads]);
+  useEffect(() => { void loadProjects().catch(() => undefined); }, [loadProjects]);
 
-  // プリセットは初期値として先頭。スレッドを開いたら最後に使ったものへ
+  // プリセットは初期値として先頭。スレッドを開いたら最後に使ったものへ、プロジェクトの新規ならその既定へ
   useEffect(() => {
     setPresetId((current) => {
-      const last = threads.find((t) => t.id === threadId)?.lastPresetId;
+      const last = threads.find((t) => t.id === threadId)?.lastPresetId ?? (threadId ? null : project?.defaultPresetId);
       if (last && presets.some((p) => p.id === last)) return last;
       return presets.some((p) => p.id === current) ? current : presets[0]?.id ?? "";
     });
     // threads は一覧の更新ごとに変わるので、開いたスレッドが変わったときとプリセットが届いたときだけ見る
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [threadId, presets]);
+  }, [threadId, presets, project?.defaultPresetId]);
 
   useEffect(() => {
     setError("");
@@ -166,7 +178,6 @@ export function ThreadsPage() {
     setTurns([]);
     setChanges([]);
     setLive({});
-    setWorkspace(null);
     setWorkspaceError("");
     setPanelOpen(false);
     if (threadId) {
@@ -175,6 +186,8 @@ export function ThreadsPage() {
     }
     composer.current?.focus();
   }, [threadId, loadDetail, loadChanges]);
+
+  useEffect(() => { composer.current?.focus(); }, [projectId]);
 
   // 承認待ちが増えたら右パネルを自動で開く（書き込みなら差分）
   const pendingKey = pendingCalls.map((c) => c.id).join(",");
@@ -279,6 +292,10 @@ export function ThreadsPage() {
         void loadChanges(active.threadId);
       }
       void loadThreads();
+    } else if (event === "image") {
+      setImageBusy(false);
+      if (data.status === "failed") setError(data.error);
+      else if (threadRef.current === data.threadId) void loadDetail(data.threadId).catch(() => undefined);
     } else if (event === "eval.progress") {
       setEvalProgress({ done: data.done, total: data.total });
     } else if (event === "eval.finished") {
@@ -286,15 +303,41 @@ export function ThreadsPage() {
     }
   });
 
+  // 画像モードを開いたら、画像モデルの一覧を読む
+  useEffect(() => {
+    if (!imageMode) return;
+    void api.get<{ items: { id: string; name: string; use: string }[] }>("/models")
+      .then((data) => {
+        const items = data.items.filter((model) => model.use === "image");
+        setImageModels(items.map((model) => ({ value: model.id, label: model.name })));
+        setImageModelId((current) => (items.some((model) => model.id === current) ? current : items[0]?.id ?? ""));
+      })
+      .catch((err) => setError(errorText(err)));
+  }, [imageMode]);
+
   async function send() {
     const content = input.trim();
-    if (!content || turn || !presetId) return;
+    if (!content || turn || imageBusy || !presetId || (imageMode && !imageModelId)) return;
     setError("");
     setTruncated(false);
     setLooped(false);
     try {
-      const id = threadId ?? (await api<ThreadInfo>("/threads", { presetId, ...(workspace ? { workspaceId: workspace.id } : {}) })).id;
+      const id = threadId ?? (await api<ThreadInfo>("/threads", { presetId, ...(projectId ? { workspaceId: projectId } : {}) })).id;
       threadRef.current = id;
+      if (imageMode) {
+        setImageBusy(true);
+        try {
+          await api(`/threads/${id}/images`, { modelId: imageModelId, prompt: content });
+        } catch (err) {
+          setImageBusy(false);
+          throw err;
+        }
+        setInput("");
+        if (id !== threadId) navigate(`/threads/${id}`, true);
+        await loadDetail(id);
+        await loadThreads();
+        return;
+      }
       const started = await api<{ turnId: string }>(`/threads/${id}/turns`, { presetId, content });
       setTurn({ id: started.turnId, threadId: id });
       setInput("");
@@ -306,12 +349,15 @@ export function ThreadsPage() {
     }
   }
 
-  async function chooseFolder() {
+  /** フォルダを選んでプロジェクトにし、そのプロジェクトの入力画面へ */
+  async function addProject() {
     setWorkspaceError("");
     const path = await pickFolder();
     if (!path) return;
     try {
-      setWorkspace(await api<Workspace>("/workspaces", { path }));
+      const added = await api<Workspace>("/workspaces", { path });
+      await Promise.all([loadProjects(), loadThreads()]);
+      navigate(`/threads/new/${added.id}`);
     } catch (err) {
       setWorkspaceError(err instanceof ApiRequestError && err.code === "PATH_NOT_ALLOWED" ? PG1.pathNotAllowed : errorText(err));
     }
@@ -363,8 +409,8 @@ export function ThreadsPage() {
   const lastTurn = turns.at(-1);
   const contextFull = !generating && lastTurn?.status === "failed" && lastTurn.error === PG1.contextFull;
   const turnError = !generating && lastTurn?.status === "failed" && lastTurn.error && !contextFull ? lastTurn.error : "";
-  const agentView = isAgent || workspace !== null;
-  const workspaceName = thread?.workspaceName ?? workspace?.name;
+  const agentView = isAgent || projectId !== undefined;
+  const workspaceName = thread?.workspaceName ?? project?.name;
   const commands = toolCalls.filter((c) => c.tool === "run_command" && c.status !== "pending_approval");
 
   const panel = isAgent && panelOpen ? (
@@ -385,29 +431,23 @@ export function ThreadsPage() {
       list={
         <ThreadList
           threads={threads}
+          projects={projects}
           selectedId={threadId}
-          query={query}
-          onQueryChange={setQuery}
+          projectId={projectId}
           runningIds={runningIds}
           onChanged={() => void loadThreads()}
+          onAddProject={() => void addProject()}
+          onProjectsChanged={() => { void loadProjects(); void loadThreads(); }}
         />
       }
       panel={panel}
     >
       <h1 className="sr-only">{CP.nav.threads}</h1>
-      <header className="thread-head">
-        <SelectField
-          title
-          hideLabel
-          label={MISSING_COPY.presetSelect}
-          value={presetId}
-          onValueChange={setPresetId}
-          options={presets.map((p) => ({ value: p.id, label: p.name }))}
-          disabled={generating}
-        />
-        {contextSize ? <span className="numeric head-context">{Math.round(contextSize / 1024)}K</span> : null}
-        {isAgent && !panelOpen ? <IconButton label={MISSING.openPanel} className="head-panel" onClick={() => setPanelOpen(true)}><PanelRight aria-hidden /></IconButton> : null}
-      </header>
+      {isAgent && !panelOpen ? (
+        <header className="thread-head">
+          <IconButton label={MISSING.openPanel} className="head-panel" onClick={() => setPanelOpen(true)}><PanelRight aria-hidden /></IconButton>
+        </header>
+      ) : null}
       <Conversation
         messages={messages}
         toolCalls={toolCalls}
@@ -423,6 +463,13 @@ export function ThreadsPage() {
           </div>
         ) : null}
       />
+      {contextFull ? (
+        <div className="context-full" role="alert">
+          <p className="field-error">{PG1.contextFull}</p>
+          <Button size="sm" onClick={() => void continueInNewThread()}>{PG1.continueInNew}</Button>
+        </div>
+      ) : null}
+      {workspaceError ? <p className="field-error workspace-error" role="alert">{workspaceError}</p> : null}
       <form className="composer-form" onSubmit={(e) => { e.preventDefault(); void send(); }}>
         <ComposerInput
           ref={composer}
@@ -433,30 +480,54 @@ export function ThreadsPage() {
           onChange={(e) => setInput(e.target.value)}
           onSubmit={() => void send()}
         />
-        {generating
-          ? <Button variant="secondary" tone="danger" disabled={stepWait} onClick={() => turn && void api.post(`/turns/${turn.id}/cancel`).catch((err) => setError(errorText(err)))}>{CP.stop}</Button>
-          : <Button type="submit" variant="primary" disabled={!input.trim() || !presetId || turn !== null}>{CP.send}</Button>}
-      </form>
-      {contextFull ? (
-        <div className="context-full" role="alert">
-          <p className="field-error">{PG1.contextFull}</p>
-          <Button size="sm" onClick={() => void continueInNewThread()}>{PG1.continueInNew}</Button>
+        <div className="composer-foot">
+          <div className="composer-info">
+            {workspaceName ? (
+              <span className="workspace-name" title={PG1.workspace(workspaceName)}>
+                {threadId ? <Folder aria-hidden /> : null}
+                <span className="sr-only">{PG1.workspace("")}</span>
+                <span className="workspace-text">{workspaceName}</span>
+              </span>
+            ) : null}
+            <Metrics
+              status={ENGINE_STATUS[engine.state]}
+              contextPercent={usage.percent}
+              tokensPerSecond={usage.tokensPerSecond}
+              generating={generating}
+              tools={agentView ? { used: lastTurn?.stepCount ?? 0, max: lastTurn?.stepLimit ?? STEP_LIMIT } : undefined}
+              contextLabel={CP.contextLabel}
+              toolLabel={CP.toolLabel}
+            />
+          </div>
+          <div className="composer-model">
+            <Button size="sm" variant="ghost" aria-pressed={imageMode} disabled={generating || imageBusy} icon={<ImageIcon aria-hidden />} onClick={() => setImageMode((on) => !on)}>{PG1.imageMode}</Button>
+            {imageMode ? (
+              <SelectField compact hideLabel label={PG1.imageModel} value={imageModelId} onValueChange={setImageModelId} options={imageModels} disabled={imageBusy} />
+            ) : null}
+            {imageMode && imageModels.length === 0 ? <span className="composer-note">{PG1.noImageModel}</span> : null}
+            {imageBusy ? <span className="composer-note" role="status">{PG1.imageGenerating}</span> : null}
+            {contextSize ? <span className="numeric head-context">{Math.round(contextSize / 1024)}K</span> : null}
+            <SelectField
+              compact
+              hideLabel
+              label={MISSING_COPY.presetSelect}
+              value={presetId}
+              onValueChange={setPresetId}
+              options={presets.map((p) => ({ value: p.id, label: p.name }))}
+              disabled={generating}
+            />
+            {generating ? (
+              <IconButton className="composer-stop" label={CP.stop} disabled={stepWait} onClick={() => turn && void api.post(`/turns/${turn.id}/cancel`).catch((err) => setError(errorText(err)))}>
+                <Square aria-hidden />
+              </IconButton>
+            ) : (
+              <IconButton className="composer-send" type="submit" label={CP.send} disabled={!input.trim() || !presetId || turn !== null || imageBusy || (imageMode && !imageModelId)}>
+                <ArrowUp aria-hidden />
+              </IconButton>
+            )}
+          </div>
         </div>
-      ) : null}
-      <div className="workspace-row">
-        {!threadId ? <Button size="sm" onClick={() => void chooseFolder()}>{PG1.pickFolder}</Button> : null}
-        {workspaceName ? <span className="workspace-name">{PG1.workspace(workspaceName)}</span> : null}
-        {workspaceError ? <p className="field-error" role="alert">{workspaceError}</p> : null}
-      </div>
-      <Metrics
-        status={ENGINE_STATUS[engine.state]}
-        contextPercent={usage.percent}
-        tokensPerSecond={usage.tokensPerSecond}
-        generating={generating}
-        tools={agentView ? { used: lastTurn?.stepCount ?? 0, max: lastTurn?.stepLimit ?? STEP_LIMIT } : undefined}
-        contextLabel={CP.contextLabel}
-        toolLabel={CP.toolLabel}
-      />
+      </form>
     </WorkLayout>
   );
 }
