@@ -11,6 +11,8 @@ import { TooltipProvider } from "./components/Tooltip";
 import { CP } from "./copy";
 import { ComparePage } from "./pages/compare";
 import { EvalsPage } from "./pages/evals";
+import { MusicPage } from "./pages/music";
+import { MusicRuntime } from "./pages/music/MusicRuntime";
 import { ModelsPage } from "./pages/models";
 import { PresetsPage } from "./pages/presets";
 import { RunsPage } from "./pages/runs";
@@ -43,6 +45,7 @@ function TokenDialog({ onDone }: { onDone(): void }) {
 function Page({ route }: { route: Route }) {
   switch (route.page) {
     case "threads": return <ThreadsPage />;
+    case "music": return <MusicPage />;
     case "setup": return <SetupPage />;
     case "models": return <ModelsPage />;
     case "presets": return <PresetsPage />;
@@ -79,6 +82,7 @@ function Shell() {
         {route.page === "setup" ? null : <Rail />}
         <Page route={route} />
       </div>
+      <MusicRuntime />
     </div>
   );
 }

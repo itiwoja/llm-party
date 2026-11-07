@@ -1,0 +1,25 @@
+/* PG-010 音楽。見出しを置かず、欄のラベルと余白で分ける（05） */
+.music-track { display: grid; gap: var(--space-4); max-width: var(--form-max); align-content: start; }
+/* 上から書いていく順に並べ、余った高さは歌詞欄だけに渡す（05） */
+.music-editor { display: flex; flex-direction: column; gap: var(--space-4); max-width: var(--form-max); min-height: 100%; }
+.music-options-row { display: flex; align-items: flex-end; gap: var(--space-4); }
+.music-duration { width: 120px; font-family: var(--font-mono); }
+.music-switch { margin: 0; padding: 0; border: 0; min-width: 0; min-height: var(--control-height); display: flex; align-items: center; }
+.music-editor .music-lyrics-editor { flex: 1; display: flex; flex-direction: column; gap: var(--space-2); min-height: 0; }
+.music-lyrics-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.music-tags { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+/* .input の min-height に負けないよう、エディタの中に限定して上書きする */
+.music-editor .music-lyrics { flex: 1; min-height: 240px; resize: vertical; }
+.music-actions { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
+.music-actions > :last-child { flex: none; }
+.music-status { display: grid; gap: var(--space-1); min-width: 0; }
+.music-status p { margin: 0; }
+.music-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; }
+.music-facts { margin: 0; color: var(--color-muted-fg); font-size: 14px; }
+.music-player { width: 100%; }
+.music-track-actions { justify-content: flex-end; }
+/* 題名を削らないよう、長さと日時は題名の下の行に置く */
+.music-rows .row-link { flex-direction: column; align-items: stretch; justify-content: center; gap: 0; padding-block: var(--space-1); }
+.music-row-meta { color: var(--color-muted-fg); font-size: 12px; white-space: nowrap; }
+.music-row-empty { min-height: var(--row-height); }
+.music-sentinel { height: 1px; list-style: none; }

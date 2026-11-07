@@ -1,6 +1,6 @@
 /** 画面の文言。正本は docs/design/ui/08_copy.md（CP-ID をそのまま写す。言い換えない） */
 export const CP = {
-  nav: { threads: "スレッド", models: "モデル", presets: "プリセット", evals: "評価", settings: "設定" }, // CP-001〜005
+  nav: { threads: "スレッド", music: "音楽", models: "モデル", presets: "プリセット", evals: "評価", settings: "設定" }, // CP-001〜005, CP-338
   cancel: "キャンセル", // CP-006
   delete: "削除", // CP-007
   save: "保存", // CP-008

@@ -3,6 +3,7 @@ import { useSyncExternalStore } from "react";
 /** 01_ia のルート。ハッシュだけで切り替える（URL の #token= は main.tsx が先に読み取って消す） */
 export type Route =
   | { page: "threads"; id?: string; projectId?: string }
+  | { page: "music"; id?: string }
   | { page: "setup" }
   | { page: "models" }
   | { page: "presets"; id?: string }
@@ -14,6 +15,7 @@ export type Route =
 export function parseRoute(hash: string): Route {
   const [first = "", second, third] = hash.replace(/^#\/?/, "").split("/").map(decodeURIComponent);
   switch (first) {
+    case "music": return { page: "music", id: second || undefined };
     case "setup": return { page: "setup" };
     case "models": return { page: "models" };
     case "presets": return { page: "presets", id: second || undefined };

@@ -1,4 +1,4 @@
-import { Box, FlaskConical, MessageSquare, Settings, SlidersHorizontal } from "lucide-react";
+import { Box, FlaskConical, MessageSquare, Music, Settings, SlidersHorizontal } from "lucide-react";
 import type { ReactNode } from "react";
 import { CP, MISSING_COPY } from "../copy";
 import { hrefOf, useRoute, type Route } from "../router";
@@ -8,6 +8,7 @@ interface Item { page: Route["page"][]; path: string; label: string; icon: React
 
 const ITEMS: Item[] = [
   { page: ["threads"], path: "/threads", label: CP.nav.threads, icon: <MessageSquare aria-hidden /> },
+  { page: ["music"], path: "/music", label: CP.nav.music, icon: <Music aria-hidden /> },
   { page: ["models"], path: "/models", label: CP.nav.models, icon: <Box aria-hidden /> },
   { page: ["presets"], path: "/presets", label: CP.nav.presets, icon: <SlidersHorizontal aria-hidden /> },
   // PG-006, PG-007 はアイコン列に出さず、評価から入る。現在地は評価に寄せる

@@ -7,6 +7,8 @@ describe("ハッシュルーター（01_ia のルート）", () => {
     ["#/threads", { page: "threads", id: undefined }],
     ["#/threads/abc", { page: "threads", id: "abc" }],
     ["#/threads/new/w1", { page: "threads", id: undefined, projectId: "w1" }],
+    ["#/music", { page: "music", id: undefined }],
+    ["#/music/t1", { page: "music", id: "t1" }],
     ["#/setup", { page: "setup" }],
     ["#/models", { page: "models" }],
     ["#/presets/p1", { page: "presets", id: "p1" }],
