@@ -1,0 +1,221 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>一色</title><style>
+/* docs/design/ui/03_tokens.md から写したもの。値の正本は設計書 */
+:root {
+  --ink-0:   #FFFFFF;
+  --ink-50:  #F7F7F8;
+  --ink-100: #ECEDEE;
+  --ink-200: #DEDFE2;
+  --ink-400: #9B9EA3;
+  --ink-500: #74777C;
+  --ink-600: #5F6368;
+  --ink-700: #2C2D30;
+  --ink-900: #1A1B1D;
+  --ink-950: #141516;
+
+  --lime-300: #D8F76A;
+  --lime-400: #C8F031;
+  --lime-ink: #15180B;
+  --olive-700: #4F6000;
+  --olive-800: #3F4D00;
+
+  --red-300: #FF7B72;  --red-600: #C4291F;  --red-ink: #14100F;
+  --amber-400: #F0B429;  --amber-700: #8A5A00;
+  --green-300: #6FD08C;  --green-700: #1F7A3D;
+
+  --diff-add-light: #E3F3E7;  --diff-del-light: #FBE6E4;
+  --diff-add-dark:  #16301F;  --diff-del-dark:  #3A1B19;
+
+  --color-bg: var(--ink-50);
+  --color-surface: var(--ink-0);
+  --color-hover: var(--ink-100);
+  --color-fg: var(--ink-900);
+  --color-muted-fg: var(--ink-600);
+  --color-line: var(--ink-200);
+  --color-control: var(--ink-500);
+  --color-primary: var(--olive-700);
+  --color-primary-hover: var(--olive-800);
+  --color-on-primary: var(--ink-0);
+  --color-danger: var(--red-600);
+  --color-on-danger: var(--ink-0);
+  --color-warning: var(--amber-700);
+  --color-success: var(--green-700);
+  --color-diff-add: var(--diff-add-light);
+  --color-diff-del: var(--diff-del-light);
+  --color-focus-ring: var(--olive-700);
+  --color-scrim: rgb(20 21 22 / 0.5);
+  --chart-focus: var(--olive-700);
+  --chart-other: var(--ink-600);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-bg: var(--ink-950);
+    --color-surface: var(--ink-900);
+    --color-hover: var(--ink-700);
+    --color-fg: var(--ink-100);
+    --color-muted-fg: var(--ink-400);
+    --color-line: var(--ink-700);
+    --color-control: var(--ink-500);
+    --color-primary: var(--lime-400);
+    --color-primary-hover: var(--lime-300);
+    --color-on-primary: var(--lime-ink);
+    --color-danger: var(--red-300);
+    --color-on-danger: var(--red-ink);
+    --color-warning: var(--amber-400);
+    --color-success: var(--green-300);
+    --color-diff-add: var(--diff-add-dark);
+    --color-diff-del: var(--diff-del-dark);
+    --color-focus-ring: var(--lime-400);
+    --color-scrim: rgb(0 0 0 / 0.6);
+    --chart-focus: var(--lime-400);
+    --chart-other: var(--ink-400);
+  }
+}
+
+:root[data-theme="dark"] {
+  --color-bg: var(--ink-950);
+  --color-surface: var(--ink-900);
+  --color-hover: var(--ink-700);
+  --color-fg: var(--ink-100);
+  --color-muted-fg: var(--ink-400);
+  --color-line: var(--ink-700);
+  --color-control: var(--ink-500);
+  --color-primary: var(--lime-400);
+  --color-primary-hover: var(--lime-300);
+  --color-on-primary: var(--lime-ink);
+  --color-danger: var(--red-300);
+  --color-on-danger: var(--red-ink);
+  --color-warning: var(--amber-400);
+  --color-success: var(--green-300);
+  --color-diff-add: var(--diff-add-dark);
+  --color-diff-del: var(--diff-del-dark);
+  --color-focus-ring: var(--lime-400);
+  --color-scrim: rgb(0 0 0 / 0.6);
+  --chart-focus: var(--lime-400);
+  --chart-other: var(--ink-400);
+}
+
+:root {
+  --font-sans: "Noto Sans JP", "Yu Gothic UI", "Meiryo", sans-serif;
+  --font-mono: "JetBrains Mono", "Noto Sans JP", "Consolas", monospace;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --rail-width: 48px;
+  --list-width: 280px;
+  --panel-width: 440px;
+  --thread-max: 760px;
+  --form-max: 640px;
+  --row-height: 36px;
+  --control-height: 36px;
+  --control-height-sm: 28px;
+  --icon-size: 18px;
+  --radius: 4px;
+  --radius-lg: 6px;
+  --radius-full: 999px;
+  --line-width: 1px;
+  --focus-width: 2px;
+  --z-sticky: 10;
+  --z-panel: 20;
+  --z-menu: 30;
+  --z-dialog: 40;
+  --z-toast: 50;
+  --duration-fast: 120ms;
+  --duration-normal: 200ms;
+  --duration-slow: 280ms;
+  --duration-spin: 800ms;
+  --duration-pulse: 1200ms;
+  --duration-shimmer: 2000ms;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --button-primary-bg: var(--color-primary);
+  --button-primary-fg: var(--color-on-primary);
+  --rail-active: var(--color-primary);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.7;
+  letter-spacing: 0.02em;
+}
+
+:root{--move:var(--duration-normal)}
+.theme-light{--color-bg:var(--ink-50);--color-surface:var(--ink-0);--color-hover:var(--ink-100);--color-fg:var(--ink-900);--color-muted-fg:var(--ink-600);--color-line:var(--ink-200);--color-primary:var(--olive-700);--color-on-primary:var(--ink-0);--color-danger:var(--red-600);--color-warning:var(--amber-700);--color-success:var(--green-700);--color-focus-ring:var(--olive-700);--on-fill:rgb(255 255 255 / .75)}
+.theme-dark{--color-bg:var(--ink-950);--color-surface:var(--ink-900);--color-hover:var(--ink-700);--color-fg:var(--ink-100);--color-muted-fg:var(--ink-400);--color-line:var(--ink-700);--color-primary:var(--lime-400);--color-on-primary:var(--lime-ink);--color-danger:var(--red-300);--color-warning:var(--amber-400);--color-success:var(--green-300);--color-focus-ring:var(--lime-400);--on-fill:rgb(20 21 22 / .6)}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;font-family:var(--font-sans);background:#101112}
+body{display:flex;flex-direction:column;min-height:100vh;padding-bottom:64px}
+.switch{display:flex;align-items:center;justify-content:center;gap:8px;padding:12px 16px;color:#ECEDEE;font-size:14px;flex-wrap:wrap}
+.switch button{height:36px;padding:0 12px;border:1px solid #2C2D30;border-radius:4px;background:transparent;color:#ECEDEE;font:inherit;cursor:pointer}
+.switch button[aria-pressed=true]{background:#ECEDEE;color:#141516}
+.stage{flex:1;display:grid;grid-template-columns:1fr 1fr}
+.pane{display:flex;flex-direction:column;justify-content:flex-end;align-items:center;padding:24px 16px;background:var(--color-bg);color:var(--color-fg);min-height:400px}
+.wrap{width:100%;max-width:520px;display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.composer{width:100%;padding:12px;background:var(--color-surface);border:1px solid var(--color-line);border-radius:6px}
+.composer p{margin:0 0 8px;color:var(--color-muted-fg);font-size:16px}
+.foot{display:flex;align-items:center;justify-content:flex-end;gap:4px;font-size:13px;color:var(--color-muted-fg)}
+.foot .sp{flex:1}.foot .pick{height:28px;display:flex;align-items:center;gap:4px;padding:0 4px 0 8px;color:var(--color-fg)}
+.foot .send{width:28px;height:28px;display:grid;place-items:center;border-radius:4px;background:var(--color-primary);color:var(--color-on-primary)}
+.card{width:260px;max-width:100%;padding:12px;display:grid;gap:8px;background:var(--color-surface);border:1px solid var(--color-line);border-radius:6px}
+.head{display:grid;grid-template-columns:1fr auto 1fr;align-items:center}
+.title{grid-column:2;font-size:16px;font-weight:500;color:var(--tone,var(--color-primary));transition:color var(--move) var(--ease-out)}
+.reset{grid-column:3;justify-self:end;width:28px;height:28px;border:0;border-radius:4px;background:var(--color-hover);color:var(--color-fg);cursor:pointer;display:grid;place-items:center}
+.reset:disabled{background:transparent;color:var(--color-line);cursor:default}
+.track{position:relative;height:32px;border-radius:999px;overflow:hidden;background:var(--color-hover);cursor:pointer;touch-action:none;outline:none}
+.track-box{position:relative;border-radius:999px}
+.track-box:has(.track:focus-visible){outline:2px solid var(--color-focus-ring);outline-offset:2px}
+.fill{position:absolute;inset:0 16px 0 0;background:var(--fill,var(--color-primary));transition:background-color var(--move) var(--ease-out)}
+.cover{position:absolute;inset:0;background:var(--color-hover);transform:translateX(calc(16px + (var(--w) - 32px) * var(--p)));transition:transform var(--move) var(--ease-out)}
+.thumb{position:absolute;top:2px;left:2px;width:28px;height:28px;border-radius:50%;background:var(--color-fg);box-shadow:0 0 0 2px var(--color-surface);transform:translateX(calc((var(--w) - 32px) * var(--p)));transition:transform var(--move) var(--ease-out)}
+.stops{position:absolute;inset:0;padding:0 13px;display:flex;align-items:center;justify-content:space-between;pointer-events:none}
+.stops i{width:6px;height:6px;border-radius:50%;background:var(--color-muted-fg);transition:background-color var(--move) var(--ease-out)}
+.stops i.on{background:var(--on-fill)}
+.dragging .cover,.dragging .thumb{transition:none}
+@media (prefers-reduced-motion:reduce){.cover,.thumb,.fill,.title,.stops i{transition:none}}
+@media (max-width:800px){.stage{grid-template-columns:1fr}.pane{min-height:320px}}
+
+</style></head><body>
+<div class="switch"><span>動き：</span><button data-mode="follow" aria-pressed="true">指についてくる</button><button data-mode="stop" aria-pressed="false">段から段へ滑る</button></div>
+<main class="stage">
+<section class="pane theme-dark"><div class="wrap"><div class="card" style="--p:.5;--w:234px"><div class="head"><span class="title">思考 中</span><button class="reset" aria-label="既定に戻す" title="既定に戻す"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></button></div><div class="track-box"><div class="track" tabindex="0" role="slider" aria-label="思考の段階" aria-valuemin="0" aria-valuemax="2"><span class="fill"></span><span class="cover"></span><span class="stops" aria-hidden="true"><i></i><i></i><i></i></span><span class="thumb"></span></div></div></div><div class="composer"><p>メッセージを入力</p><div class="foot"><span>● 停止中</span><span class="sp"></span><span class="pick"><span class="now">思考 中</span>⌄</span><span class="send">↑</span></div></div></div></section><section class="pane theme-light"><div class="wrap"><div class="card" style="--p:.5;--w:234px"><div class="head"><span class="title">思考 中</span><button class="reset" aria-label="既定に戻す" title="既定に戻す"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></button></div><div class="track-box"><div class="track" tabindex="0" role="slider" aria-label="思考の段階" aria-valuemin="0" aria-valuemax="2"><span class="fill"></span><span class="cover"></span><span class="stops" aria-hidden="true"><i></i><i></i><i></i></span><span class="thumb"></span></div></div></div><div class="composer"><p>メッセージを入力</p><div class="foot"><span>● 停止中</span><span class="sp"></span><span class="pick"><span class="now">思考 中</span>⌄</span><span class="send">↑</span></div></div></div></section>
+</main>
+<script>
+const CASE="ichishoku",L=["思考 低","思考 中","思考 高"];
+let mode="follow";
+document.querySelectorAll(".switch button").forEach(b=>b.onclick=()=>{mode=b.dataset.mode;document.querySelectorAll(".switch button").forEach(x=>x.setAttribute("aria-pressed",x===b))});
+document.querySelectorAll(".card").forEach(card=>{
+ const box=card.querySelector(".track"),title=card.querySelector(".title"),reset=card.querySelector(".reset"),pick=card.closest(".wrap").querySelector(".now");
+ const dots=[...box.querySelectorAll(".stops i")];
+ let idx=1,dragging=false;
+ const paint=(p)=>{card.style.setProperty("--p",p);const i=Math.round(p*2);
+  title.textContent=L[i];pick.textContent=L[i];box.setAttribute("aria-valuenow",i);box.setAttribute("aria-valuetext",L[i]);
+  dots.forEach((d,k)=>d.classList.toggle("on",k/2<=p+.001));
+  card.dataset.level=i;reset.disabled=i===1};
+ const measure=()=>card.style.setProperty("--w",box.clientWidth+"px");
+ measure();addEventListener("resize",measure);paint(.5);
+ const at=e=>{const r=box.getBoundingClientRect();return Math.min(1,Math.max(0,(e.clientX-r.left-16)/(r.width-32)))};
+ box.addEventListener("pointerdown",e=>{dragging=true;box.setPointerCapture(e.pointerId);box.focus({preventScroll:true,focusVisible:false});const p=at(e);
+  /* 押した所へは滑らせてから、動かし始めたら指につける */
+  paint(mode==="follow"?p:Math.round(p*2)/2);box.dataset.startX=e.clientX});
+ box.addEventListener("pointermove",e=>{if(!dragging)return;const p=at(e);
+  if(mode==="follow"){if(Math.abs(e.clientX-box.dataset.startX)>2)card.classList.add("dragging");paint(p)}else paint(Math.round(p*2)/2)});
+ const up=e=>{if(!dragging)return;dragging=false;card.classList.remove("dragging");idx=Math.round(at(e)*2);paint(idx/2)};
+ box.addEventListener("pointerup",up);box.addEventListener("pointercancel",up);
+ box.addEventListener("keydown",e=>{const d={ArrowRight:1,ArrowUp:1,ArrowLeft:-1,ArrowDown:-1}[e.key];if(!d)return;e.preventDefault();idx=Math.min(2,Math.max(0,idx+d));paint(idx/2)});
+ reset.onclick=()=>{idx=1;paint(.5)};
+});
+</script></body></html>
