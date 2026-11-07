@@ -90,6 +90,11 @@ export function AppDataProvider({ children, onUnauthorized }: { children: ReactN
     void reloadPresets().catch(unauthorized);
     void reloadModels().catch(unauthorized);
     return subscribeEvents((event) => {
+      // DL が終わるとサーバーがモデルを登録し、チャットのモデルならプリセットも作る。どの画面にいてもモデルの選択に出るよう読み直す
+      if (event.event === "download.progress" && (event.data as { status?: string }).status === "completed") {
+        void reloadModels().catch(unauthorized);
+        void reloadPresets().catch(unauthorized);
+      }
       if (event.event === "engine") setEngine({ state: event.data.state, presetId: event.data.presetId ?? null, error: event.data.error ?? null, installPercent: event.data.installPercent ?? null, warning: event.data.warning ?? null });
       listeners.current.forEach((l) => l(event));
     });
