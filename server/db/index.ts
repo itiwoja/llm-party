@@ -31,7 +31,13 @@ export function openDatabase(dataDir: string): Db {
   const db = new Database(path.join(dir, "llm-party.sqlite"));
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
-  migrate(db, path.join(dir, "backup", "llm-party.sqlite"));
+  try {
+    migrate(db, path.join(dir, "backup", "llm-party.sqlite"));
+  } catch (error) {
+    // 開いたままだと Windows ではファイルが消せなくなる
+    db.close();
+    throw error;
+  }
   return db;
 }
 
