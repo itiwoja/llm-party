@@ -6,6 +6,7 @@ import { HfClient } from "../hf/client";
 import { GENRE_NAMES } from "../hf/genres";
 import { DEFAULT_GPU_RATIO } from "../hf/memory";
 import { assertRepo, groupFiles } from "../hf/names";
+import { isRootSafetensors } from "../hf/usable";
 import { parse } from "./parse";
 
 /** 空欄は指定なし。数字は GB の上限（1〜1024） */
@@ -35,9 +36,12 @@ export function hfRoutes({ downloads, store, hfBaseUrl, dataDir }: Context): Rou
   });
 
   api.get("/hf/files", async (req, res) => {
-    const { repo } = parse(z.object({ repo: z.string().min(1) }), req.query);
+    const { repo, use } = parse(z.object({ repo: z.string().min(1), use: z.enum(["chat", "image"]).default("chat") }), req.query);
     assertRepo(repo);
-    const items = groupFiles(await hf.listFiles(repo)).map((group) => ({
+    const groups = groupFiles(await hf.listFiles(repo));
+    // 画像は一体型と確かめられたファイルだけ出す（D-89）
+    const usable = use === "chat" ? groups : (await Promise.all(groups.filter((group) => isRootSafetensors(group.name)).map(async (group) => ((await hf.isCheckpoint(repo, group.name)) ? [group] : [])))).flat();
+    const items = usable.map((group) => ({
       name: group.name,
       quantization: group.quantization,
       sizeBytes: group.sizeBytes,
@@ -52,7 +56,7 @@ export function hfRoutes({ downloads, store, hfBaseUrl, dataDir }: Context): Rou
     ...rest,
     // 完了した LoRA の保存先。画面が POST /api/adapters の reference に使う
     ...(rest.kind === "adapter" && rest.status === "completed" ? { filePath: path.join(destDir, files[0].name) } : {}),
-    // 保存だけの DL の置き場。登録されないので、ここでしか場所が分からない。モデルの本体や部品になったものは画面が行を出さない
+    // D-88 より前の保存だけの DL の置き場。登録されないので、ここでしか場所が分からない。モデルの本体や部品になったものは画面が行を出さない
     ...(rest.kind === "file" && rest.status === "completed"
       ? { savedDir: destDir, usedByModel: files.every((file) => store.downloads.isInModel(path.join(destDir, file.name))) }
       : {}),
@@ -61,7 +65,7 @@ export function hfRoutes({ downloads, store, hfBaseUrl, dataDir }: Context): Rou
 
   api.post("/downloads", async (req, res) => {
     const input = parse(
-      z.object({ repo: z.string().min(1), files: z.array(z.string().min(1)).min(1).optional(), kind: z.enum(["model", "adapter", "image", "file"]) }),
+      z.object({ repo: z.string().min(1), files: z.array(z.string().min(1)).min(1), kind: z.enum(["model", "adapter", "image"]) }),
       req.body,
     );
     res.status(202).json(view(await downloads.create(input)));

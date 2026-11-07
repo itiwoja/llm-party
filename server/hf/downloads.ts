@@ -106,30 +106,26 @@ export class DownloadService {
     return this.options.store.downloads.list();
   }
 
-  /**
-   * 空き容量と、ゲートの有無を確かめてから待ち行列に入れる。
-   * files を省くとリポジトリ全体を取る（保存だけの file に限る）
-   */
-  async create(input: { repo: string; files?: string[]; kind: DownloadRecord["kind"] }): Promise<DownloadRecord> {
+  /** 空き容量と、ゲートの有無を確かめてから待ち行列に入れる */
+  async create(input: { repo: string; files: string[]; kind: "model" | "adapter" | "image" }): Promise<DownloadRecord> {
     const { store } = this.options;
     assertRepo(input.repo);
-    input.files?.forEach((file) => assertFileName(file));
+    input.files.forEach((file) => assertFileName(file));
     if (input.kind === "image") {
-      if (!input.files || input.files.length !== 1) throw new ApiError("VALIDATION_ERROR", "入力が正しくありません", [{ field: "files" }]);
+      if (input.files.length !== 1) throw new ApiError("VALIDATION_ERROR", "入力が正しくありません", [{ field: "files" }]);
       assertSafetensors(input.files[0]);
-    } else if (input.kind !== "file") {
-      if (!input.files) throw new ApiError("VALIDATION_ERROR", "入力が正しくありません", [{ field: "files" }]);
+    } else {
       input.files.forEach((file) => assertGguf(file));
     }
     const tree = await this.client.listFiles(input.repo);
-    const selected = input.files ? expandSelection(input.files, tree) : tree;
+    const selected = expandSelection(input.files, tree);
     if (selected.length === 0) throw new ApiError("VALIDATION_ERROR", "ファイルが見つかりません", [{ field: "files" }]);
-    // 全体を取るときの名前は HF から来る。保存先の外へ出る形が混ざらないよう同じ検査を通す
+    // 分割の仲間の名前は HF から来る。保存先の外へ出る形が混ざらないよう同じ検査を通す
     selected.forEach((file) => assertFileName(file.path));
     const destDir = insideDir(store.downloads.modelsDir(this.options.dataDir), input.repo);
     selected.forEach((file) => insideDir(destDir, file.path));
     // 登録済みのファイルを取り直しても models.create が衝突するだけなので、入口で断る
-    if (input.kind !== "file" && store.downloads.isRegistered(input.kind, insideDir(destDir, selected[0].path))) {
+    if (store.downloads.isRegistered(input.kind, insideDir(destDir, selected[0].path))) {
       throw new ApiError("CONFLICT", "このファイルは登録済みです");
     }
 
@@ -336,7 +332,7 @@ export class DownloadService {
       toRename.push(final);
     }
     const total = record.files.reduce((sum, file) => sum + file.size, 0);
-    // 保存だけの DL は形式を問わないので、GGUF としての確認も登録もしない
+    // D-88 より前の保存だけの DL。新しくは作らないが、失敗で残った行は再開できる。GGUF としての確認も登録もしない
     if (record.kind === "file") {
       for (const final of toRename) await rename(`${final}.part`, final);
       this.set(job.id, { status: "completed", receivedBytes: total });

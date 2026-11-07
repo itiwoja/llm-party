@@ -17,6 +17,14 @@ export function ggufBytes(options: { type?: string; padding?: number } = {}): Bu
   }
 }
 
+/** 本物の safetensors の頭。tensors は重みの名前。既定は UNet・VAE・テキストエンコーダが揃った一体型 */
+export function checkpointBytes(tensors = ["model.diffusion_model.a", "first_stage_model.b", "cond_stage_model.c"]): Buffer {
+  const header = Buffer.from(JSON.stringify(Object.fromEntries(tensors.map((name) => [name, { dtype: "F32", shape: [0], data_offsets: [0, 0] }]))));
+  const length = Buffer.alloc(8);
+  length.writeBigUInt64LE(BigInt(header.length));
+  return Buffer.concat([length, header]);
+}
+
 export interface FakeFile {
   path: string;
   data: Buffer;
@@ -28,6 +36,12 @@ export interface FakeFile {
 
 export interface FakeRepo {
   files: FakeFile[];
+  /** GGUF の形式。既定は qwen35。null なら HF が形式を返さない */
+  architecture?: string | null;
+  /** false ならチャットテンプレートを返さない */
+  chatTemplate?: boolean;
+  /** diffusers の組み立て（config.diffusers._class_name） */
+  pipeline?: string;
   /** 付けるとゲート付き。resolve は Bearer がこの値のときだけ通る */
   gatedToken?: string;
   pipelineTag?: string;
@@ -83,6 +97,11 @@ export async function startFakeHf(repos: Record<string, FakeRepo> = {}): Promise
     res.end(JSON.stringify(body));
   };
 
+  const fakeGguf = (repo: FakeRepo) => ({
+    ...(repo.params ? { total: repo.params } : {}),
+    ...(repo.architecture === null ? {} : { architecture: repo.architecture ?? "qwen35" }),
+    ...(repo.chatTemplate === false ? {} : { chat_template: "{{ messages }}" }),
+  });
   const hf = createServer((req, res) => {
     fake.hfRequests.push(note(req));
     const url = new URL(req.url ?? "/", "http://x");
@@ -99,7 +118,9 @@ export async function startFakeHf(repos: Record<string, FakeRepo> = {}): Promise
           // 本物と同じく、頼まないと返らない
           ...(url.searchParams.getAll("expand[]").includes("lastModified") ? { lastModified: "2026-11-01T00:00:00.000Z" } : {}),
           ...(url.searchParams.getAll("expand[]").includes("gated") ? { gated: Boolean(fake.repos.get(repo)!.gatedToken) } : {}),
-          ...(url.searchParams.getAll("expand[]").includes("gguf") && fake.repos.get(repo)!.params ? { gguf: { total: fake.repos.get(repo)!.params } } : {}),
+          ...(url.searchParams.getAll("expand[]").includes("gguf") ? { gguf: fakeGguf(fake.repos.get(repo)!) } : {}),
+          ...(url.searchParams.getAll("expand[]").includes("siblings") ? { siblings: fake.repos.get(repo)!.files.map((file) => ({ rfilename: file.path })) } : {}),
+          ...(url.searchParams.getAll("expand[]").includes("config") && fake.repos.get(repo)!.pipeline ? { config: { diffusers: { _class_name: fake.repos.get(repo)!.pipeline } } } : {}),
           ...(url.searchParams.getAll("expand[]").includes("safetensors") && fake.repos.get(repo)!.params ? { safetensors: { total: fake.repos.get(repo)!.params } } : {}),
         }));
       return json(res, items);

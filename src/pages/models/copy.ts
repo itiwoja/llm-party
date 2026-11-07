@@ -51,16 +51,10 @@ export const PG3_MISSING = {
     all: "すべて",
     chat: "チャット",
     image: "画像生成",
-    video: "映像生成",
-    music: "音楽生成",
-    speech: "音声生成",
-    transcribe: "文字起こし",
-    embedding: "Embedding",
   }, // CP-286
   uncensored: "無検閲のみ", // CP-287
   colLicense: "ライセンス", // CP-288
-  saveOnly: "チャットでは動かせないモデル。置き場に保存するだけ", // CP-289
-  imageHint: "単一の .safetensors は画像生成のモデルとして登録。分割したファイルと GGUF は保存するだけ",
+  imageHint: "画像生成に使える一体型の .safetensors だけを表示",
   fileCount: (n: number) => `${n} ファイル`, // CP-291
   savedTo: "保存先", // CP-292
   vram: "VRAM まで（GB）", // CP-309
@@ -73,6 +67,7 @@ export const PG3_MISSING = {
   colStrength: "強さ", // HF 検索結果の列。強さはパラメータ数で測る（HF は性能の点数を返さない）
   modelsOnlyHint: "モデル（GGUF）だけを表示。画像の入力部（mmproj）と量子化の計算用（imatrix）は外す", // 同
   noModelFile: "GGUF のモデルがない。チャットでは動かせない", // 同
+  noImageFile: "画像生成に使えるファイルがない", // 同
   recipeNote: "既定の組み合わせは 16GB 以上の GPU を前提", // R-18（画像の一括 DL の注意）
   musicRecipeNote: "音楽生成のモデル一式（XL）。8GB の GPU で動く", // CP-337（D-78, D-79）
   recipeTotal: (size: string) => `合計 ${size}`, // API-098 の sizeBytes

@@ -156,62 +156,26 @@ describe("DL の完了とモデル登録", () => {
   });
 });
 
-describe("保存だけの DL（file）", () => {
-  it("GGUF でなくても保存し、モデルには登録しない。置き場を返す", async () => {
-    const created = await worker.api("/downloads", body(["model.safetensors"], "acme/sdxl", "file"));
-    expect(created.status).toBe(202);
-    const done = await find(created.body.id, "completed");
-    expect(done.savedDir).toBe(path.join(models(), "acme", "sdxl"));
-    expect(done.resultId).toBeNull();
-    expect(readFileSync(path.join(models(), "acme/sdxl/model.safetensors"))).toEqual(payload);
-    expect(worker.context.store.models.list()).toEqual([]);
+describe("保存だけの DL をやめた（D-88）", () => {
+  it("file は新しく始められない。files を省くのも 400", async () => {
+    expect((await worker.api("/downloads", body(["model.safetensors"], "acme/sdxl", "file"))).status).toBe(400);
+    expect((await worker.api("/downloads", { body: { repo: "acme/sdxl", kind: "model" } })).status).toBe(400);
+    expect((await worker.api("/downloads")).body.items).toEqual([]);
   });
 
-  it("GGUF のファイルでも file なら登録しない", async () => {
-    const created = await worker.api("/downloads", body(["tiny-Q4_K_M.gguf"], "acme/tiny-GGUF", "file"));
-    await find(created.body.id, "completed");
-    expect(worker.context.store.models.list()).toEqual([]);
-  });
-
-  it("分割の safetensors は仲間ごと取る", async () => {
-    const created = await worker.api("/downloads", body(["text_encoder/model-00002-of-00002.safetensors"], "acme/sdxl", "file"));
-    await find(created.body.id, "completed");
-    expect(existsSync(path.join(models(), "acme/sdxl/text_encoder/model-00001-of-00002.safetensors"))).toBe(true);
-    expect(existsSync(path.join(models(), "acme/sdxl/text_encoder/model-00002-of-00002.safetensors"))).toBe(true);
-  });
-
-  it("sha256 が合わなければ失敗する", async () => {
-    const created = await worker.api("/downloads", body(["broken.safetensors"], "acme/sdxl", "file"));
-    await find(created.body.id, "failed");
-    expect(existsSync(path.join(models(), "acme/sdxl/broken.safetensors"))).toBe(false);
-  });
-
-  it("files を省くとリポジトリ全体を取る（サブフォルダ・LFS でないもの・空のファイルも）", async () => {
-    hf.repos.get("acme/sdxl")!.files.pop(); // 壊れたファイルは除く
-    const created = await worker.api("/downloads", { body: { repo: "acme/sdxl", kind: "file" } });
-    expect(created.status).toBe(202);
-    const done = await find(created.body.id, "completed");
-    expect(done.files.map((file: any) => file.name).sort()).toEqual([
-      "README.md", "empty.txt", "model.safetensors", "text_encoder/model-00001-of-00002.safetensors", "text_encoder/model-00002-of-00002.safetensors",
-    ]);
-    const root = path.join(models(), "acme/sdxl");
-    expect(readFileSync(path.join(root, "README.md"), "utf8")).toBe("# fake repo");
-    expect(readFileSync(path.join(root, "empty.txt")).length).toBe(0);
-    expect(existsSync(path.join(root, "model.safetensors.part"))).toBe(false);
-  });
-
-  it("途中で失敗しても再開で続きから取り、取り終えたファイルは取り直さない", async () => {
-    hf.repos.get("acme/sdxl")!.files.pop();
-    // 先頭の README で1つ、model.safetensors で再試行の上限まで切る
-    hf.behavior.cuts = [1000, 1000, 1000, 1000, 1000];
-    const created = await worker.api("/downloads", { body: { repo: "acme/sdxl", kind: "file" } });
-    await find(created.body.id, "failed");
-    const before = hf.cdnRequests.length;
-    await worker.api(`/downloads/${created.body.id}/resume`, { method: "POST" });
-    await find(created.body.id, "completed");
-    // 残りは model.safetensors の続きと text_encoder の2つだけ。README は取り終えている
-    expect(hf.cdnRequests.length - before).toBe(3);
-    expect(readFileSync(path.join(models(), "acme/sdxl/model.safetensors"))).toEqual(payload);
+  it("前からある行は置き場を返し、ファイルがモデルの部品になると usedByModel を返す", async () => {
+    const { store } = worker.context;
+    const destDir = path.join(models(), "acme", "tiny-GGUF");
+    const record = store.downloads.create({ kind: "file", repo: "acme/tiny-GGUF", files: [{ name: "tiny-Q4_K_M.gguf", size: 1, sha256: null }], destDir });
+    store.downloads.update(record.id, { status: "completed" });
+    const before = await find(record.id, "completed");
+    expect(before.savedDir).toBe(destDir);
+    expect(before.usedByModel).toBe(false);
+    store.models.create({
+      name: "組み合わせ", path: path.join(models(), "main.gguf"), source: "hf", use: "image", architecture: "moss-image", quantization: null, sizeBytes: 1, trainContext: null,
+      parts: { diffusion: path.join(models(), "main.gguf"), llm: path.join(destDir, "tiny-Q4_K_M.gguf"), vae: path.join(models(), "vae"), tokenizer: path.join(models(), "tokenizer") },
+    });
+    expect((await find(record.id, "completed")).usedByModel).toBe(true);
   });
 });
 

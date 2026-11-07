@@ -1,5 +1,6 @@
 import { ApiError } from "../http-error";
-import { GENRES, GGUF_ONLY_GENRES, type Genre } from "./genres";
+import { GENRES, type Genre, type GenreQuery } from "./genres";
+import { headerLength, isCheckpointHeader, usableAs } from "./usable";
 import { assertRepo, encodePath, type TreeFile } from "./names";
 import { DEFAULT_GPU_RATIO, fits, memoryNeed, q4Bytes, type MemoryLimit } from "./memory";
 import { readHfToken } from "./token";
@@ -11,10 +12,10 @@ const MAX_REDIRECTS = 5;
 /** tree の続きを辿る回数の上限（暴走防止） */
 const MAX_TREE_PAGES = 100;
 const SEARCH_LIMIT = 50;
-/** VRAM・RAM で絞るときは、絞った後も結果が残るよう多めに取る（HF はサイズで絞れない） */
-const FILTER_FETCH_LIMIT = 100;
+/** 取った後に絞るので多めに取る（HF は使えるかどうかもサイズも絞れない） */
+const FETCH_LIMIT = 100;
 /** 検索で使う項目。指定しないと lastModified と gated が返らない。指定すると既定の項目も消えるので全部書く */
-const SEARCH_FIELDS = ["downloads", "lastModified", "createdAt", "gated", "pipeline_tag", "tags", "gguf", "safetensors"];
+const SEARCH_FIELDS = ["downloads", "lastModified", "createdAt", "gated", "pipeline_tag", "tags", "gguf", "safetensors", "siblings", "config"];
 
 /** GGUF か safetensors のパラメータ数を取る */
 function sizeOf(item: { gguf?: { total?: unknown }; safetensors?: { total?: unknown } }): Pick<HfRepo, "params"> {
@@ -102,10 +103,7 @@ export class HfClient {
 
   /** ジャンルと語で探す。pipeline_tag が複数のジャンルは検索ごとの結果を DL 数の順に混ぜる */
   async search({ query, genre, uncensored, vram = null, ram = null, gpuRatio = DEFAULT_GPU_RATIO }: HfSearch): Promise<HfRepo[]> {
-    const tags: readonly (string | null)[] = GENRES[genre].length > 0 ? GENRES[genre] : [null];
-    const filters = [...(GGUF_ONLY_GENRES.includes(genre) ? ["gguf"] : []), ...(uncensored ? ["uncensored"] : [])];
-    const limit = vram === null && ram === null ? SEARCH_LIMIT : FILTER_FETCH_LIMIT;
-    const results = await Promise.all(tags.map((tag) => this.searchOne(query, tag, filters, limit)));
+    const results = await Promise.all(GENRES[genre].map((item: GenreQuery) => this.searchOne(query, item, uncensored)));
     const merged = new Map(results.flat().map((repo) => [repo.repo, repo]));
     return [...merged.values()]
       .filter((repo) => fits(repo.params === null ? null : memoryNeed(q4Bytes(repo.params), gpuRatio), { vram, ram }))
@@ -113,18 +111,22 @@ export class HfClient {
       .slice(0, SEARCH_LIMIT);
   }
 
-  private async searchOne(query: string, pipelineTag: string | null, filters: string[], limit: number): Promise<HfRepo[]> {
+  /** 使えると確定したリポジトリだけ返す（D-89） */
+  private async searchOne(query: string, { tag, filters }: GenreQuery, uncensored: boolean): Promise<HfRepo[]> {
     const url = new URL("/api/models", this.baseUrl);
-    const params = new URLSearchParams({ sort: "downloads", limit: String(limit) });
+    const params = new URLSearchParams({ sort: "downloads", limit: String(FETCH_LIMIT) });
     if (query) params.set("search", query);
-    if (pipelineTag) params.set("pipeline_tag", pipelineTag);
-    for (const filter of filters) params.append("filter", filter); // filter を重ねると AND になる
+    params.set("pipeline_tag", tag);
+    for (const filter of [...filters, ...(uncensored ? ["uncensored"] : [])]) params.append("filter", filter); // filter を重ねると AND になる
     for (const field of SEARCH_FIELDS) params.append("expand[]", field);
     url.search = params.toString();
     const { body } = await this.json(url);
     if (!Array.isArray(body)) throw new ApiError("UPSTREAM_ERROR", CONNECT_MESSAGE);
-    return body.map((item) => ({
+    return body.flatMap((item) => {
+      const use = usableAs(item);
+      return use ? [{
       repo: String(item.id ?? item.modelId),
+      use,
       downloads: Number(item.downloads ?? 0),
       updatedAt: item.lastModified ?? null,
       createdAt: item.createdAt ?? null,
@@ -132,7 +134,23 @@ export class HfClient {
       pipelineTag: item.pipeline_tag ?? null,
       license: (item.tags as string[] | undefined)?.find((tag) => tag.startsWith("license:"))?.slice("license:".length) ?? null,
       ...sizeOf(item),
-    }));
+      }] : [];
+    });
+  }
+
+  /** 画像モデルとして読める一体型か。頭だけ読むので全体は取らない。読めなければ確定しないので false */
+  async isCheckpoint(repo: string, file: string): Promise<boolean> {
+    try {
+      const url = this.resolveUrl(repo, file);
+      const read = async (from: number, to: number) => {
+        const res = await this.check(await this.fetch(url, { headers: { Range: `bytes=${from}-${to}` } }));
+        return Buffer.from(await res.arrayBuffer());
+      };
+      const length = headerLength(await read(0, 7));
+      return length !== null && isCheckpointHeader(await read(8, 7 + length));
+    } catch {
+      return false;
+    }
   }
 
   /** リポジトリの全ファイル。tree は続きがあるので Link ヘッダーの next を最後まで辿る */

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { api, ApiRequestError } from "../../api";
 import { Button } from "../../components/Button";
-import { RadioField, SelectField, SwitchField } from "../../components/Controls";
+import { SelectField, SwitchField } from "../../components/Controls";
 import { GpuRatioField } from "../../components/GpuRatioField";
 import { SearchField } from "../../components/SearchField";
 import { Table, type Column } from "../../components/Table";
@@ -50,31 +50,10 @@ function StrengthBar({ params, max }: { params: number | null; max: number }) {
 
 const GENRE_OPTIONS = (Object.keys(PG3_MISSING.genres) as Genre[]).map((value) => ({ value, label: PG3_MISSING.genres[value] }));
 
-/** pipeline_tag の表示名。ジャンルにない値はそのまま出す */
-const PIPELINE_LABELS: Record<string, string> = {
-  "text-generation": PG3_MISSING.genres.chat,
-  "image-text-to-text": PG3_MISSING.genres.chat,
-  "text-to-image": PG3_MISSING.genres.image,
-  "text-to-video": PG3_MISSING.genres.video,
-  "text-to-audio": PG3_MISSING.genres.music,
-  "text-to-speech": PG3_MISSING.genres.speech,
-  "automatic-speech-recognition": PG3_MISSING.genres.transcribe,
-  "feature-extraction": PG3_MISSING.genres.embedding,
-  "sentence-similarity": PG3_MISSING.genres.embedding,
-};
-
-/** チャットで動かせる見込みがあるか。pipeline_tag の無いリポジトリ（LoRA に多い）は今までどおり選ばせる */
-const isChatRepo = (repo: HfRepo) => repo.pipelineTag === null || PIPELINE_LABELS[repo.pipelineTag] === PG3_MISSING.genres.chat;
-const isGguf = (name: string) => name.toLowerCase().endsWith(".gguf");
-const isImageRepo = (repo: HfRepo) => repo.pipelineTag !== null && PIPELINE_LABELS[repo.pipelineTag] === PG3_MISSING.genres.image;
-/** 画像生成に登録できる形。分割していない単一の .safetensors */
-const isImageFile = (name: string) => name.toLowerCase().endsWith(".safetensors") && !/-\d{5}-of-\d{5}\.safetensors$/i.test(name);
 /** mmproj（画像の入力部）と imatrix（量子化の計算用）は、どのリポジトリでもモデル本体ではないので出さない */
 const isAuxFile = (name: string) => /^(mmproj|imatrix)/i.test(name.split("/").pop() ?? name);
 /** チャット用に出すのはモデル本体の GGUF だけ */
-const isModelFile = (name: string) => isGguf(name) && !isAuxFile(name);
-/** 保存だけのリポジトリに出すのはモデルの重みファイルだけ（README・設定の json・画像は出さない） */
-const isWeightFile = (name: string) => /\.(gguf|safetensors|ckpt|pt|pth|bin|onnx)$/i.test(name) && !isAuxFile(name);
+const isModelFile = (name: string) => name.toLowerCase().endsWith(".gguf") && !isAuxFile(name);
 
 /** 401 は設定の HF トークンへ案内する（CP-096） */
 export function hfFailure(err: unknown): ReactNode {
@@ -147,7 +126,6 @@ export function HfTab({ onStarted }: { onStarted(): void }) {
   const [searching, setSearching] = useState(false);
   const [repo, setRepo] = useState<HfRepo | null>(null);
   const [files, setFiles] = useState<HfFile[] | null>(null);
-  const [kind, setKind] = useState<"model" | "adapter">("model");
   const [starting, setStarting] = useState<string | null>(null);
   const [failure, setFailure] = useState<unknown>(null);
   // ジャンルを続けて変えたとき、古い検索の結果で上書きしない
@@ -213,21 +191,18 @@ export function HfTab({ onStarted }: { onStarted(): void }) {
     setRepo(row);
     setFiles(null);
     try {
-      setFiles((await api.get<{ items: HfFile[] }>(`/hf/files?repo=${encodeURIComponent(row.repo)}`)).items);
+      setFiles((await api.get<{ items: HfFile[] }>(`/hf/files?repo=${encodeURIComponent(row.repo)}&use=${row.use}`)).items);
     } catch (err) {
       setFailure(err);
     }
   }
 
-  /** GGUF 以外とチャットで動かないモデルは保存だけにする */
   async function start(file: HfFile) {
     if (!repo) return;
     setFailure(null);
     setStarting(file.name);
     try {
-      const saveOnly = !isGguf(file.name) || !isChatRepo(repo);
-      const useKind = isImageRepo(repo) && isImageFile(file.name) ? "image" : saveOnly ? "file" : kind;
-      await api("/downloads", { repo: repo.repo, files: [file.name], kind: useKind });
+      await api("/downloads", { repo: repo.repo, files: [file.name], kind: chatRepo ? "model" : "image" });
       onStarted();
     } catch (err) {
       setFailure(err);
@@ -239,11 +214,11 @@ export function HfTab({ onStarted }: { onStarted(): void }) {
   // 強さ順に並べ直す（API は DL 数の順で返すので、ここで並べ替える）
   const ranked = repos ? [...repos].sort(byStrength) : [];
   const maxParams = Math.max(0, ...ranked.map((r) => r.params ?? 0));
-  // チャットのリポジトリは GGUF のモデルだけを出し、リポジトリ全体の DL は出さない（全部取ると不要なファイルまで入る）。それ以外も重みだけを出す
-  const chatRepo = repo !== null && isChatRepo(repo);
+  // チャットは GGUF のモデルだけを出す。画像は API が一体型と確かめたファイルだけ返す（D-89）
+  const chatRepo = repo?.use === "chat";
   // 強さ順（容量が大きいほど強い）に並べる。同じ容量は名前順
   const shownFiles = files
-    ?.filter((f) => (chatRepo ? isModelFile(f.name) : isWeightFile(f.name)))
+    ?.filter((f) => !chatRepo || isModelFile(f.name))
     .sort((a, b) => b.sizeBytes - a.sizeBytes || a.name.localeCompare(b.name));
 
   const repoNeed = (r: HfRepo) => (r.params === null ? null : memoryNeed(q4Bytes(r.params), gpuRatio));
@@ -252,7 +227,7 @@ export function HfTab({ onStarted }: { onStarted(): void }) {
   const repoColumns: Column<HfRepo>[] = [
     { key: "repo", header: PG3_MISSING.colRepo, render: (r) => <button type="button" className="link-btn numeric">{r.repo}</button> },
     { key: "strength", header: PG3_MISSING.colStrength, render: (r) => <StrengthBar params={r.params} max={maxParams} /> },
-    { key: "genre", header: PG3_MISSING.genre, render: (r) => <span className="models-nowrap">{r.pipelineTag ? PIPELINE_LABELS[r.pipelineTag] ?? r.pipelineTag : ""}</span> },
+    { key: "genre", header: PG3_MISSING.genre, render: (r) => <span className="models-nowrap">{PG3_MISSING.genres[r.use]}</span> },
     { key: "license", header: PG3_MISSING.colLicense, render: (r) => <span className="numeric models-nowrap">{r.license ?? ""}</span> },
     { key: "vram", header: PG3_MISSING.colVram, numeric: true, render: (r) => { const need = repoNeed(r); return need ? gbText(need.vramGb) : ""; } },
     { key: "ram", header: PG3_MISSING.colRam, numeric: true, render: (r) => { const need = repoNeed(r); return need ? gbText(need.ramGb) : ""; } },
@@ -331,17 +306,9 @@ export function HfTab({ onStarted }: { onStarted(): void }) {
       {repo ? (
         <section ref={filesRef} className="models-files">
           <p className="models-path numeric">{repo.repo}</p>
-          {isChatRepo(repo) ? (
-            <RadioField
-              label={PG3.tabDownloads}
-              value={kind}
-              onValueChange={(v) => setKind(v as "model" | "adapter")}
-              options={[{ value: "model", label: PG3.tabModels }, { value: "adapter", label: PG3.tabAdapters }]}
-            />
-          ) : <p className="models-note">{isImageRepo(repo) ? PG3_MISSING.imageHint : PG3_MISSING.saveOnly}</p>}
-          {chatRepo ? <p className="models-note">{PG3_MISSING.modelsOnlyHint}</p> : null}
+          <p className="models-note">{chatRepo ? PG3_MISSING.modelsOnlyHint : PG3_MISSING.imageHint}</p>
           {shownFiles ? ratioField : null}
-          {shownFiles ? <Table columns={fileColumns} rows={shownFiles} rowKey={(f) => f.name} caption={repo.repo} empty={chatRepo ? PG3_MISSING.noModelFile : PG3.emptySearch} /> : null}
+          {shownFiles ? <Table columns={fileColumns} rows={shownFiles} rowKey={(f) => f.name} caption={repo.repo} empty={chatRepo ? PG3_MISSING.noModelFile : PG3_MISSING.noImageFile} /> : null}
         </section>
       ) : null}
     </>

@@ -1,18 +1,17 @@
-/** 検索のジャンルと、HF の pipeline_tag の対応。1つのジャンルに複数あるときは別々に検索して混ぜる（HF は pipeline_tag を1つしか受けない） */
+/** 検索の1回分。tag は pipeline_tag（HF は1つしか受けない）、filter は重ねると AND になるタグ */
+export interface GenreQuery { tag: string; filters: readonly string[] }
+
+const CHAT_QUERIES: GenreQuery[] = [{ tag: "text-generation", filters: ["gguf"] }, { tag: "image-text-to-text", filters: ["gguf"] }];
+const image = (pipeline: string): GenreQuery => ({ tag: "text-to-image", filters: [`diffusers:${pipeline}`] });
+const IMAGE_QUERIES = [image("StableDiffusionPipeline"), image("StableDiffusionXLPipeline")];
+
+/** ジャンルごとの検索。結果は DL 数の順に混ぜてから、hf/usable.ts で使えると確定したものだけ残す（D-89） */
 export const GENRES = {
-  all: [],
-  chat: ["text-generation", "image-text-to-text"],
-  image: ["text-to-image"],
-  video: ["text-to-video"],
-  music: ["text-to-audio"],
-  speech: ["text-to-speech"],
-  transcribe: ["automatic-speech-recognition"],
-  embedding: ["feature-extraction", "sentence-similarity"],
-} as const satisfies Record<string, readonly string[]>;
+  all: [...CHAT_QUERIES, ...IMAGE_QUERIES],
+  chat: CHAT_QUERIES,
+  image: IMAGE_QUERIES,
+} as const satisfies Record<string, readonly GenreQuery[]>;
 
 export type Genre = keyof typeof GENRES;
 
 export const GENRE_NAMES = Object.keys(GENRES) as [Genre, ...Genre[]];
-
-/** llama-server で動かせるのは GGUF だけなので、チャットのジャンルは GGUF に絞る */
-export const GGUF_ONLY_GENRES: readonly Genre[] = ["chat"];
