@@ -75,7 +75,7 @@ export const PG3_MISSING = {
   modelsOnlyHint: "モデル（GGUF）だけを表示。画像の入力部（mmproj）と量子化の計算用（imatrix）は外す", // 同
   noModelFile: "GGUF のモデルがない。チャットでは動かせない", // 同
   recipeNote: "既定の組み合わせは 16GB 以上の GPU を前提", // R-18（画像の一括 DL の注意）
-  musicRecipeNote: "音楽生成のモデル一式。8GB の GPU で動く", // CP-337（D-78）
+  musicRecipeNote: "音楽生成のモデル一式（XL）。8GB の GPU で動く", // CP-337（D-78, D-79）
   recipeTotal: (size: string) => `合計 ${size}`, // API-098 の sizeBytes
   recipeStart: "一括で DL する", // API-097
   recipeInstalled: "入っています", // API-098 の installed

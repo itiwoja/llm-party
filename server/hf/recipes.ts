@@ -10,10 +10,10 @@ export const MOSS_IMAGE: RecipePart[] = [
   { key: "tokenizer", repo: "unsloth/MOSS-Image-SFT-FP8", file: "tokenizer/tokenizer.json" },
 ];
 
-/** 8GB の GPU で動く組み合わせ（D-78, ADR-013）。acestep.cpp は同じフォルダから読むので、リポジトリは1つ */
+/** 8GB の GPU で動く組み合わせ（D-78, D-79, ADR-013, ADR-014）。acestep.cpp は同じフォルダから読むので、リポジトリは1つ */
 const ACE_REPO = "Serveurperso/ACE-Step-1.5-GGUF";
 export const ACE_STEP: RecipePart[] = [
-  { key: "dit", repo: ACE_REPO, file: "acestep-v15-turbo-Q8_0.gguf" },
+  { key: "dit", repo: ACE_REPO, file: "acestep-v15-xl-turbo-Q8_0.gguf" },
   { key: "lm", repo: ACE_REPO, file: "acestep-5Hz-lm-1.7B-Q8_0.gguf" },
   { key: "textEncoder", repo: ACE_REPO, file: "Qwen3-Embedding-0.6B-Q8_0.gguf" },
   { key: "vae", repo: ACE_REPO, file: "vae-BF16.gguf" },
@@ -25,5 +25,5 @@ export interface Recipe { id: "moss-image" | "ace-step"; name: string; kind: Rec
 
 export const RECIPES: Recipe[] = [
   { id: "moss-image", name: "MOSS-Image", kind: "image-set", parts: MOSS_IMAGE },
-  { id: "ace-step", name: "ACE-Step 1.5", kind: "music-set", parts: ACE_STEP },
+  { id: "ace-step", name: "ACE-Step 1.5 XL", kind: "music-set", parts: ACE_STEP },
 ];

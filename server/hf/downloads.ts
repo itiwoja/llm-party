@@ -1,10 +1,11 @@
 import { createHash } from "node:crypto";
-import { createReadStream, existsSync, mkdirSync, readSync, openSync, closeSync, statSync } from "node:fs";
+import { createReadStream, existsSync, mkdirSync, rmSync, readSync, openSync, closeSync, statSync } from "node:fs";
 import { open, rename, rm, statfs, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { EventBus } from "../events";
 import { readGguf } from "../gguf";
 import { ApiError } from "../http-error";
+import { logger } from "../logger";
 import type { Store } from "../store";
 import type { DownloadRecord } from "../store/downloads";
 import { HfClient, RetryableError } from "./client";
@@ -62,6 +63,12 @@ async function ensureSpace(dir: string, remaining: number): Promise<void> {
 }
 
 const isRecipeKind = (kind: string): kind is RecipeKind => kind === "image-set" || kind === "music-set";
+
+/** file が置き場の中のファイルか（local_ref など外のパスを消さないため） */
+function insideModels(root: string, file: string): boolean {
+  const relative = path.relative(root, file);
+  return relative !== "" && !relative.startsWith("..") && !path.isAbsolute(relative);
+}
 
 function hasMagic(file: string): boolean {
   const fd = openSync(file, "r");
@@ -352,6 +359,7 @@ export class DownloadService {
         quantization: null, sizeBytes: total, trainContext: null, use: record.kind === "music-set" ? "music" : "image", parts,
       });
       store.downloads.setModelRepo(model.id, record.repo);
+      if (record.kind === "music-set") this.replaceOldMusic(model.id, at("dit"), record.destDir);
       this.set(job.id, { status: "completed", receivedBytes: total, resultId: model.id });
       return;
     }
@@ -407,6 +415,25 @@ export class DownloadService {
       }
     }
     this.set(job.id, { status: "completed", receivedBytes: total, resultId });
+  }
+
+  /**
+   * 音楽モデルを置き換える（D-79, ADR-014）。XL の登録が済んだあとに、古い ACE-Step の行とその DiT だけを消す。
+   * 登録は済んでいるので、ここでの失敗は DL を失敗にせずログに残す。lm・textEncoder・vae は新旧で共有なので消さない
+   */
+  private replaceOldMusic(keepId: string, newDit: string, modelsDir: string): void {
+    const { store } = this.options;
+    for (const old of store.models.list()) {
+      if (old.id === keepId || old.use !== "music" || old.architecture !== "ace-step") continue;
+      try {
+        const dit = old.parts && "dit" in old.parts ? old.parts.dit : null;
+        store.models.delete(old.id);
+        // 置き場の外のパス（local_ref など）と、新しい DiT と同じファイルは消さない
+        if (dit && dit !== newDit && insideModels(modelsDir, dit)) rmSync(dit, { force: true });
+      } catch (error) {
+        logger.error("古い音楽モデルを消せなかった", error);
+      }
+    }
   }
 
   /** サイズ・sha256 を確かめる（checkGguf なら GGUF の先頭も）。壊れていれば .part を消して失敗にする */
