@@ -10,6 +10,7 @@
     "dev": "tsx watch --ignore ./data server/local.ts",
     "build": "vite build",
     "start": "npm run build && NODE_ENV=production tsx server/local.ts",
+    "win": "bash scripts/win.sh",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
