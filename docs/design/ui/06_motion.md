@@ -19,8 +19,8 @@ flowchart TD
 ```
 
 ## 要点
-- 動かすのは `transform` と `opacity` だけ。
-- UI の動きは `--duration-slow` 以内。繰り返す2つ（スピナー・脈打つ印）だけ別の長さ。
+- 動かすのは `transform` と `opacity` だけ。例外は MOT-011 の `background-position`（ユーザーの希望）。
+- UI の動きは `--duration-slow` 以内。繰り返す3つ（スピナー・脈打つ印・生成中の文）だけ別の長さ。
 - 目立つ動きは1画面に2つまで。
 - 全 MOT に reduced-motion の代わりがある。
 
@@ -41,6 +41,7 @@ flowchart TD
 | MOT-008 | CMP-002 のツールチップ, CMP-020 | 開く | 急な出現の違和感を消す | opacity 0→1, scale 0.95→1（押した位置から） | `--duration-fast` | `--ease-out` | opacity のみ | 中 |
 | MOT-009 | CMP-021 | 出る・消える | 完了を知らせる | translateY 8px→0, opacity | `--duration-normal` | `--ease-out` | opacity のみ | 低 |
 | MOT-010 | CMP-006 | 開く・閉じる | 開閉の状態 | 矢印の回転のみ。中身は動かさず即時 | `--duration-fast` | `--ease-out` | 回転なし | 高 |
+| MOT-011 | PG-001 の生成中の文（画像・曲） | 生成中 | 止まっていないと分かる | 文字の上を明るいグラデーションが左から右へ流れる繰り返し（`background-position`） | `--duration-shimmer` | linear | 文字は止めて `--color-muted-fg` のまま、文言の切り替えだけ残す | 中 |
 
 右パネルが開くとき、会話の幅はスライドの終わりに一度で変える（`width` を動かさない）。
 

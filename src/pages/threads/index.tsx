@@ -503,7 +503,7 @@ export function ThreadsPage() {
           {pendingImage && pendingImage.threadId === threadId ? (
             <>
               <article className="message message-user"><div className="user-text">{pendingImage.prompt}</div></article>
-              <p className="image-message-state" role="status">{imageNote}</p>
+              <p className="image-message-state status-shimmer" role="status">{imageNote}</p>
             </>
           ) : null}
           {generating && stepWait ? (

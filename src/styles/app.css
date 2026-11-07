@@ -74,6 +74,17 @@ svg.lucide, .btn svg, .icon-btn svg { width: var(--icon-size); height: var(--ico
 .dot-pulse { background: var(--color-primary); animation: pulse var(--duration-pulse) var(--ease-in-out) infinite; }
 @keyframes pulse { 50% { opacity: 0.4; } }
 
+/* MOT-011 生成中の文に光を流す。文字の幅だけに塗るので fit-content にする */
+.status-shimmer {
+  width: fit-content;
+  background: linear-gradient(90deg, var(--color-muted-fg) 35%, var(--color-fg) 50%, var(--color-muted-fg) 65%) 0 0 / 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer var(--duration-shimmer) linear infinite;
+}
+@keyframes shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+
 /* CMP-012 進捗バー */
 .progress { display: flex; align-items: center; gap: var(--space-3); }
 .progress-track { flex: 1; height: var(--space-1); border-radius: var(--radius-full); background: var(--color-hover); overflow: hidden; }
@@ -244,6 +255,7 @@ svg.lucide, .btn svg, .icon-btn svg { width: var(--icon-size); height: var(--ico
 .composer-stop svg { fill: currentColor; }
 @media (prefers-reduced-motion: reduce) {
   .spin, .dot-pulse { animation: none; }
+  .status-shimmer { background: none; -webkit-text-fill-color: currentcolor; animation: none; }
   .btn, .row-link, .collapsible-arrow, .switch-thumb { transition: none; }
   .btn:active:not(:disabled), .row-link:active { transform: none; }
   .dialog[data-state], .dialog-scrim, .menu, .tooltip, .toast[data-state] { animation-name: fade; }

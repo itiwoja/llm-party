@@ -128,6 +128,7 @@
   --duration-slow: 280ms;
   --duration-spin: 800ms;
   --duration-pulse: 1200ms;
+  --duration-shimmer: 2000ms;
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --button-primary-bg: var(--color-primary);

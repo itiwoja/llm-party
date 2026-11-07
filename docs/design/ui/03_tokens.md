@@ -212,6 +212,7 @@ flowchart LR
 | `--duration-slow` | 280ms |
 | `--duration-spin` | 800ms（スピナーの1周） |
 | `--duration-pulse` | 1200ms（脈打つ点の1周） |
+| `--duration-shimmer` | 2000ms（生成中の文に光が流れる1周） |
 | `--ease-out` | `cubic-bezier(0.23, 1, 0.32, 1)` |
 | `--ease-in-out` | `cubic-bezier(0.77, 0, 0.175, 1)` |
 
