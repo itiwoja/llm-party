@@ -1,5 +1,5 @@
 # 09-2. API設計：worker（画面 ↔ worker の HTTP＋SSE）
-- プロジェクト：LLM-PARTY ／ 版数：v0.2（2026-11-07） ／ 親：[09 README](README.md)
+- プロジェクト：LLM-PARTY ／ 版数：v0.3（2026-11-07） ／ 親：[09 README](README.md)
 
 > **3行で**
 > 1. REST 風の `/api/*` が API-020〜094、通知は SSE の `/api/events`（API-099）。
@@ -114,18 +114,26 @@ sequenceDiagram
 - 生成したものは `messages` に `role = image` で入る。内容は JSON（`imageId`・`prompt`・`modelName`・`width`・`height`）。履歴の文脈には入らない
 - 同時に1枚。チャットの生成中・評価中は断る（BUSY）
 
-## 音楽生成（D-78）
+## 音楽生成（D-78, D-80）
 
 | ID | メソッド | パス | 内容 | 対応 |
 |---|---|---|---|---|
-| API-103 | POST | `/api/threads/:id/music` | `{ modelId, prompt, lyrics?, duration?, seed? }` を受けて 202 `{ status: "running" }`。`duration` は 10〜240 秒（既定 60）。`lyrics` は空なら作詞を任せ、`[Instrumental]` なら歌なし。結果は SSE の `music` イベントで届く。音楽モデル（`use: music`）だけを受ける | FR-012, D-78 |
-| API-104 | POST | `/api/threads/:id/music/cancel` | 実行中の生成を止める。`{ status: "cancelling" }`、動いていなければ `{ status: "idle" }` | FR-012, D-78 |
-| API-105 | GET | `/api/music/:id` | 生成した MP3 を返す（`dataDir/music` の中だけ） | FR-012, D-78 |
+| API-103 | POST | `/api/threads/:id/music` | **廃止**（D-80）→ API-109 | — |
+| API-104 | POST | `/api/threads/:id/music/cancel` | **廃止**（D-80）→ API-110 | — |
+| API-105 | GET | `/api/music/:id` | 生成した MP3 を返す（`dataDir/music` の中だけ）。消した曲は 404 | FR-025, FR-027, D-78 |
 | API-106 | POST | `/api/music-recipes` | `{ recipe: "ace-step" }` を受けて、部品を DL の待ち行列に入れる（kind `music-set`）。形は API-097 と同じ | FR-012, D-78 |
-| API-107 | GET | `/api/music-recipes` | レシピの一覧。形は API-098 と同じ。`installed` は部品がそろい、モデルとして登録済みのときだけ true（API-098 も同じ） | FR-012, D-78 |
+| API-107 | GET | `/api/music-recipes` | レシピの一覧。形は API-098 と同じ。`installed` は部品がそろい、モデルとして登録済みのときだけ true（API-098 も同じ） | FR-012, FR-022, D-78 |
+| API-108 | POST | `/api/music/draft` | `{ modelId, prompt }` を受けて 202 `{ status: "running" }`。歌詞だけを作る | FR-023 |
+| API-109 | POST | `/api/music/generate` | `{ modelId, prompt, lyrics?, duration? }` を受けて 202 `{ status: "running" }`。`duration` は 10〜240 秒（既定 60）。`lyrics` は空なら作詞を任せ、`[Instrumental]` なら歌なし。シードは毎回新しい。音楽モデル（`use: music`）だけを受ける | FR-025 |
+| API-110 | POST | `/api/music/cancel` | 実行中の下書き・生成を止める。`{ status: "cancelling" }`、動いていなければ `{ status: "idle" }` | FR-023, FR-025 |
+| API-111 | GET | `/api/tracks` | 曲の一覧。`{ items: [{ id, prompt, duration, createdAt }], nextCursor }`。新しい順、既定 50 件 | FR-027 |
+| API-112 | GET | `/api/tracks/:id` | 曲の中身。`{ id, prompt, lyrics, reasoning, duration, bpm, keyscale, modelName, seed, createdAt }` | FR-026, FR-027 |
+| API-113 | DELETE | `/api/tracks/:id` | 曲の行と MP3 を消す。204、なければ 404 | FR-027 |
+| API-114 | GET | `/api/music/status` | 今の状態。`{ status: "idle" \| "drafting" \| "composing" \| "rendering", reasoning? }` | FR-023, FR-025 |
 
-- `music` イベント：`{ threadId, status: "progress", phase: "composing" | "rendering", reasoning? }`（`reasoning` は LM の思考のそれまでの全文）、`{ threadId, status: "completed", trackId }`、`{ threadId, status: "failed", error }`、`{ threadId, status: "cancelled" }`
-- 生成したものは `messages` に `role = music` で入る。内容は JSON（`trackId`・`prompt`・`lyrics`・`modelName`・`duration`・`bpm`・`keyscale`）。履歴の文脈には入らない
+- `music` イベント：`{ job: "draft" | "track", status: "progress", phase: "drafting" | "composing" | "rendering", reasoning? }`（`reasoning` は LM の思考のそれまでの全文）、`{ job: "draft", status: "completed", lyrics }`、`{ job: "track", status: "completed", trackId }`、`{ job, status: "failed", error }`、`{ job, status: "cancelled" }`
+- 別の生成が動いているときの API-108・API-109 は 409 BUSY
+- 新しい曲は `messages` に入らない。v7 までの `role = music` のメッセージは残し、スレッドで再生する。履歴の文脈には入らない
 
 ## 評価
 | ID | メソッド | パス | 概要 | 関連 |

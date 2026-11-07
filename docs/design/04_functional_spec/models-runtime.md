@@ -1,5 +1,5 @@
 # 04-1. 機能仕様：準備（GPU・モデル・プリセット）
-- プロジェクト：LLM-PARTY ／ 版数：v0.2（2026-11-07） ／ 親：[04 README](README.md)
+- プロジェクト：LLM-PARTY ／ 版数：v0.3（2026-11-07） ／ 親：[04 README](README.md)
 
 > **3行で**
 > 1. 実行バックエンドは CUDA → Vulkan → CPU の順に、使えるものを自動で選ぶ。CUDA は追加のランタイムパックとして DL する。
@@ -121,7 +121,7 @@ flowchart LR
 - HF トークン（任意）：ゲート付きリポジトリ用。設定で入れると main が暗号化して保存し（D-06）、worker には起動時にメモリで渡す
 - 初回のおすすめ：`unsloth/Qwen3.5-9B-GGUF` の `Qwen3.5-9B-Q4_K_M.gguf`（5.7GB）（D-33）
 
-- 音楽のレシピ（D-78、ADR-013）：ACE-Step 1.5 の部品 4 つを `music-set` の DL として一括で取り、音楽モデル（`use: music`）を1つ登録する。レシピの主の部品は `parts` の先頭
+- 音楽のレシピ（D-78、D-79、ADR-013、ADR-014）：ACE-Step 1.5 XL の部品 4 つを `music-set` の DL として一括で取り、音楽モデル（`use: music`）を1つ登録する。レシピの主の部品は `parts` の先頭。置き換えの手順は [FR-022](music.md#fr-022音楽モデルの用意)
 
 ## FR-013：ファイル登録
 〔UC-004〕

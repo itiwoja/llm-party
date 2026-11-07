@@ -1,5 +1,5 @@
 # 09. API設計
-- プロジェクト：LLM-PARTY ／ 版数：v0.1（2026-11-05） ／ インプット：[04](../04_functional_spec/README.md)、[06](../06_ux_design.md)、[07](../07_architecture.md)
+- プロジェクト：LLM-PARTY ／ 版数：v0.3（2026-11-07） ／ インプット：[04](../04_functional_spec/README.md)、[06](../06_ux_design.md)、[07](../07_architecture.md)
 
 > **3行で**
 > 1. インターフェースは3種類：画面 ↔ main の IPC（API-001〜010）、画面 ↔ worker の HTTP＋SSE（API-020〜099）、worker ↔ llama-server（API-100〜102）。
@@ -75,6 +75,7 @@ flowchart LR
 | スレッド・ターン | API-030〜044 | スレッド、送信、停止、承認、変更、ワークスペース | [worker.md](worker.md#スレッドターン) |
 | モデル | API-050〜059 | モデル・LoRA・HF 検索・DL | [worker.md](worker.md#モデル) |
 | プリセット | API-060〜063 | CRUD | [worker.md](worker.md#プリセット) |
+| 音楽 | API-105〜114 | レシピ、下書き、生成、曲の一覧・削除（API-103・104 は廃止） | [worker.md](worker.md#音楽生成d-78-d-80) |
 | 評価 | API-070〜082 | 評価セット・取込・書出・ラン・採点・推移 | [worker.md](worker.md#評価) |
 | 設定・診断 | API-090〜092 | 設定、診断情報 | [worker.md](worker.md#設定診断) |
 | イベント | API-099 | SSE | [worker.md](worker.md#api-099get-apievents) |

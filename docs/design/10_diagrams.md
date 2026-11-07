@@ -1,9 +1,9 @@
 # 10. ER図 / シーケンス図 / 状態遷移図
-- プロジェクト：LLM-PARTY ／ 版数：v0.2（2026-11-07） ／ インプット：[08](08_database.md)、[09](09_api/README.md)、[04 状態の定義](04_functional_spec/README.md#状態の定義)
+- プロジェクト：LLM-PARTY ／ 版数：v0.3（2026-11-07） ／ インプット：[08](08_database.md)、[09](09_api/README.md)、[04 状態の定義](04_functional_spec/README.md#状態の定義)
 
 > **3行で**
-> 1. ER 図は 08 の 17 テーブル。シーケンスは主要4本（初回・エージェント・評価・更新）とエラー1本（エンジン停止）。
-> 2. 状態遷移はターン・ツール呼び出し・ラン・ケース結果・DL・推論エンジンの6つ。
+> 1. ER 図は 08 の 18 テーブル。シーケンスは主要5本（初回・エージェント・評価・更新・音楽）とエラー1本（エンジン停止）。
+> 2. 状態遷移はターン・ツール呼び出し・ラン・ケース結果・DL・推論エンジン・音楽のジョブの7つ。
 > 3. 値は 04 の「状態の定義」と一致させている。
 
 ## 🧭 判断してほしいこと
@@ -12,7 +12,7 @@
 ## 全体図
 ```mermaid
 flowchart LR
-  ER[ER 図] --- SEQ[シーケンス 5 本] --- ST[状態遷移 6 つ]
+  ER[ER 図] --- SEQ[シーケンス 6 本] --- ST[状態遷移 7 つ]
 ```
 
 ## 要点
@@ -43,8 +43,9 @@ erDiagram
   EVAL_RUNS ||--o{ EVAL_RESULTS : has
   EVAL_CASES |o--o{ EVAL_RESULTS : graded
   MODELS |o--o{ DOWNLOADS : result
+  THREADS |o--o{ TRACKS : legacy
 ```
-DOWNLOADS・RUNTIME_PACKS・SETTINGS は単独のテーブル。
+DOWNLOADS・RUNTIME_PACKS・SETTINGS は単独のテーブル。TRACKS は v7 までの曲だけが THREADS を指す。
 
 ## シーケンス図
 
@@ -158,6 +159,37 @@ sequenceDiagram
   M->>M: quitAndInstall（15 秒で入れ替わらなければエラー）
 ```
 
+### UC-009：曲を作る
+```mermaid
+sequenceDiagram
+    actor U as 利用者
+    participant R as SCR-010
+    participant W as worker
+    participant L as ace-lm（CPU）
+    participant S as ace-synth（Vulkan）
+    participant D as TBL-018
+    U->>R: AI に下書き
+    R->>W: POST /api/music/draft
+    W-->>R: 202 running
+    W->>L: lm_mode inspire
+    L-->>W: request0.json（歌詞）
+    W-->>R: music draft completed
+    U->>R: 歌詞を手直しして生成する
+    R->>W: POST /api/music/generate
+    W-->>R: 202 running
+    W->>W: チャットと sd-server を止める
+    W->>L: lm_mode generate
+    L-->>W: request0.json（音声コード）
+    W-->>R: music progress rendering
+    W->>S: --vae-chunk 384
+    S-->>W: MP3
+    W->>D: INSERT（thread_id = NULL）
+    W-->>R: music track completed
+    R->>W: GET /api/music/:id
+    W-->>R: MP3
+    R-->>U: 再生できる
+```
+
 ### エラー：生成中に推論エンジンが落ちた
 ```mermaid
 sequenceDiagram
@@ -257,6 +289,18 @@ stateDiagram-v2
   ready --> failed: 異常終了
   ready --> stopped: 停止・終了
   failed --> starting: 再読み込み
+```
+
+### 音楽のジョブ
+```mermaid
+stateDiagram-v2
+  [*] --> idle
+  idle --> drafting: 下書き
+  drafting --> idle: 完了・失敗・止める
+  idle --> composing: 生成
+  composing --> rendering: ace-lm の完了
+  composing --> idle: 失敗・止める
+  rendering --> idle: 完了・失敗・止める
 ```
 
 ## このドキュメントで決まったこと

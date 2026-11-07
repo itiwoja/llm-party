@@ -1,5 +1,5 @@
 # 11. 技術仕様書
-- プロジェクト：LLM-PARTY ／ 版数：v0.2（2026-11-07） ／ インプット：00〜10 すべて
+- プロジェクト：LLM-PARTY ／ 版数：v0.3（2026-11-07） ／ インプット：00〜10 すべて
 
 > **3行で**
 > 1. LLM-PARTY は Electron（main・画面・worker）＋同梱の llama-server で、GGUF モデルとの対話・ワークスペース内のエージェント・評価セットの一括実行を行う Windows アプリ。
@@ -50,9 +50,10 @@ flowchart LR
 | 会話・エージェント | FR-003 エンジン、FR-005 送信、FR-006 文脈、FR-008 ループ、FR-009 ツール、FR-010 承認、FR-011 変更 | [chat-agent](04_functional_spec/chat-agent.md) |
 | 評価 | FR-015 セット、FR-016 実行、FR-017 採点、FR-018 比較 | [eval](04_functional_spec/eval.md) |
 | アプリ | FR-004 スレッド、FR-007 ワークスペース、FR-019 更新、FR-020 設定、FR-021 ログ | [app](04_functional_spec/app.md) |
+| 音楽 | FR-022 XL のレシピ、FR-023 下書き、FR-024 編集、FR-025 生成、FR-026 作り直し、FR-027 一覧と削除 | [music](04_functional_spec/music.md) |
 
 ## 4. データモデル
-- 17 テーブル。2系統（会話：threads → turns → messages / tool_calls → file_changes、評価：eval_sets → eval_cases、eval_runs → eval_results）
+- 18 テーブル。2系統（会話：threads → turns → messages / tool_calls → file_changes、評価：eval_sets → eval_cases、eval_runs → eval_results）
 - ER 図は [10](10_diagrams.md#er図)、定義は [08](08_database.md)
 - ULID・UTC の ISO 8601・物理削除・`PRAGMA user_version` で版上げ
 
@@ -61,7 +62,7 @@ flowchart LR
 - 外部：Hugging Face の検索・tree・resolve、GitHub Releases の `latest.yml`・exe・runtime zip
 
 ## 6. 画面構成
-- 9 画面。メインは3ペイン（[06 SCR-001](06_ux_design.md#scr-001メイン)）。遷移図は [06 全体図](06_ux_design.md#全体図)
+- 10 画面。メインは3ペイン（[06 SCR-001](06_ux_design.md#scr-001メイン)）。遷移図は [06 全体図](06_ux_design.md#全体図)
 
 ## 7. 非機能要件への対応方針
 | NFR | 実現手段 |
@@ -123,10 +124,12 @@ flowchart LR
 | R-19 | `LLM_PARTY_LLAMA_BIN` の打ち間違いでも読み込みが止まらず、別の本体が動くことがある | 警告で気づけるようにする（CP-313） | [ADR-012](adr/ADR-012-invalid-llama-override.md) |
 | R-15 | Windows 固有の動きは exe 段階まで確かめられない | exe 段階の確認に入れる | 同上 |
 | R-16 | 他のサイトから localhost の API を叩かれる | トークン＋Host・Origin の確認 | 同上 |
+| R-22 | XL の VRAM の余裕は約 1.4GB | 失敗しても内容を残して案内する | [music](04_functional_spec/music.md) |
+| R-23 | 下書きの内容のずれ、長い歌詞の歌われ方が未確認 | 手直しの土台と位置づけ、実装時に耳で確かめる | 同上 |
 
 ## 13. 未決事項・Claude 判断で決めた項目
 - 未決：Q-02, Q-06。どちらも exe 段階で決める（[README](README.md#-判断してほしいこと)）
-- Claude 判断：ADR-002 のうち「子プロセスにする」点、D-45（細部の定石の一覧）。定石：D-33〜D-37, D-39（[00](00_overview.md#決定事項ログ)）
+- Claude 判断：ADR-002 のうち「子プロセスにする」点、D-45（細部の定石の一覧）、D-79・D-81 の一部、D-83（音楽の細部）。定石：D-33〜D-37, D-39（[00](00_overview.md#決定事項ログ)）
 
 ## 14. 参照ドキュメント
 - 設計書：[00](00_overview.md)〜[10](10_diagrams.md)、[12](12_localhost_stage.md)、[adr/](adr/)

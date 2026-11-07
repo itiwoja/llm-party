@@ -1,5 +1,5 @@
 # 05. 非機能要件
-- プロジェクト：LLM-PARTY ／ 版数：v0.1（2026-11-05） ／ インプット：[01_requirements](01_requirements.md)、[04_functional_spec](04_functional_spec/README.md)
+- プロジェクト：LLM-PARTY ／ 版数：v0.3（2026-11-07） ／ インプット：[01_requirements](01_requirements.md)、[04_functional_spec](04_functional_spec/README.md)
 
 > **3行で**
 > 1. 数値はすべてヒアリングで決めたもの（D-22〜D-32）か、DC-Designer に合わせたもの。生成速度は目安を置かず、評価で毎回測る（D-56）。
@@ -51,6 +51,10 @@ flowchart LR
 | NFR-006 | 評価1ケースの時間切れ | 300 秒 | D-29 |
 | NFR-007 | 起動時の更新確認 | 10 秒で打ち切り。起動を待たせない | D-25 |
 | NFR-008 | 1 指示のツール呼び出し | 40 回まで | D-24 |
+| NFR-051 | 音楽の下書き（60 秒の指定、LM は CPU） | 45 秒以内（実測 27 秒） | ADR-014 |
+| NFR-052 | 60 秒の曲の生成（LM＋XL の合成） | 150 秒以内（実測 109 秒） | ADR-014 |
+| NFR-053 | 240 秒の曲の生成（LM＋XL の合成） | 6 分以内（実測 267 秒） | ADR-014 |
+| NFR-054 | XL の生成中の VRAM の山（開始前 1.7GB、8GB の GPU） | 7.0GB 以下（実測 6.8GB） | R-22 |
 
 ## セキュリティ
 | ID | 要件 | 実現方法 |

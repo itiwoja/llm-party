@@ -1,8 +1,8 @@
 # 08. DB設計
-- プロジェクト：LLM-PARTY ／ 版数：v0.1（2026-11-05） ／ インプット：[04_functional_spec](04_functional_spec/README.md)
+- プロジェクト：LLM-PARTY ／ 版数：v0.3（2026-11-07） ／ インプット：[04_functional_spec](04_functional_spec/README.md)
 
 > **3行で**
-> 1. 端末内の SQLite 1ファイル（`db\llm-party.sqlite`）に 17 テーブル。worker だけが読み書きする。
+> 1. 端末内の SQLite 1ファイル（`db\llm-party.sqlite`）に 18 テーブル。worker だけが読み書きする。
 > 2. 中心は「スレッド → ターン → メッセージ / ツール呼び出し → 変更記録」と「評価セット → ケース」「ラン → 結果」の2系統。
 > 3. ランはプリセットの中身を写して持つので、プリセットを消しても過去の評価は残る。
 
@@ -47,7 +47,7 @@ flowchart LR
 | ID | ULID（文字列 26 桁）（D-34） |
 | 日時 | ISO 8601 の UTC 文字列（`2026-11-05T07:29:28.000Z`）。表示はローカル時刻（D-34） |
 | 命名 | テーブル・カラムは snake_case。API は camelCase に変換 |
-| 削除 | 物理削除。親を消すと子も消える（`ON DELETE CASCADE`）。例外は eval_runs → presets（`SET NULL`） |
+| 削除 | 物理削除。親を消すと子も消える（`ON DELETE CASCADE`）。例外は eval_runs → presets と tracks → threads（`SET NULL`） |
 | JSON | 構造を持つ値（生成設定・採点方法・写し）は JSON 文字列のカラム |
 | 版上げ | `PRAGMA user_version` で版を持ち、起動時に移行（前に1世代バックアップ。NFR-023） |
 
@@ -240,19 +240,55 @@ LoRA の GGUF。主なカラム：`id`, `base_model_id`, `path`
 
 
 ### TBL-018：tracks
-音楽生成の結果（D-78）。`images` と同じくスレッドの表示にだけ使い、チャットの文脈には入らない。音声は `dataDir/music/<id>.mp3`。
+音楽生成の結果（D-78、D-80）。スレッドから独立し、チャットの文脈には入らない。音声は `dataDir/music/<id>.mp3`。v7 までの曲は `thread_id` を持ち、スレッドでも再生できる。
 
 | 列 | 型 | NULL | 既定 | キー | 説明 |
 |---|---|---|---|---|---|
 | id | TEXT | NO | | PK | ULID |
-| thread_id | TEXT | NO | | FK | threads.id（ON DELETE CASCADE） |
+| thread_id | TEXT | YES | | FK | threads.id（ON DELETE SET NULL）。音楽の画面で作った曲は NULL |
 | model_name | TEXT | NO | | | 生成時のモデル名 |
 | prompt | TEXT | NO | | | 曲の説明 |
 | lyrics | TEXT | NO | | | 使った歌詞（LM が作ったものを含む） |
 | duration | INTEGER | NO | | | 指定した長さ（秒） |
 | seed | INTEGER | NO | | | 使ったシード |
 | path | TEXT | NO | | | MP3 の絶対パス |
+| bpm | INTEGER | YES | | | LM が決めた BPM |
+| keyscale | TEXT | YES | | | LM が決めたキー |
+| reasoning | TEXT | NO | '' | | LM の思考 |
 | created_at | TEXT | NO | | | 作成日時 |
+
+- インデックス：`idx_tracks_created (created_at DESC, id DESC)`
+
+<details>
+<summary>v8 の移行（SQLite は列の制約を変えられないので作り直す）</summary>
+
+```sql
+CREATE TABLE tracks_v8 (
+  id TEXT PRIMARY KEY,
+  thread_id TEXT REFERENCES threads(id) ON DELETE SET NULL,
+  model_name TEXT NOT NULL,
+  prompt TEXT NOT NULL,
+  lyrics TEXT NOT NULL,
+  duration INTEGER NOT NULL,
+  seed INTEGER NOT NULL,
+  path TEXT NOT NULL,
+  bpm INTEGER,
+  keyscale TEXT,
+  reasoning TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL
+);
+INSERT INTO tracks_v8
+SELECT t.id, t.thread_id, t.model_name, t.prompt, t.lyrics, t.duration, t.seed, t.path,
+       json_extract(m.content, '$.bpm'), json_extract(m.content, '$.keyscale'),
+       COALESCE(json_extract(m.content, '$.reasoning'), ''), t.created_at
+FROM tracks t
+LEFT JOIN messages m ON m.role = 'music' AND json_extract(m.content, '$.trackId') = t.id;
+DROP TABLE tracks;
+ALTER TABLE tracks_v8 RENAME TO tracks;
+CREATE INDEX idx_tracks_created ON tracks(created_at DESC, id DESC);
+```
+
+</details>
 
 ## データ保持・削除ポリシー
 | データ | 保持 | 消すとき |
@@ -260,6 +296,7 @@ LoRA の GGUF。主なカラム：`id`, `base_model_id`, `path`
 | スレッド・メッセージ・変更記録 | 利用者が消すまで | スレッド削除で全部（ワークスペースのファイルはそのまま） |
 | ラン・結果 | 利用者が消すまで | ラン削除で結果と使い捨てフォルダも |
 | DL の記録 | 完了から 30 日、失敗・取消は再開しなければ同じ | 起動時（D-44 の⑨） |
+| 曲（TBL-018 と MP3） | 利用者が消すまで | 音楽の画面で1曲ずつ。スレッドを消しても残る |
 | ログ | 14 日 | 起動時（D-30） |
 
 ## このドキュメントで決まったこと
