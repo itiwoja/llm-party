@@ -13,6 +13,9 @@ export interface GgufInfo extends ThinkingSupport {
   sizeBytes: number;
 }
 
+/** 先読みの補助部分（MTP）だけのファイルを登録・読み込みしようとしたときの文言 */
+export const MTP_ONLY_MESSAGE = "先読みの補助部分（MTP）だけの GGUF。単体では動かないので、同じリポジトリのモデル本体の GGUF を使う";
+
 const FIXED_SIZE: Record<number, number> = { 0: 1, 1: 1, 2: 2, 3: 2, 4: 4, 5: 4, 6: 4, 7: 1, 10: 8, 11: 8, 12: 8 };
 const STRING = 8;
 const ARRAY = 9;
@@ -79,7 +82,7 @@ export function readGguf(file: string): GgufInfo {
       throw new ApiError("INVALID_GGUF", "GGUF ファイルではありません");
     }
     reader.u32(); // 版
-    reader.u64(); // テンソル数
+    const tensorCount = reader.u64();
     const count = reader.u64();
     const kv = new Map<string, string | number>();
     for (let i = 0; i < count; i += 1) {
@@ -97,8 +100,11 @@ export function readGguf(file: string): GgufInfo {
     const name = kv.get("general.name");
     const type = kv.get("general.type");
     const template = kv.get("tokenizer.chat_template");
+    const nextn = kv.get(`${architecture}.nextn_predict_layers`);
+    const mtpOnly = typeof nextn === "number" && nextn > 0 && typeof blocks === "number"
+      && !hasMainLayers(reader, tensorCount, blocks - nextn);
     return {
-      type: typeof type === "string" ? type : "model",
+      type: mtpOnly ? "mtp" : typeof type === "string" ? type : "model",
       architecture,
       name: typeof name === "string" ? name : null,
       quantization: typeof fileType === "number" ? (FILE_TYPES[fileType] ?? null) : null,
@@ -113,4 +119,19 @@ export function readGguf(file: string): GgufInfo {
   } finally {
     closeSync(fd);
   }
+}
+
+/**
+ * MTP（先読みの補助部分）だけを切り出した GGUF は、ヘッダの block_count は本体と同じでも、
+ * テンソルは最後の nextn 層しか持たない。本体の層（blk.0 〜 blk.(mainLayers-1)）が1つでもあれば本体とみなす
+ */
+function hasMainLayers(reader: Reader, tensorCount: number, mainLayers: number): boolean {
+  for (let i = 0; i < tensorCount; i += 1) {
+    const name = reader.string();
+    const dims = reader.u32();
+    reader.skip(8 * dims + 4 + 8); // 各次元・型・位置
+    const match = /^blk\.(\d+)\./.exec(name);
+    if (match && Number(match[1]) < mainLayers) return true;
+  }
+  return false;
 }

@@ -78,7 +78,7 @@ export const PG3_MISSING = {
   memoryHint: "検索結果の推奨は Q4_K_M で計算。パラメータ数の分からないモデルは外す", // CP-312
   splitHint: "推奨はこの割合で動かすときの目安。RAM は OS とアプリの分（4GB）を含む。文脈が長いと増える", // CP-321
   colStrength: "強さ", // HF 検索結果の列。強さはパラメータ数で測る（HF は性能の点数を返さない）
-  modelsOnlyHint: "モデル（GGUF）だけを表示。画像の入力部（mmproj）と量子化の計算用（imatrix）は外す", // 同
+  modelsOnlyHint: "モデル（GGUF）だけを表示。画像の入力部（mmproj）・量子化の計算用（imatrix）・先読みの補助部分（mtp）は外す", // 同
   noModelFile: "GGUF のモデルがない。チャットでは動かせない", // 同
   noImageFile: "画像生成に使えるファイルがない", // 同
   recipeNote: "既定の組み合わせは 16GB 以上の GPU を前提", // R-18（画像の一括 DL の注意）

@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildArgs, EngineManager, gpuLayersArg, loadKey, type EngineSpec } from "../server/engine";
 import { EventBus } from "../server/events";
 import { installDirFor } from "../server/runtime/resolver";
-import { FAKE_LLAMA, tempDir, waitForEvent } from "./helpers";
+import { FAKE_LLAMA, tempDir, waitForEvent, writeGguf } from "./helpers";
 
 const SPEC: EngineSpec = { presetId: "p1", modelPath: "/m.gguf", contextSize: 32768, adapterPaths: [] };
 
@@ -101,6 +101,14 @@ describe("EngineManager", () => {
     vi.stubEnv("FAKE_LLAMA_MODE", "fail");
     await expect(create().load(SPEC)).rejects.toThrow(/not enough VRAM/);
     expect(engine.state).toBe("failed");
+  });
+
+  it("MTP（先読みの補助部分）だけのファイルは起動せずに理由を返す", async () => {
+    const modelPath = path.join(temp.dir, "mtp-m.gguf");
+    writeGguf(modelPath, { nextn: 1, tensors: ["blk.31.attn_q.weight"] });
+    await expect(create().load({ ...SPEC, modelPath })).rejects.toThrow(/MTP/);
+    expect(engine.state).toBe("failed");
+    expect(existsSync(path.join(temp.dir, "runtime", "engine.pid"))).toBe(false);
   });
 
   it("期限までに ready にならなければ止めて failed", async () => {

@@ -55,8 +55,8 @@ const PURPOSE_OPTIONS = (Object.keys(PG3_MISSING.purposes) as Purpose[]).map((va
 /** 思考・用途の絞り込みが入っているか。入っていれば結果はチャットのモデルだけ（D-90） */
 const narrowsChat = ({ effort, thinking, purpose }: Filters) => effort || thinking || purpose !== "all";
 
-/** mmproj（画像の入力部）と imatrix（量子化の計算用）は、どのリポジトリでもモデル本体ではないので出さない */
-const isAuxFile = (name: string) => /^(mmproj|imatrix)/i.test(name.split("/").pop() ?? name);
+/** mmproj（画像の入力部）・imatrix（量子化の計算用）・mtp（先読みの補助部分）は、どのリポジトリでもモデル本体ではないので出さない */
+const isAuxFile = (name: string) => /^(mmproj|imatrix|mtp)[-_.]/i.test(name.split("/").pop() ?? name);
 /** チャット用に出すのはモデル本体の GGUF だけ */
 const isModelFile = (name: string) => name.toLowerCase().endsWith(".gguf") && !isAuxFile(name);
 

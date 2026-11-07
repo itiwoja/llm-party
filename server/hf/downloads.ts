@@ -3,7 +3,7 @@ import { createReadStream, existsSync, mkdirSync, rmSync, readSync, openSync, cl
 import { open, rename, rm, statfs, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { EventBus } from "../events";
-import { readGguf } from "../gguf";
+import { MTP_ONLY_MESSAGE, readGguf } from "../gguf";
 import { ApiError } from "../http-error";
 import { logger } from "../logger";
 import type { Store } from "../store";
@@ -385,7 +385,7 @@ export class DownloadService {
     const expected = record.kind === "model" ? "model" : "adapter";
     if (info.type !== expected) {
       await Promise.all(toRename.map((final) => rm(`${final}.part`, { force: true })));
-      throw new ApiError("INVALID_GGUF", record.kind === "model" ? NOT_MODEL_MESSAGE : NOT_LORA_MESSAGE);
+      throw new ApiError("INVALID_GGUF", info.type === "mtp" ? MTP_ONLY_MESSAGE : record.kind === "model" ? NOT_MODEL_MESSAGE : NOT_LORA_MESSAGE);
     }
     for (const final of toRename) await rename(`${final}.part`, final);
 
