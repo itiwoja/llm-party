@@ -20,8 +20,22 @@ const DEEP_FETCH_LIMIT = 500;
 /** 検索で使う項目。指定しないと lastModified と gated が返らない。指定すると既定の項目も消えるので全部書く */
 const SEARCH_FIELDS = ["downloads", "lastModified", "createdAt", "gated", "pipeline_tag", "tags", "gguf", "safetensors", "siblings", "config"];
 
-/** GGUF か safetensors のパラメータ数を取る */
-function sizeOf(item: { gguf?: { total?: unknown }; safetensors?: { total?: unknown } }): Pick<HfRepo, "params"> {
+/** HF が GGUF の代表に選ぶことがある、単体では動かない先読みの下書きモデルの architecture */
+const DRAFT_ARCHITECTURES = new Set(["dflash"]);
+
+/** リポジトリ名の「27B」「0.6B」「30B-A3B」の先頭の数からパラメータ数を取る。無ければ null */
+export function paramsFromName(repo: string): number | null {
+  const match = /(?:^|[-_/ .])(\d+(?:\.\d+)?)[bB](?=$|[-_. ])/.exec(repo);
+  return match ? Number(match[1]) * 1e9 : null;
+}
+
+/**
+ * GGUF か safetensors のパラメータ数を取る。
+ * HF が下書きモデル（dflash）の GGUF を代表にしたときは、その値（27B の本体に 1.9B など）は使わず、名前から取る
+ */
+export function sizeOf(item: { id?: string; gguf?: { total?: unknown; architecture?: unknown }; safetensors?: { total?: unknown } }): Pick<HfRepo, "params"> {
+  const arch = item.gguf?.architecture;
+  if (typeof arch === "string" && DRAFT_ARCHITECTURES.has(arch.toLowerCase())) return { params: paramsFromName(item.id ?? "") };
   const total = item.gguf?.total ?? item.safetensors?.total;
   return { params: typeof total === "number" && total > 0 ? total : null };
 }
@@ -156,7 +170,7 @@ export class HfClient {
       gated: Boolean(item.gated),
       pipelineTag: item.pipeline_tag ?? null,
       license: (item.tags as string[] | undefined)?.find((tag) => tag.startsWith("license:"))?.slice("license:".length) ?? null,
-      ...sizeOf(item),
+      ...sizeOf({ ...item, id: String(item.id ?? item.modelId) }),
       ...thinkingSupport(item.gguf?.chat_template),
       }] : [];
     });
