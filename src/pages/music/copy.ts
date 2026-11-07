@@ -26,6 +26,8 @@ export const PG10 = {
   draftFailed: "歌詞の下書きに失敗しました", // CP-354
   insertTag: (tag: string) => `${tag} を入れる`, // CP-355
   busy: "別の生成が動いています", // CP-357
+  lyricsPreset: "歌詞を書くモデル", // CP-360
+  noPreset: "歌詞を書くにはプリセットが必要です", // CP-361
 } as const;
 
 /** 08_copy.md に無く、PG-010 に必要になった文言（仮置き）。単位は PG-001 の曲のメッセージと同じ書き方 */

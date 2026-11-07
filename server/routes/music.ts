@@ -19,7 +19,14 @@ export function musicRoutes({ store, music, dataDir }: Context): Router {
 
   // 歌詞の下書き（FR-023）。202 で返し、結果は "music" イベントで届く
   api.post("/music/draft", (req, res) => {
-    const input = parse(z.object({ modelId: z.string().min(1), prompt: z.string().trim().min(1).max(2000) }), req.body);
+    const input = parse(
+      z.object({
+        presetId: z.string().min(1),
+        prompt: z.string().trim().min(1).max(2000),
+        duration: z.number().int().min(MUSIC_MIN_SECONDS).max(MUSIC_MAX_SECONDS).default(MUSIC_DEFAULT_SECONDS),
+      }),
+      req.body,
+    );
     res.status(202).json(music.draft(input));
   });
 

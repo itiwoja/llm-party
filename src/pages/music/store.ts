@@ -14,10 +14,12 @@ export interface MusicState extends MusicDraft {
   error: string;
   /** 曲が出来上がるたびに増える。一覧の読み直しの合図 */
   completedSeq: number;
+  /** 歌詞を書くプリセット。曲の内容ではないので、編集中の内容を空に戻しても残す。空なら画面が既定を選ぶ */
+  lyricsPresetId: string;
 }
 
 const EMPTY_DRAFT: MusicDraft = { prompt: "", lyrics: "", duration: MUSIC_DEFAULT_SECONDS, instrumental: false };
-const INITIAL: MusicState = { ...EMPTY_DRAFT, job: null, phase: null, reasoning: "", error: "", completedSeq: 0 };
+const INITIAL: MusicState = { ...EMPTY_DRAFT, job: null, phase: null, reasoning: "", error: "", completedSeq: 0, lyricsPresetId: "" };
 
 /** サーバーが「評価の実行中です」と返したときは、FR-025 の既存の文言をそのまま出す */
 const EVAL_BUSY_MESSAGE = "評価の実行中です";
@@ -54,6 +56,10 @@ export const musicStore = {
 
   setDraft(patch: Partial<MusicDraft>): void {
     set(patch);
+  },
+
+  setLyricsPreset(lyricsPresetId: string): void {
+    set({ lyricsPresetId });
   },
 
   /** POST の前に実行中にしておく。イベントが POST の応答より先に届いても壊れない */

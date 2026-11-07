@@ -1,9 +1,10 @@
-import { chmodSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MusicEngine } from "../server/music-engine";
+import { cleanLyrics, LYRICS_MAX_CHARS, lyricsMessages } from "../server/music-lyrics";
 import type { BusEvent } from "../server/events";
-import { startWorker, tempDir, type TestWorker, waitForEvent } from "./helpers";
+import { SAMPLING, startWorker, tempDir, type TestWorker, waitForEvent, writeGguf } from "./helpers";
 
 const FAKE = path.resolve("tests/fixtures/fake-ace.mjs");
 const PARTS = { lm: "/m/lm.gguf", textEncoder: "/m/enc.gguf", dit: "/m/dit.gguf", vae: "/m/vae.gguf" };
@@ -19,6 +20,36 @@ function fakeBinaries(dir: string): string {
   }
   return dir;
 }
+
+describe("FR-023 歌詞の依頼と整形", () => {
+  const ask = (duration: number) => lyricsMessages({ prompt: "夏", duration })[0].content;
+
+  it("長さから行数を決め、短い曲は構成を絞る", () => {
+    expect(ask(60)).toContain("15 行以内");
+    expect(ask(240)).toContain("60 行以内");
+    expect(ask(10)).toContain("[Verse] と [Chorus] だけ");
+    expect(ask(60)).not.toContain("[Verse] と [Chorus] だけ");
+  });
+
+  it("前置き・見出し・コードブロック・太字・思考を落とす", () => {
+    expect(cleanLyrics("<think>考え</think>\nはい！\n```\n# 題名\n**[Verse]**\n海へ\n\n[Chorus]\n走る\n```\n")).toBe("[Verse]\n海へ\n\n[Chorus]\n走る");
+  });
+
+  it("タグが無くても本文は残す", () => {
+    expect(cleanLyrics("海へ\n走る")).toBe("海へ\n走る");
+  });
+
+  it("空なら空を返す", () => {
+    expect(cleanLyrics("```\n```\n")).toBe("");
+  });
+
+  it("上限を超えたら行の切れ目で切る", () => {
+    const lyrics = cleanLyrics(`[Verse]\n${"あ".repeat(1000)}\n`.repeat(5));
+    expect(lyrics.length).toBeLessThanOrEqual(LYRICS_MAX_CHARS);
+    expect(lyrics.endsWith("あ")).toBe(true);
+    expect(lyrics.split("\n").at(-1)).toHaveLength(1000);
+  });
+});
 
 describe("MusicEngine", () => {
   let temp: ReturnType<typeof tempDir>;
@@ -50,19 +81,9 @@ describe("MusicEngine", () => {
     expect(runtime()).toEqual([]);
   });
 
-  it("下書きは LM だけを CPU で動かし、歌詞だけを返す。作業フォルダは消す", async () => {
-    const thoughts: string[] = [];
-    const lyrics = await engine().draft({ prompt: "夏の曲" }, PARTS, new AbortController().signal, (text) => thoughts.push(text));
-    expect(lyrics).toBe("[Verse]\n下書きの歌詞");
-    expect(thoughts.at(-1)).toBe("bpm:120\ncaption: 夏の曲\n");
-    expect(runtime()).toEqual([]);
-  });
-
-  it("下書きの出力が無い・歌詞が空なら失敗にする", async () => {
+  it("LM の出力が無ければ失敗にする", async () => {
     process.env.FAKE_ACE_MODE = "lm-silent";
-    await expect(engine().draft({ prompt: "x" }, PARTS, new AbortController().signal, () => undefined)).rejects.toMatchObject({ code: "ENGINE_FAILED" });
-    process.env.FAKE_ACE_MODE = "lm-empty";
-    await expect(engine().draft({ prompt: "x" }, PARTS, new AbortController().signal, () => undefined)).rejects.toMatchObject({ code: "ENGINE_FAILED" });
+    await expect(engine().generate(PARAMS, PARTS, new AbortController().signal, () => undefined)).rejects.toMatchObject({ code: "ENGINE_FAILED" });
     expect(runtime()).toEqual([]);
   });
 
@@ -92,6 +113,7 @@ describe("音楽の API", () => {
   let temp: ReturnType<typeof tempDir>;
   afterEach(async () => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
     delete process.env.FAKE_ACE_MODE;
     await worker?.close();
     worker = null;
@@ -126,40 +148,86 @@ describe("音楽の API", () => {
     return (done.data as { trackId: string }).trackId;
   }
 
-  it("下書きは歌詞をイベントで返し、エンジンを止めず、曲も増やさない", async () => {
-    const { modelId } = await setup();
+  /** 歌詞を書くチャットのプリセットを用意する */
+  async function lyricsPreset(thinking = false) {
+    const file = path.join(worker!.dir, "chat.gguf");
+    writeGguf(file);
+    const model = await worker!.api("/models", { body: { path: file, mode: "reference" } });
+    const preset = await worker!.api("/presets", { body: { name: "作詞", modelId: model.body.id, sampling: SAMPLING, thinking, contextSize: 8192, systemPrompt: "コードを書く" } });
+    return preset.body.id as string;
+  }
+  /** 代役の llama-server の応答を決める。worker を起動する前に呼ぶ */
+  function script(steps: unknown[]) {
+    const dir = tempDir();
+    const file = path.join(dir.dir, "script.json");
+    writeFileSync(file, JSON.stringify(steps));
+    vi.stubEnv("FAKE_LLAMA_SCRIPT", file);
+    return dir;
+  }
+  /** 代役の llama-server が受け取った最後の依頼 */
+  function lastRequest() {
+    const logs = path.join(worker!.dir, "logs");
+    const text = readdirSync(logs).filter((f) => f.startsWith("llama-server")).map((f) => readFileSync(path.join(logs, f), "utf8")).join("\n");
+    return JSON.parse(text.match(/REQUEST (.+)/g)!.at(-1)!.slice("REQUEST ".length)) as {
+      messages: { role: string; content: string }[]; max_tokens: number; temperature: number; chat_template_kwargs: { enable_thinking: boolean };
+    };
+  }
+
+  it("下書きはチャットのモデルが説明と長さをもとに書き、整えた歌詞だけをイベントで返す", async () => {
+    const dir = script([{ reasoning: ["考え", "中"], content: "はい、書きます。\n\n# 突き進む\n**[Verse]**\nむらかみいっき 進む\n" }]);
+    await setup();
+    const presetId = await lyricsPreset();
     const stop = vi.spyOn(worker!.context.engine, "stop");
-    const imageStop = vi.spyOn(worker!.context.image, "stop");
-    expect((await worker!.api("/music/draft", { body: { modelId, prompt: "夏の曲" } })).status).toBe(202);
+    expect((await worker!.api("/music/draft", { body: { presetId, prompt: "むらかみいっきの曲", duration: 120 } })).status).toBe(202);
     const done = await waitForEvent(worker!.context.bus, music("draft", "completed"));
-    expect(done.data).toEqual({ job: "draft", status: "completed", lyrics: "[Verse]\n下書きの歌詞" });
-    const progress = musicEvents().filter((e) => e.status === "progress");
-    expect(progress.at(-1)).toMatchObject({ job: "draft", phase: "drafting", reasoning: "bpm:120\ncaption: 夏の曲\n" });
+    expect(done.data).toEqual({ job: "draft", status: "completed", lyrics: "[Verse]\nむらかみいっき 進む" });
+    expect(musicEvents().filter((e) => e.status === "progress").at(-1)).toMatchObject({ job: "draft", phase: "drafting", reasoning: "考え中" });
+
+    const request = lastRequest();
+    expect(request.messages).toHaveLength(1);
+    expect(request.messages[0].content).toContain("むらかみいっきの曲");
+    expect(request.messages[0].content).toContain("曲の長さは 120 秒");
+    expect(request.messages[0].content).toContain("30 行以内");
+    // プリセットの生成設定を使い、コーディング用などの指示は持ち込まない
+    expect(request.messages[0].content).not.toContain("コードを書く");
+    expect(request).toMatchObject({ temperature: SAMPLING.temperature, chat_template_kwargs: { enable_thinking: false } });
+
+    expect(worker!.context.engine.state).toBe("ready");
     expect(stop).not.toHaveBeenCalled();
-    expect(imageStop).not.toHaveBeenCalled();
     expect(tracks()).toBe(0);
     expect((await worker!.api("/music/status")).body).toEqual({ status: "idle" });
+    dir.remove();
   });
 
-  it("下書きが空・出力なしなら failed", async () => {
-    for (const mode of ["lm-empty", "lm-silent"]) {
-      process.env.FAKE_ACE_MODE = mode;
-      const { modelId } = await setup();
-      await worker!.api("/music/draft", { body: { modelId, prompt: "x" } });
-      const failed = await waitForEvent(worker!.context.bus, music("draft", "failed"));
-      expect(failed.data).toMatchObject({ job: "draft", error: expect.stringContaining("下書き") });
-      await worker!.close();
-      worker = null;
-    }
+  it("音楽エンジンが無くても下書きはできる", async () => {
+    const dir = script([{ content: "[Verse]\nla" }]);
+    worker = await startWorker();
+    temp = tempDir();
+    const presetId = await lyricsPreset();
+    expect((await worker!.api("/music/draft", { body: { presetId, prompt: "x" } })).status).toBe(202);
+    await waitForEvent(worker!.context.bus, music("draft", "completed"));
+    dir.remove();
+  });
+
+  it("下書きの本文が空なら failed", async () => {
+    const dir = script([{ reasoning: ["考えただけ"] }]);
+    await setup();
+    const presetId = await lyricsPreset();
+    await worker!.api("/music/draft", { body: { presetId, prompt: "x" } });
+    const failed = await waitForEvent(worker!.context.bus, music("draft", "failed"));
+    expect(failed.data).toMatchObject({ job: "draft", error: expect.stringContaining("下書き") });
+    dir.remove();
   });
 
   it("下書きを止めると cancelled が届く", async () => {
-    process.env.FAKE_ACE_MODE = "slow";
-    const { modelId } = await setup();
-    await worker!.api("/music/draft", { body: { modelId, prompt: "x" } });
+    vi.stubEnv("FAKE_LLAMA_MODE", "slow");
+    await setup();
+    const presetId = await lyricsPreset();
+    await worker!.api("/music/draft", { body: { presetId, prompt: "x" } });
+    expect((await worker!.api("/music/status")).body).toEqual({ status: "drafting" });
     expect((await worker!.api("/music/cancel", { body: {} })).body).toEqual({ status: "cancelling" });
     expect((await waitForEvent(worker!.context.bus, music("draft", "cancelled"))).data).toEqual({ job: "draft", status: "cancelled" });
-    expect((await worker!.api("/music/cancel", { body: {} })).body).toEqual({ status: "idle" });
+    await vi.waitFor(async () => expect((await worker!.api("/music/cancel", { body: {} })).body).toEqual({ status: "idle" }));
   });
 
   it("生成した曲はスレッドに属さず、messages にも入らない。MP3 を返す", async () => {
@@ -252,13 +320,15 @@ describe("音楽の API", () => {
     const { modelId } = await setup();
     expect((await worker!.api("/music/generate", { body: { modelId, prompt: "x", duration: 241 } })).status).toBe(400);
     expect((await worker!.api("/music/generate", { body: { modelId, prompt: "x", duration: 9 } })).status).toBe(400);
-    expect((await worker!.api("/music/draft", { body: { modelId, prompt: "  " } })).status).toBe(400);
+    const presetId = await lyricsPreset();
+    expect((await worker!.api("/music/draft", { body: { presetId, prompt: "  " } })).status).toBe(400);
+    expect((await worker!.api("/music/draft", { body: { presetId, prompt: "x", duration: 241 } })).status).toBe(400);
   });
 
-  it("音楽モデル以外は断る", async () => {
+  it("音楽モデル以外は断る。下書きは無いプリセットを断る", async () => {
     await setup();
     expect((await worker!.api("/music/generate", { body: { modelId: "nope", prompt: "x" } })).status).toBe(404);
-    expect((await worker!.api("/music/draft", { body: { modelId: "nope", prompt: "x" } })).status).toBe(404);
+    expect((await worker!.api("/music/draft", { body: { presetId: "nope", prompt: "x" } })).status).toBe(404);
   });
 
   it("状態は idle と実行中で変わり、/music/status は曲の id に取られない", async () => {
@@ -270,10 +340,6 @@ describe("音楽の API", () => {
     await worker!.api("/music/cancel", { body: {} });
     expect((await waitForEvent(worker!.context.bus, music("track", "cancelled"))).data).toEqual({ job: "track", status: "cancelled" });
     await vi.waitFor(async () => expect((await worker!.api("/music/status")).body).toEqual({ status: "idle" }));
-    await worker!.api("/music/draft", { body: { modelId, prompt: "x" } });
-    expect((await worker!.api("/music/status")).body).toEqual({ status: "drafting" });
-    await worker!.api("/music/cancel", { body: {} });
-    await waitForEvent(worker!.context.bus, music("draft", "cancelled"));
   });
 
   it("実行中は LM の思考と段階を返す", async () => {
@@ -296,9 +362,10 @@ describe("音楽の API", () => {
   it("生成中は下書きも生成も受けない", async () => {
     process.env.FAKE_ACE_MODE = "slow";
     const { modelId } = await setup();
+    const presetId = await lyricsPreset();
     await worker!.api("/music/generate", { body: { modelId, prompt: "x" } });
     expect((await worker!.api("/music/generate", { body: { modelId, prompt: "y" } })).status).toBe(409);
-    const draft = await worker!.api("/music/draft", { body: { modelId, prompt: "y" } });
+    const draft = await worker!.api("/music/draft", { body: { presetId, prompt: "y" } });
     expect(draft).toMatchObject({ status: 409, body: { error: { code: "BUSY" } } });
     expect((await worker!.api("/engine/load", { body: { presetId: "any" } })).status).toBe(409);
     await worker!.api("/music/cancel", { body: {} });

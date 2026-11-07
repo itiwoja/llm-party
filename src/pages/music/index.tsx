@@ -3,11 +3,12 @@ import { api, ApiRequestError } from "../../api";
 import { useAppData } from "../../app-data";
 import { Button } from "../../components/Button";
 import { Collapsible } from "../../components/Collapsible";
-import { SwitchField } from "../../components/Controls";
+import { SelectField, SwitchField } from "../../components/Controls";
 import { Dialog } from "../../components/Dialog";
 import { TextArea, TextField } from "../../components/Field";
 import { ListRow } from "../../components/ListRow";
 import { CP } from "../../copy";
+import type { Preset } from "../../types";
 import { ManageLayout } from "../../layouts";
 import { hrefOf, navigate, useRoute } from "../../router";
 import { PG10, PG10_MISSING } from "./copy";
@@ -41,7 +42,7 @@ const dateLabel = (value: string | number) => new Date(value).toLocaleString("ja
 export function MusicPage() {
   const route = useRoute();
   const routeId = route.page === "music" ? route.id : undefined;
-  const { models } = useAppData();
+  const { models, presets, engine } = useAppData();
   const state = useMusicState();
   const musicModel = models.find((m) => m.use === "music");
 
@@ -118,7 +119,7 @@ export function MusicPage() {
           onDeleted={() => { setTracks((old) => old?.filter((t) => t.id !== routeId) ?? old); navigate("/music"); }}
         />
       ) : (
-        <Editor state={state} modelId={musicModel?.id ?? null} />
+        <Editor state={state} modelId={musicModel?.id ?? null} presets={presets} loadedPresetId={engine.presetId} />
       )}
     </ManageLayout>
   );
@@ -156,16 +157,21 @@ function ConfirmOverwrite({ onCancel, onConfirm }: { onCancel(): void; onConfirm
   );
 }
 
-function Editor({ state, modelId }: { state: MusicState; modelId: string | null }) {
+function Editor({ state, modelId, presets, loadedPresetId }: { state: MusicState; modelId: string | null; presets: Preset[]; loadedPresetId: string | null }) {
   const running = state.job !== null;
   const [confirmDraft, setConfirmDraft] = useState(false);
-  const canDraft = !running && !!modelId && state.prompt.trim() !== "";
-  const canGenerate = canDraft;
+  const hasPrompt = state.prompt.trim() !== "";
+  const canGenerate = !running && !!modelId && hasPrompt;
+  /** 選んだものが消えていたら、読み込み済みのもの → 先頭の順に選び直す（D-90） */
+  const presetId = [state.lyricsPresetId, loadedPresetId].find((id) => presets.some((p) => p.id === id)) ?? presets[0]?.id ?? "";
+  const canDraft = !running && !!presetId && hasPrompt;
 
   function draft() {
-    if (!modelId) return;
+    if (!presetId) return;
     setConfirmDraft(false);
-    void startJob("draft", "/music/draft", { modelId, prompt: state.prompt });
+    const duration = clampDuration(state.duration);
+    musicStore.setDraft({ duration });
+    void startJob("draft", "/music/draft", { presetId, prompt: state.prompt, duration });
   }
 
   function generate() {
@@ -210,7 +216,22 @@ function Editor({ state, modelId }: { state: MusicState; modelId: string | null 
           onChange={(lyrics) => musicStore.setDraft({ lyrics })}
           disabled={running}
           action={
-            <Button size="sm" disabled={!canDraft} onClick={() => (state.lyrics.trim() !== "" ? setConfirmDraft(true) : draft())}>{PG10.draft}</Button>
+            <div className="music-draft">
+              {presets.length > 0 ? (
+                <SelectField
+                  compact
+                  hideLabel
+                  label={PG10.lyricsPreset}
+                  disabled={running}
+                  value={presetId}
+                  onValueChange={musicStore.setLyricsPreset}
+                  options={presets.map((p) => ({ value: p.id, label: p.name }))}
+                />
+              ) : (
+                <span className="music-no-preset">{PG10.noPreset} <a href={hrefOf("/presets")}>{CP.nav.presets}</a></span>
+              )}
+              <Button size="sm" disabled={!canDraft} onClick={() => (state.lyrics.trim() !== "" ? setConfirmDraft(true) : draft())}>{PG10.draft}</Button>
+            </div>
           }
         />
       )}
