@@ -165,9 +165,12 @@ describe("画像生成の経路", () => {
     });
     const thread = store.threads.create(null);
 
+    expect((await worker.api("/images/status")).body).toEqual({ status: "idle" });
     const started = await worker.api(`/threads/${thread.id}/images`, { body: { modelId: model.id, prompt: "a cat", width: 64, height: 64, steps: 2 } });
     expect(started.status).toBe(202);
     await waitForEvent(worker.context.bus, (e) => e.event === "image" && (e.data as { status: string }).status === "progress", 10_000).catch(() => undefined);
+    // 画面を開き直しても、依頼の文と実行中であることが分かる（D-84）
+    expect((await worker.api("/images/status")).body).toEqual({ status: "running", threadId: thread.id, prompt: "a cat", modelId: model.id });
     const stopped = await worker.api(`/threads/${thread.id}/images/cancel`, { body: {} });
     expect(stopped.body).toEqual({ status: "cancelling" });
 
@@ -175,6 +178,8 @@ describe("画像生成の経路", () => {
     expect((done.data as { status: string }).status).toBe("cancelled");
     expect(store.threads.get(thread.id)).toBeTruthy();
     expect(JSON.stringify((await worker.api(`/threads/${thread.id}/messages`)).body)).not.toContain("imageId");
+
+    expect((await worker.api("/images/status")).body).toEqual({ status: "idle" });
 
     // 終わった後に止めても何もしない
     expect((await worker.api(`/threads/${thread.id}/images/cancel`, { body: {} })).body).toEqual({ status: "idle" });

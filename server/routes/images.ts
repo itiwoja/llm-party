@@ -33,6 +33,11 @@ export function imageRoutes({ store, images, dataDir }: Context): Router {
     res.json(images.cancel(req.params.id));
   });
 
+  // 今の状態（/images/:id より先に置く）
+  api.get("/images/status", (_req, res) => {
+    res.json(images.status());
+  });
+
   // 生成した PNG（ファイルは dataDir/images の中だけを返す）
   api.get("/images/:id", (req, res) => {
     const image = store.images.get(req.params.id);

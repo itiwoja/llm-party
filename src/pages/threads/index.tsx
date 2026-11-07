@@ -14,6 +14,7 @@ import { pickFolder } from "../../platform";
 import { thinkingChoice, thinkingOptions, thinkingPatch } from "../../thinking";
 import type { EngineState } from "../../types";
 import { Conversation } from "./Conversation";
+import { imageStore, useImageState } from "./imageStore";
 import { PG1, MISSING } from "./copy";
 import { Panel, TERMINAL_MAX_CHARS } from "./Panel";
 import { ThreadList } from "./ThreadList";
@@ -98,9 +99,10 @@ export function ThreadsPage() {
   const preset = presets.find((p) => p.id === presetId);
   const presetModel = models.find((m) => m.id === preset?.modelId);
   const thinkingChoices = imageMode ? [] : thinkingOptions(presetModel);
-  const [imageBusy, setImageBusy] = useState(false);
-  // 生成中の依頼。文は生成が終わるまで DB に入らないので、画面には送った時点でこれを出す
-  const [pendingImage, setPendingImage] = useState<{ threadId: string; prompt: string } | null>(null);
+  // 生成中の依頼。文は生成が終わるまで DB に入らないので、画面を離れても消えない場所に持つ（D-84）
+  const { job: imageJob, failure: imageFailure } = useImageState();
+  const imageBusy = imageJob !== null;
+  const shownImage = imageJob?.threadId === threadId ? imageJob : imageFailure?.threadId === threadId ? imageFailure : null;
 
   const composer = useRef<HTMLTextAreaElement>(null);
   const turnRef = useRef(turn);
@@ -322,10 +324,8 @@ export function ThreadsPage() {
     } else if (event === "image" && data.status === "progress") {
       // 進捗は画面に表示しない
     } else if (event === "image") {
-      setImageBusy(false);
-      setPendingImage(null);
-      if (data.status === "failed") setError(data.error);
-      else if (threadRef.current === data.threadId) void loadDetail(data.threadId).catch(() => undefined);
+      // 依頼と失敗の文は imageStore が受ける
+      if (data.status !== "failed" && threadRef.current === data.threadId) void loadDetail(data.threadId).catch(() => undefined);
       void loadThreads().catch(() => undefined);
     } else if (event === "eval.progress") {
       setEvalProgress({ done: data.done, total: data.total });
@@ -333,6 +333,14 @@ export function ThreadsPage() {
       setEvalProgress(null);
     }
   });
+
+  // 画面に戻ったら、動いている画像生成のモデルを選んだ状態に戻す
+  const imageJobModel = imageJob?.modelId;
+  useEffect(() => {
+    if (!imageJobModel) return;
+    setImageMode(true);
+    setImageModelId(imageJobModel);
+  }, [imageJobModel]);
 
   // 画像モデルが変わったら、選んでいる画像モデルを確かめる。1 つも無くなったらチャットへ戻す
   useEffect(() => {
@@ -364,13 +372,11 @@ export function ThreadsPage() {
       const id = threadId ?? (await api<ThreadInfo>("/threads", { presetId, ...(projectId ? { workspaceId: projectId } : {}) })).id;
       threadRef.current = id;
       if (imageMode) {
-        setImageBusy(true);
-        setPendingImage({ threadId: id, prompt: content });
+        imageStore.start({ threadId: id, prompt: content, modelId: imageModelId });
         try {
           await api(`/threads/${id}/images`, { modelId: imageModelId, prompt: content });
         } catch (err) {
-          setImageBusy(false);
-          setPendingImage(null);
+          imageStore.startFailed();
           throw err;
         }
         setInput("");
@@ -416,9 +422,8 @@ export function ThreadsPage() {
 
   /** 画像生成を止める。届くのは "image" イベント（cancelled）で、画面の後始末はそこで行う */
   async function stopImage() {
-    const id = threadRef.current;
-    if (!id) return;
-    await api.post(`/threads/${id}/images/cancel`).catch((err) => setError(errorText(err)));
+    if (!imageJob) return;
+    await api.post(`/threads/${imageJob.threadId}/images/cancel`).catch((err) => setError(errorText(err)));
   }
 
   async function answerStepLimit(action: "continue" | "stop") {
@@ -499,15 +504,11 @@ export function ThreadsPage() {
       <Conversation
         messages={messages}
         toolCalls={toolCalls}
-        error={error || turnError}
+        error={error || (imageFailure?.threadId === threadId ? imageFailure?.error : "") || turnError}
         onDecide={decide}
         footer={<>
-          {pendingImage && pendingImage.threadId === threadId ? (
-            <>
-              <article className="message message-user"><div className="user-text">{pendingImage.prompt}</div></article>
-              <p className="image-message-state status-shimmer" role="status">{PG1.imageGenerating}</p>
-            </>
-          ) : null}
+          {shownImage ? <article className="message message-user"><div className="user-text">{shownImage.prompt}</div></article> : null}
+          {imageJob && shownImage === imageJob ? <p className="image-message-state status-shimmer" role="status">{PG1.imageGenerating}</p> : null}
           {generating && stepWait ? (
             <div className="step-limit" role="group" aria-label={PG1.stepLimit}>
               <p>{PG1.stepLimit}</p>

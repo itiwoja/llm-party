@@ -13,6 +13,7 @@ import { ComparePage } from "./pages/compare";
 import { EvalsPage } from "./pages/evals";
 import { MusicPage } from "./pages/music";
 import { MusicRuntime } from "./pages/music/MusicRuntime";
+import { ImageRuntime } from "./pages/threads/ImageRuntime";
 import { ModelsPage } from "./pages/models";
 import { PresetsPage } from "./pages/presets";
 import { RunsPage } from "./pages/runs";
@@ -83,6 +84,7 @@ function Shell() {
         <Page route={route} />
       </div>
       <MusicRuntime />
+      <ImageRuntime />
     </div>
   );
 }

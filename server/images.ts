@@ -20,7 +20,7 @@ export interface ImageRequest extends ImageParams {
  */
 export class ImageService {
   /** 今動いている生成の取り消し口（止めるときに使う） */
-  private running: { threadId: string; abort: AbortController } | null = null;
+  private running: { threadId: string; prompt: string; modelId: string; abort: AbortController } | null = null;
 
   constructor(
     private store: Store,
@@ -44,12 +44,19 @@ export class ImageService {
     this.store.threads.titleFromPrompt(threadId, input.prompt);
     this.slot.mediaBusy = true;
     const abort = new AbortController();
-    this.running = { threadId, abort };
+    this.running = { threadId, prompt: input.prompt, modelId: model.id, abort };
     void this.run(threadId, { ...model, parts: model.parts as ImageParts | null }, input, abort.signal).finally(() => {
       this.slot.mediaBusy = false;
       this.running = null;
     });
     return { status: "running" };
+  }
+
+  /** API-115。依頼の文は生成が終わるまで DB に入らないので、画面を開き直したらここから戻す */
+  status(): { status: "idle" } | { status: "running"; threadId: string; prompt: string; modelId: string } {
+    if (!this.running) return { status: "idle" };
+    const { threadId, prompt, modelId } = this.running;
+    return { status: "running", threadId, prompt, modelId };
   }
 
   /** 実行中の画像生成を止める。止まると "image" イベントで status = cancelled が届く */
