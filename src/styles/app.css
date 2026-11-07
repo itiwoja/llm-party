@@ -251,20 +251,21 @@ svg.lucide, .btn svg, .icon-btn svg { width: var(--icon-size); height: var(--ico
 .effort-title { grid-column: 2; font-size: 16px; font-weight: 500; color: var(--color-primary); }
 .effort-reset { grid-column: 3; justify-self: end; }
 .effort-reset:disabled { background: transparent; color: var(--color-line); cursor: default; }
-.effort-track { position: relative; height: 32px; padding: 2px; box-sizing: border-box; background: var(--color-hover); border-radius: var(--radius-full); }
+.effort-track { position: relative; height: 32px; overflow: hidden; background: var(--color-hover); border-radius: var(--radius-full); touch-action: none; }
+.effort-track:has(input:focus-visible) { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
+/* 塗りは動かさず、上から地の色の覆いをずらして、左端からつまみの中心までを見せる */
+.effort-fill { position: absolute; inset: 0 16px 0 0; background: var(--color-primary); }
+/* 左右 16px 内側の幅のレール。--p（0〜1）をレール自身の幅に掛けて動かす */
+.effort-rail { position: absolute; inset: 0 16px; transform: translateX(calc(var(--p) * 100%)); transition: transform var(--duration-normal) var(--ease-out); }
+.effort-track[data-dragging] .effort-rail { transition: none; }
+.effort-cover { position: absolute; inset: 0 -16px 0 0; background: var(--color-hover); }
+.effort-thumb { position: absolute; top: 2px; left: -14px; width: 28px; height: 28px; background: var(--color-fg); border-radius: var(--radius-full); box-shadow: 0 0 0 2px var(--color-surface); }
 .effort-stops { position: absolute; inset: 0; padding: 0 13px; display: flex; align-items: center; justify-content: space-between; pointer-events: none; }
 .effort-stops span { width: 6px; height: 6px; background: var(--color-muted-fg); border-radius: var(--radius-full); }
-.effort-track input { position: relative; display: block; width: 100%; height: 28px; margin: 0; background: transparent; cursor: pointer; appearance: none; -webkit-appearance: none; }
+.effort-stops span[data-on] { background: var(--color-on-primary); }
+.effort-track input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; touch-action: none; }
 .effort-track input:disabled { cursor: default; }
-.effort-track input:focus-visible { outline: none; }
-.effort-track input::-webkit-slider-runnable-track { height: 28px; background: transparent; }
-.effort-track input::-moz-range-track { height: 28px; background: transparent; }
-.effort-track input::-webkit-slider-thumb { width: 28px; height: 28px; background: var(--color-fg); border: 0; border-radius: var(--radius-full); appearance: none; -webkit-appearance: none; }
-.effort-track input::-moz-range-thumb { width: 28px; height: 28px; background: var(--color-fg); border: 0; border-radius: var(--radius-full); }
-.effort-track input:focus-visible::-webkit-slider-thumb { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
-.effort-track input:focus-visible::-moz-range-thumb { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
-.effort-track input:disabled::-webkit-slider-thumb { background: var(--color-muted-fg); }
-.effort-track input:disabled::-moz-range-thumb { background: var(--color-muted-fg); }
+.effort-track:has(input:disabled) .effort-fill, .effort-track:has(input:disabled) .effort-thumb { background: var(--color-muted-fg); }
 .composer-thinking:disabled { background: transparent; cursor: default; }
 .composer-thinking-on, .composer-thinking-on:hover { color: var(--color-primary); }
 .composer-send { background: var(--button-primary-bg); color: var(--button-primary-fg); }
@@ -281,4 +282,5 @@ svg.lucide, .btn svg, .icon-btn svg { width: var(--icon-size); height: var(--ico
   .btn:active:not(:disabled), .row-link:active { transform: none; }
   .dialog[data-state], .dialog-scrim, .menu, .tooltip, .toast[data-state] { animation-name: fade; }
   .panel { animation-name: fade; }
+  .effort-rail { transition: none; }
 }
