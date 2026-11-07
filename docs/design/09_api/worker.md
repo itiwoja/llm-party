@@ -108,7 +108,8 @@ sequenceDiagram
 |---|---|---|---|---|
 | API-095 | POST | `/api/threads/:id/images` | `{ modelId, prompt, width?, height?, steps?, seed? }` を受けて 202 `{ status: "running" }`。結果は SSE の `image` イベント（`{ threadId, status: "completed", imageId }` または `{ threadId, status: "failed", error }`）で届く。画像モデル（`use: image`）だけを受ける | FR-012, D-72 |
 | API-096 | GET | `/api/images/:id` | 生成した PNG を返す（`dataDir/images` の中だけ） | FR-012, D-72 |
-| API-115 | GET | `/api/images/status` | 今の状態。`{ status: "idle" }` か `{ status: "running", threadId, prompt, modelId }` | FR-012, D-84 |
+| API-115 | GET | `/api/images/status` | 今の状態。`{ status: "idle" }` か `{ status: "running", threadId, prompt, modelId, step, totalSteps, previewSeq }`。読み込み中の `step`・`totalSteps` は `null` | FR-012, D-84, D-85 |
+| API-116 | GET | `/api/images/preview` | 生成の途中の画像（PNG）。無ければ 404。`image` イベントの `status: "progress"` の `previewSeq` が増えたら取り直す | FR-012, D-85 |
 | API-097 | POST | `/api/image-recipes` | `{ recipe: "moss-image" }` を受けて、レシピの部品を DL の待ち行列に入れる（kind `image-set`）。202 で DL の行を返す。空き容量が部品の合計＋2GB に足りなければ断る（INSUFFICIENT_STORAGE）。DL が終わると画像モデル（`use: image`）が1つ登録される | FR-012, D-73, ADR-010 |
 | API-098 | GET | `/api/image-recipes` | レシピの一覧。各レシピの部品（ファイル名・取得元・サイズ）、合計サイズ、登録済みかどうか | FR-012, D-73 |
 

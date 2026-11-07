@@ -22,7 +22,7 @@
 | Q-14 | 未決 | MOSS-Image の DiT の版：unsloth の UD-Q4_K_XL か、leejet の MOSS-Image-SFT-GGUF か | unsloth の UD-Q4_K_XL（手順が検証済みの card に合う） | API-097 の部品一覧 | [ADR-010](adr/ADR-010-moss-image-recipe.md) |
 | Q-15 | 未決 | 既定のエンコーダ（Qwen3.5-9B Q8_0 は約 9GB 級）を、小さい量子化に替えるか | 替えない（品質を優先）。8GB 機は後で決める | R-18 の扱い | [ADR-010](adr/ADR-010-moss-image-recipe.md) |
 | R-17 | リスク | 同梱の sd-server を master-975 以降に上げても、MOSS の複数ファイル指定が未確認 | 実機で1枚生成を確かめる。だめなら版を上げ直す | FR-012 | [ADR-010](adr/ADR-010-moss-image-recipe.md) |
-| R-18 | リスク | 既定の組み合わせは 8GB の GPU に載らない見込み | 16GB 以上を前提にと明記し、8GB は Q-15 の結論後 | FR-012 | [ADR-010](adr/ADR-010-moss-image-recipe.md) |
+| R-18 | 対処済み | 既定の組み合わせは 8GB の GPU に一度に載らない | `--max-vram 5.5` で順に載せ替えて全部 GPU で動かす（D-85）。実機 RTX 4060 8GB で確認 | FR-012 | [ADR-010](adr/ADR-010-moss-image-recipe.md) |
 | R-20 | リスク | acestep.cpp は公式の配布物がなく、作者のサイトの `/temp/` の Windows 版を使っている。sha256 の公開もなく、場所が消える恐れがある | 版 07abf07 の sha256 を ADR-013 に控えた。exe 段階までに自前のビルドに切り替える | FR-012 | [ADR-013](adr/ADR-013-acestep-cli.md) |
 | R-21 | リスク | この Windows 版には cublas64_13.dll が無く CUDA が読めないので、合成は Vulkan、LM は CPU で動く。LM は Vulkan だと結果が壊れる | LM は常に CPU を指定。合成の結果は CPU と波形が一致することを確認済み。CUDA 版が手に入れば見直す | FR-012 | [ADR-013](adr/ADR-013-acestep-cli.md) |
 | R-22 | リスク | XL の VRAM の山は 6.8GB で、8GB の GPU の余裕は約 1.4GB。他のアプリが GPU を使うと失敗しうる | 失敗しても編集中の内容を残し、CP-353 で案内する | — | [music](04_functional_spec/music.md#-判断してほしいこと) |
