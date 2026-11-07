@@ -233,8 +233,8 @@ svg.lucide, .btn svg, .icon-btn svg { width: var(--icon-size); height: var(--ico
 .head-context { font-size: 14px; color: var(--color-muted-fg); }
 .log { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-4) 0; }
 /* スクロールバーだけを隠す（スクロールはできる） */
-.log { scrollbar-width: none; }
-.log::-webkit-scrollbar { display: none; }
+.log, .list-pane { scrollbar-width: none; }
+.log::-webkit-scrollbar, .list-pane::-webkit-scrollbar { display: none; }
 .log-inner { display: grid; gap: var(--space-5); }
 .user-text { padding: var(--space-3); background: var(--color-hover); border-radius: var(--radius); white-space: pre-wrap; overflow-wrap: anywhere; }
 .reasoning { margin: var(--space-1) 0 var(--space-3); padding-left: var(--space-3); border-left: 2px solid var(--color-line); color: var(--color-muted-fg); font-size: 14px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
