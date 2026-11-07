@@ -4,6 +4,8 @@ export const PG1 = {
   chatGroup: "チャット", // 選択肢の見出し（チャットのプリセット）
   imageGroup: "画像", // 選択肢の見出し（画像モデル。選ぶと画像を生成する）
   imageGenerating: "画像を生成しています…",
+  imageSteps: (step: number, total: number) => `${step} / ${total} ステップ`, // CP-358
+  imagePreview: "生成の途中の画像", // CP-359（読み上げ名）
   imageLoading: "画像を読み込んでいます",
   imageLoadFailed: "画像を表示できません",
   musicLoading: "曲を読み込んでいます", // CP-330

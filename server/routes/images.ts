@@ -38,6 +38,13 @@ export function imageRoutes({ store, images, dataDir }: Context): Router {
     res.json(images.status());
   });
 
+  // 生成の途中の画像（/images/:id より先に置く）。D-85
+  api.get("/images/preview", (_req, res) => {
+    const preview = images.preview();
+    if (!preview) throw new ApiError("NOT_FOUND", "途中の画像がありません");
+    res.type("png").set("Cache-Control", "no-store").send(preview);
+  });
+
   // 生成した PNG（ファイルは dataDir/images の中だけを返す）
   api.get("/images/:id", (req, res) => {
     const image = store.images.get(req.params.id);

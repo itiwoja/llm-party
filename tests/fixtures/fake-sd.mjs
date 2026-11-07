@@ -37,8 +37,9 @@ createServer((req, res) => {
     req.on("data", (chunk) => { raw += chunk; });
     req.on("end", () => {
       const body = JSON.parse(raw || "{}");
+      console.error(`body: ${JSON.stringify(body)}`);
       const id = `job_${++counter}`;
-      jobs.set(id, { id, status: mode === "slow" ? "generating" : "completed", body, cancelled: false });
+      jobs.set(id, { id, status: mode === "slow" || mode === "preview" ? "generating" : "completed", body, cancelled: false });
       send(res, 202, { id, kind: "img_gen", status: "queued", created: Date.now(), poll_url: `/sdcpp/v1/jobs/${id}` });
     });
     return;
@@ -55,6 +56,7 @@ createServer((req, res) => {
     const base = { id: found.id, kind: "img_gen", status: found.status, created: 1, started: 2, completed: found.status === "completed" ? 3 : null, queue_position: 0, error: null };
     if (found.status === "completed") base.result = { output_format: "png", images: [{ index: 0, b64_json: PNG }] };
     else base.result = null;
+    if (mode === "preview") base.preview = { pass: 1, step: 1, total_steps: 2, b64_json: PNG };
     if (found.status === "cancelled") base.error = { code: "cancelled", message: "job cancelled by client" };
     return send(res, 200, base);
   }

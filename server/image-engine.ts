@@ -18,6 +18,14 @@ export interface ImageParams {
   seed: number;
 }
 
+/** 生成の途中経過。ステップが分かれば step・totalSteps、途中の画像が出ていれば preview（PNG）が付く */
+export interface ImageProgress {
+  percent: number;
+  step?: number;
+  totalSteps?: number;
+  preview?: Buffer;
+}
+
 export interface ImageEngineOptions {
   /** sd-server の場所（LLM_PARTY_SD_BIN）。未設定なら画像生成は使えない */
   bin: string | null;
@@ -40,6 +48,15 @@ const POLL_MS = 500;
  * 使う分の予算を絞って順に載せ替えさせる。絞らないと作業領域が足りず失敗する
  */
 const PARTS_GPU = ["--max-vram", "5.5"];
+
+/** 途中の画像の作り方（D-85）。proj は潜在を色へ写すだけなので VRAM を使わず、速度にもほぼ響かない */
+const PREVIEW_MODE = "proj";
+
+/** sd-cli のサンプリングの進捗行。読み込みの進捗（|### |）とは棒の文字で見分ける */
+const CLI_STEP = /\|[=> ]*\|\s*(\d+)\/(\d+) - /g;
+
+/** 書きかけの PNG を見せないよう、終端（IEND）まであるものだけ受け取る */
+const isWholePng = (data: Buffer): boolean => data.length > 12 && data.subarray(0, 4).toString("hex") === "89504e47" && data.subarray(-8, -4).toString("latin1") === "IEND";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -237,19 +254,20 @@ export class ImageEngine {
     }
   }
 
-  /** 1枚生成して PNG のバイト列を返す。時間を過ぎたら取り消して失敗にする。進捗（0〜100）は onProgress に届く（sd-server のみ） */
-  generate(params: ImageParams, signal: AbortSignal, onProgress?: (percent: number) => void): Promise<Buffer> {
-    return this.enqueue(() => (this.cliMode ? this.doGenerateCli(params, signal) : this.doGenerate(params, signal, onProgress)));
+  /** 1枚生成して PNG のバイト列を返す。時間を過ぎたら取り消して失敗にする。途中経過は onProgress に届く */
+  generate(params: ImageParams, signal: AbortSignal, onProgress?: (progress: ImageProgress) => void): Promise<Buffer> {
+    return this.enqueue(() => (this.cliMode ? this.doGenerateCli(params, signal, onProgress) : this.doGenerate(params, signal, onProgress)));
   }
 
   /** sd-cli で 1 枚作る。時間を過ぎたら、または取り消されたら子プロセスを止める */
-  private async doGenerateCli(params: ImageParams, signal: AbortSignal): Promise<Buffer> {
+  private async doGenerateCli(params: ImageParams, signal: AbortSignal, onProgress?: (progress: ImageProgress) => void): Promise<Buffer> {
     if (!this.cliModel || !this.options.bin) throw new ApiError("ENGINE_FAILED", "画像モデルが読み込まれていません");
     const model = await this.localModel(this.cliModel);
     if (signal.aborted) throw new ApiError("ENGINE_FAILED", "画像の生成が取り消されました");
     const runDir = path.join(this.options.dataDir, "runtime");
     mkdirSync(runDir, { recursive: true });
     const out = path.join(runDir, `${randomUUID()}.png`);
+    const previewFile = path.join(runDir, `${randomUUID()}-preview.png`);
     const host = (file: string) => this.toHostPath(file);
     const modelArgs = model.parts
       ? ["--diffusion-model", host(model.parts.diffusion), "--llm", host(model.parts.llm), "--vae", host(model.parts.vae), "--tokenizer", host(model.parts.tokenizer), ...PARTS_GPU]
@@ -261,16 +279,30 @@ export class ImageEngine {
       "-H", String(params.height),
       "--steps", String(params.steps),
       "--seed", String(params.seed),
+      "--preview", PREVIEW_MODE,
+      "--preview-path", host(previewFile),
+      "--preview-interval", "1",
       "-o", host(out),
     ];
     const child = spawn(this.options.bin, args, { stdio: ["ignore", "pipe", "pipe"] });
     this.cliChild = child;
     let tail: string[] = [];
+    let lastStep = 0;
+    const reportSteps = (text: string) => {
+      const last = [...text.matchAll(CLI_STEP)].at(-1);
+      if (!last) return;
+      const step = Number(last[1]);
+      const totalSteps = Number(last[2]);
+      if (step === lastStep || totalSteps === 0) return;
+      lastStep = step;
+      onProgress?.({ percent: Math.round((step / totalSteps) * 100), step, totalSteps, preview: this.readPreview(previewFile) });
+    };
     const log = (chunk: Buffer) => {
       const text = chunk.toString("utf8");
       tail = [...tail, ...text.split("\n").filter(Boolean)].slice(-20);
       const date = new Date().toISOString().slice(0, 10).replaceAll("-", "");
       appendFileSync(path.join(this.logsDir, `sd-cli-${date}.log`), text);
+      reportSteps(text);
     };
     child.stdout?.on("data", log);
     child.stderr?.on("data", log);
@@ -308,10 +340,21 @@ export class ImageEngine {
       clearTimeout(timer);
       this.cliChild = null;
       rmSync(out, { force: true });
+      rmSync(previewFile, { force: true });
     }
   }
 
-  private async doGenerate(params: ImageParams, signal: AbortSignal, onProgress?: (percent: number) => void): Promise<Buffer> {
+  /** 途中の画像は表示だけなので、読めなくても生成は続ける */
+  private readPreview(file: string): Buffer | undefined {
+    try {
+      const data = readFileSync(file);
+      return isWholePng(data) ? data : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private async doGenerate(params: ImageParams, signal: AbortSignal, onProgress?: (progress: ImageProgress) => void): Promise<Buffer> {
     if (!this.child) throw new ApiError("ENGINE_FAILED", "画像モデルが読み込まれていません");
     const submit = await fetch(`${this.baseUrl}/sdcpp/v1/img_gen`, {
       method: "POST",
@@ -323,6 +366,8 @@ export class ImageEngine {
         seed: params.seed,
         batch_count: 1,
         output_format: "png",
+        preview: PREVIEW_MODE,
+        preview_interval: 1,
         sample_params: { sample_steps: params.steps },
       }),
       signal,
@@ -335,6 +380,7 @@ export class ImageEngine {
 
     const started = Date.now();
     let lastPercent = -1;
+    let lastStep = 0;
     while (true) {
       if ((this.generateTimeoutMs !== null && Date.now() - started > this.generateTimeoutMs) || signal.aborted) {
         await this.cancelJob(id);
@@ -342,17 +388,24 @@ export class ImageEngine {
       }
       await sleep(this.pollMs);
       const percent = await this.progressPercent();
-      if (percent !== null && percent !== lastPercent) {
-        lastPercent = percent;
-        onProgress?.(percent);
-      }
       const res = await fetch(`${this.baseUrl}/sdcpp/v1/jobs/${encodeURIComponent(id)}`, { signal: AbortSignal.timeout(this.pollMs * 4) }).catch(() => null);
       if (!res || !res.ok) continue;
       const job = (await res.json()) as {
         status: string;
         result?: { images?: { b64_json?: string }[] } | null;
         error?: { message?: string } | null;
+        preview?: { step?: number; total_steps?: number; b64_json?: string } | null;
       };
+      const { step, total_steps: totalSteps, b64_json: previewB64 } = job.preview ?? {};
+      if (typeof step === "number" && typeof totalSteps === "number" && totalSteps > 0 && step !== lastStep) {
+        lastStep = step;
+        const preview = previewB64 ? Buffer.from(previewB64, "base64") : undefined;
+        onProgress?.({ percent: Math.round((step / totalSteps) * 100), step, totalSteps, preview: preview && isWholePng(preview) ? preview : undefined });
+      } else if (lastStep === 0 && percent !== null && percent !== lastPercent) {
+        // 途中の画像が出ないモデルは、割合だけ伝える
+        lastPercent = percent;
+        onProgress?.({ percent });
+      }
       if (job.status === "completed") {
         const b64 = job.result?.images?.[0]?.b64_json;
         if (!b64) throw new ApiError("ENGINE_FAILED", "画像が返りませんでした");

@@ -15,6 +15,7 @@ import { thinkingChoice, thinkingOptions, thinkingPatch } from "../../thinking";
 import type { EngineState } from "../../types";
 import { Conversation } from "./Conversation";
 import { imageStore, useImageState } from "./imageStore";
+import { ImagePreview } from "./ImagePreview";
 import { PG1, MISSING } from "./copy";
 import { Panel, TERMINAL_MAX_CHARS } from "./Panel";
 import { ThreadList } from "./ThreadList";
@@ -100,7 +101,7 @@ export function ThreadsPage() {
   const presetModel = models.find((m) => m.id === preset?.modelId);
   const thinkingChoices = imageMode ? [] : thinkingOptions(presetModel);
   // 生成中の依頼。文は生成が終わるまで DB に入らないので、画面を離れても消えない場所に持つ（D-84）
-  const { job: imageJob, failure: imageFailure } = useImageState();
+  const { job: imageJob, progress: imageProgress, failure: imageFailure } = useImageState();
   const imageBusy = imageJob !== null;
   const shownImage = imageJob?.threadId === threadId ? imageJob : imageFailure?.threadId === threadId ? imageFailure : null;
 
@@ -322,7 +323,7 @@ export function ThreadsPage() {
       }
       void loadThreads();
     } else if (event === "image" && data.status === "progress") {
-      // 進捗は画面に表示しない
+      // 進捗は ImageRuntime が受けて imageStore に入れる
     } else if (event === "image") {
       // 依頼と失敗の文は imageStore が受ける
       if (data.status !== "failed" && threadRef.current === data.threadId) void loadDetail(data.threadId).catch(() => undefined);
@@ -508,7 +509,7 @@ export function ThreadsPage() {
         onDecide={decide}
         footer={<>
           {shownImage ? <article className="message message-user"><div className="user-text">{shownImage.prompt}</div></article> : null}
-          {imageJob && shownImage === imageJob ? <p className="image-message-state status-shimmer" role="status">{PG1.imageGenerating}</p> : null}
+          {imageJob && shownImage === imageJob ? <ImagePreview progress={imageProgress} /> : null}
           {generating && stepWait ? (
             <div className="step-limit" role="group" aria-label={PG1.stepLimit}>
               <p>{PG1.stepLimit}</p>

@@ -92,6 +92,8 @@
 .image-message img { max-width: 100%; height: auto; border-radius: 8px; }
 .image-message figcaption { color: var(--muted, #666); font-size: 0.875rem; white-space: pre-wrap; }
 .image-message-state { color: var(--muted, #666); font-size: 0.875rem; }
+.image-preview { margin: 0; display: grid; gap: 6px; justify-items: start; }
+.image-preview img { width: min(256px, 100%); height: auto; border-radius: 8px; }
 .composer-note { color: var(--muted, #666); font-size: 0.8125rem; align-self: center; }
 
 /* 音楽（D-78） */

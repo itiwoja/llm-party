@@ -63,8 +63,22 @@ describe("ImageEngine", () => {
     const e = create("ok");
     await e.load({ path: "/models/a.safetensors", parts: null });
     const seen: number[] = [];
-    await e.generate(params, new AbortController().signal, (percent) => seen.push(percent));
+    await e.generate(params, new AbortController().signal, ({ percent }) => seen.push(percent));
     expect(seen).toEqual([50]);
+  });
+
+  it("途中の画像とステップ数を通知し、同じステップは繰り返さない（D-85）", async () => {
+    const e = create("preview");
+    await e.load({ path: "/models/a.safetensors", parts: null });
+    const abort = new AbortController();
+    const seen: { step?: number; totalSteps?: number; png: boolean }[] = [];
+    const done = e.generate(params, abort.signal, ({ step, totalSteps, preview }) => {
+      seen.push({ step, totalSteps, png: preview?.subarray(0, 4).toString("hex") === "89504e47" });
+      setTimeout(() => abort.abort(), 200);
+    });
+    await expect(done).rejects.toThrow();
+    expect(seen).toEqual([{ step: 1, totalSteps: 2, png: true }]);
+    expect(loggedBody()).toMatchObject({ preview: "proj", preview_interval: 1 });
   });
 
   it("読み込んで1枚生成し、PNG のバイト列を返す", async () => {
@@ -80,6 +94,43 @@ describe("ImageEngine", () => {
     const text = readdirSync(dir).map((f) => readFileSync(path.join(dir, f), "utf8")).join("\n");
     return text.split("\n").find((l) => l.startsWith("args: ")) ?? "";
   };
+
+  const loggedBody = () => {
+    const dir = path.join(temp.dir, "logs");
+    const text = readdirSync(dir).map((f) => readFileSync(path.join(dir, f), "utf8")).join("\n");
+    return JSON.parse(text.split("\n").find((l) => l.startsWith("body: "))?.slice(6) ?? "{}");
+  };
+
+  it("sd-cli の進捗行からステップを読み、読み込みの進捗は数えず、途中の画像を渡す（D-85）", async () => {
+    temp = tempDir();
+    const bin = path.join(temp.dir, "sd-cli");
+    const png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+    writeFileSync(bin, `#!/bin/sh
+while [ $# -gt 0 ]; do
+  case "$1" in --preview-path) p="$2";; -o) o="$2";; esac
+  shift
+done
+printf '  |#####     | 231/462 - 59.26MB/s\\r'
+sleep 0.1
+echo ${png} | base64 -d > "$p"
+printf '  |==>       |  1/2 - 1.57s/it - ETA 00:10\\r'
+sleep 0.1
+printf '  |==========|  2/2 - 1.57s/it\\n'
+sleep 0.1
+echo ${png} | base64 -d > "$o"
+`, { mode: 0o755 });
+    engine = new ImageEngine({ bin, dataDir: temp.dir, bus: new EventBus() });
+    await engine.load({ path: "/m.safetensors", parts: null });
+    const seen: { percent: number; step?: number; totalSteps?: number; png: boolean }[] = [];
+    const out = await engine.generate(params, new AbortController().signal, ({ percent, step, totalSteps, preview }) => {
+      seen.push({ percent, step, totalSteps, png: preview !== undefined });
+    });
+    expect(out.subarray(0, 4).toString("hex")).toBe("89504e47");
+    expect(seen).toEqual([
+      { percent: 50, step: 1, totalSteps: 2, png: true },
+      { percent: 100, step: 2, totalSteps: 2, png: true },
+    ]);
+  });
 
   it("parts があれば --diffusion-model / --llm / --vae / --tokenizer を渡し、-m は付けない", async () => {
     const e = create("ok");
@@ -156,6 +207,29 @@ describe("画像生成の経路", () => {
     expect(store.threads.agentConversation(thread.id).map((m) => m.content).join("\n")).not.toContain(imageId);
   });
 
+  it("途中の画像は生成中だけ取れ、ステップと番号は status にも出る（API-115・116, D-85）", async () => {
+    worker = await startWorker(null, { sdBin: FAKE_SD });
+    process.env.FAKE_SD_MODE = "preview";
+    const { store } = worker.context;
+    const model = store.models.create({
+      name: "Test XL", path: path.join(worker.dir, "preview.safetensors"), source: "hf", use: "image",
+      architecture: "safetensors", quantization: null, sizeBytes: 10, trainContext: null,
+    });
+    const thread = store.threads.create(null);
+    await worker.api(`/threads/${thread.id}/images`, { body: { modelId: model.id, prompt: "a cat", width: 64, height: 64, steps: 2 } });
+    const progress = await waitForEvent(worker.context.bus, (e) => e.event === "image" && (e.data as { status: string }).status === "progress" && (e.data as { previewSeq?: number }).previewSeq === 1, 10_000);
+    expect(progress.data).toMatchObject({ threadId: thread.id, step: 1, totalSteps: 2, previewSeq: 1 });
+    expect(JSON.stringify(progress.data)).not.toContain("iVBOR");
+    expect((await worker.api("/images/status")).body).toMatchObject({ step: 1, totalSteps: 2, previewSeq: 1 });
+
+    const png = await fetch(`http://127.0.0.1:${worker.port}/api/images/preview`, { headers: { Authorization: "Bearer secret" } });
+    expect(png.headers.get("content-type")).toContain("image/png");
+
+    await worker.api(`/threads/${thread.id}/images/cancel`, { body: {} });
+    await waitForEvent(worker.context.bus, (e) => e.event === "image" && (e.data as { status: string }).status === "cancelled", 10_000);
+    await expect.poll(async () => (await worker.api("/images/preview")).status).toBe(404);
+  });
+
   it("生成中に止めると cancelled になり、画像は残らず、エラーにもならない", async () => {
     worker = await startWorker(null, { sdBin: FAKE_SD });
     process.env.FAKE_SD_MODE = "slow";
@@ -171,7 +245,8 @@ describe("画像生成の経路", () => {
     expect(started.status).toBe(202);
     await waitForEvent(worker.context.bus, (e) => e.event === "image" && (e.data as { status: string }).status === "progress", 10_000).catch(() => undefined);
     // 画面を開き直しても、依頼の文と実行中であることが分かる（D-84）
-    expect((await worker.api("/images/status")).body).toEqual({ status: "running", threadId: thread.id, prompt: "a cat", modelId: model.id });
+    expect((await worker.api("/images/status")).body).toEqual({ status: "running", threadId: thread.id, prompt: "a cat", modelId: model.id, step: null, totalSteps: null, previewSeq: 0 });
+    expect((await worker.api("/images/preview")).status).toBe(404);
     const stopped = await worker.api(`/threads/${thread.id}/images/cancel`, { body: {} });
     expect(stopped.body).toEqual({ status: "cancelling" });
 
