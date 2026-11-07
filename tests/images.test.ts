@@ -90,7 +90,8 @@ describe("ImageEngine", () => {
     expect(line).toContain("--llm /m/l.gguf");
     expect(line).toContain("--vae /m/v.safetensors");
     expect(line).toContain("--tokenizer /m/t.json");
-    expect(line).toContain("--backend te=cpu");
+    expect(line).toContain("--max-vram 5.5");
+    expect(line).not.toContain("--backend");
     expect(line.split(" ")).not.toContain("-m");
   });
 

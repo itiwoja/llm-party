@@ -5,6 +5,7 @@ import { appendFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "
 import { createServer } from "node:net";
 import path from "node:path";
 import type { EventBus } from "./events";
+import { HostModelCache, windowsCacheDir } from "./host-model-cache";
 import { ApiError } from "./http-error";
 import type { ImageParts } from "./store/models";
 
@@ -34,8 +35,11 @@ export interface ImageModelSpec { path: string; parts: ImageParts | null }
 
 const POLL_MS = 500;
 
-/** 部品モデルのテキストエンコーダは大きく、8GB の GPU では DiT と一緒に載らない。CPU（Windows の RAM）で動かす（R-18） */
-const PARTS_BACKEND = ["--backend", "te=cpu"];
+/**
+ * 部品モデルも全部 GPU で動かす（D-85）。テキストエンコーダは大きく、8GB の GPU では DiT と一緒に載らないので、
+ * 使う分の予算を絞って順に載せ替えさせる。絞らないと作業領域が足りず失敗する
+ */
+const PARTS_GPU = ["--max-vram", "5.5"];
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -89,6 +93,40 @@ export class ImageEngine {
   }
 
   private cliModel: ImageModelSpec | null = null;
+  private hostCache: HostModelCache | null | undefined;
+
+  /** Windows の exe のときだけ、モデルを Windows のディスクの写しから読ませる */
+  private get modelCache(): HostModelCache | null {
+    if (this.hostCache === undefined) {
+      const dir = this.options.bin?.toLowerCase().endsWith(".exe") ? windowsCacheDir() : null;
+      this.hostCache = dir ? new HostModelCache(dir) : null;
+    }
+    return this.hostCache;
+  }
+
+  private async localModel(model: ImageModelSpec): Promise<ImageModelSpec> {
+    const cache = this.modelCache;
+    if (!cache) return model;
+    const { parts } = model;
+    if (!parts) return { path: await cache.localize(model.path), parts: null };
+    return {
+      path: model.path,
+      parts: {
+        diffusion: await cache.localize(parts.diffusion),
+        llm: await cache.localize(parts.llm),
+        vae: await cache.localize(parts.vae),
+        tokenizer: await cache.localize(parts.tokenizer),
+      },
+    };
+  }
+
+  /** モデルを消すときに写しも消す */
+  async dropCopies(model: ImageModelSpec): Promise<void> {
+    const cache = this.modelCache;
+    if (!cache) return;
+    const files = model.parts ? [model.parts.diffusion, model.parts.llm, model.parts.vae, model.parts.tokenizer] : [model.path];
+    await Promise.all(files.map((file) => cache.drop(file)));
+  }
   private cliChild: ChildProcess | null = null;
 
   /** WSL から Windows の exe を呼ぶときは、パスを Windows 形式（\\wsl.localhost\...）に直す */
@@ -143,7 +181,7 @@ export class ImageEngine {
     // 終了はプロセスグループごと行うので、自分のグループを持たせる
     const { parts } = model;
     const modelArgs = parts
-      ? ["--diffusion-model", parts.diffusion, "--llm", parts.llm, "--vae", parts.vae, "--tokenizer", parts.tokenizer, ...PARTS_BACKEND]
+      ? ["--diffusion-model", parts.diffusion, "--llm", parts.llm, "--vae", parts.vae, "--tokenizer", parts.tokenizer, ...PARTS_GPU]
       : ["-m", model.path];
     const child = spawn(this.options.bin, [...modelArgs, "--listen-ip", "127.0.0.1", "--listen-port", String(port)], {
       stdio: ["ignore", "pipe", "pipe"],
@@ -206,14 +244,15 @@ export class ImageEngine {
 
   /** sd-cli で 1 枚作る。時間を過ぎたら、または取り消されたら子プロセスを止める */
   private async doGenerateCli(params: ImageParams, signal: AbortSignal): Promise<Buffer> {
-    const model = this.cliModel;
-    if (!model || !this.options.bin) throw new ApiError("ENGINE_FAILED", "画像モデルが読み込まれていません");
+    if (!this.cliModel || !this.options.bin) throw new ApiError("ENGINE_FAILED", "画像モデルが読み込まれていません");
+    const model = await this.localModel(this.cliModel);
+    if (signal.aborted) throw new ApiError("ENGINE_FAILED", "画像の生成が取り消されました");
     const runDir = path.join(this.options.dataDir, "runtime");
     mkdirSync(runDir, { recursive: true });
     const out = path.join(runDir, `${randomUUID()}.png`);
     const host = (file: string) => this.toHostPath(file);
     const modelArgs = model.parts
-      ? ["--diffusion-model", host(model.parts.diffusion), "--llm", host(model.parts.llm), "--vae", host(model.parts.vae), "--tokenizer", host(model.parts.tokenizer), ...PARTS_BACKEND]
+      ? ["--diffusion-model", host(model.parts.diffusion), "--llm", host(model.parts.llm), "--vae", host(model.parts.vae), "--tokenizer", host(model.parts.tokenizer), ...PARTS_GPU]
       : ["-m", host(model.path)];
     const args = [
       ...modelArgs,
