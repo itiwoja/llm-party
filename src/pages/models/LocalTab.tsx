@@ -70,7 +70,9 @@ export function LocalTab({ kind, models, adapters, downloads, etaSeconds, onChan
   }
 
   // 登録済みのモデルの DL（completed で resultId あり）と、モデルの本体や部品になった保存だけの DL は、手元のモデルの行と重なるので出さない。LoRA の DL は完了後も登録まで残す
-  const shown = downloads.filter((d) => (kind === "adapter" ? d.kind === "adapter" : d.kind !== "adapter" && !(d.status === "completed" && (d.kind !== "file" || d.usedByModel))));
+  // 取り消した DL は .part も消えていて、できることが無いので出さない
+  const shown = downloads.filter((d) => d.status !== "cancelled"
+    && (kind === "adapter" ? d.kind === "adapter" : d.kind !== "adapter" && !(d.status === "completed" && (d.kind !== "file" || d.usedByModel))));
 
   const rows: Row[] = [
     ...(kind === "model" ? models.map((m) => ({ ...m, kind: "model" as const })) : adapters.map((a) => ({ ...a, kind: "adapter" as const }))),
