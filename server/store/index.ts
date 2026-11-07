@@ -5,6 +5,7 @@ import { ChangeStore } from "./changes";
 import { DownloadStore } from "./downloads";
 import { EvalStore } from "./eval";
 import { ImageStore } from "./images";
+import { TrackStore } from "./tracks";
 import { ModelStore } from "./models";
 import { PresetStore } from "./presets";
 import { SettingStore } from "./settings";
@@ -26,6 +27,7 @@ export class Store {
   readonly evals: EvalStore;
   readonly settings: SettingStore;
   readonly images: ImageStore;
+  readonly tracks: TrackStore;
 
   constructor(db: Db) {
     this.models = new ModelStore(db);
@@ -38,5 +40,6 @@ export class Store {
     this.evals = new EvalStore(db);
     this.settings = new SettingStore(db);
     this.images = new ImageStore(db);
+    this.tracks = new TrackStore(db);
   }
 }

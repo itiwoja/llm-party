@@ -64,6 +64,7 @@ WSL で動かすのは検証のためで、Linux 版の配布ではない。D-19
 |---|---|---|
 | `LLM_PARTY_LLAMA_BIN` | なし（任意） | 使う llama-server のパスを上書きする。未設定なら worker が `data/runtime/` を見て、無ければ自動に取得する（[ADR-011](adr/ADR-011-runtime-resolver.md)）。パスが実在しなければ、警告を出して未設定と同じに動く（[ADR-012](adr/ADR-012-invalid-llama-override.md)） |
 | `LLM_PARTY_SD_BIN` | なし（画像生成だけ使えない） | 使う sd-server のパス（ADR-009） |
+| `LLM_PARTY_ACE_DIR` | `<LLM_PARTY_DATA_DIR>/runtime/ace`（無ければ音楽生成だけ使えない） | ace-lm と ace-synth のあるフォルダ（ADR-013） |
 | `LLM_PARTY_BACKEND` | `cuda` | `LLM_PARTY_LLAMA_BIN` の本体を使うときのバックエンド名（`cuda` / `vulkan` / `cpu`）。自動で決めた本体には効かない |
 | `LLM_PARTY_PORT` | `8787` | 待ち受けポート |
 | `LLM_PARTY_DATA_DIR` | リポジトリの `data/` | データの置き場。`data/` は Git に入れない |

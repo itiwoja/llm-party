@@ -23,6 +23,8 @@
 | Q-15 | 未決 | 既定のエンコーダ（Qwen3.5-9B Q8_0 は約 9GB 級）を、小さい量子化に替えるか | 替えない（品質を優先）。8GB 機は後で決める | R-18 の扱い | [ADR-010](adr/ADR-010-moss-image-recipe.md) |
 | R-17 | リスク | 同梱の sd-server を master-975 以降に上げても、MOSS の複数ファイル指定が未確認 | 実機で1枚生成を確かめる。だめなら版を上げ直す | FR-012 | [ADR-010](adr/ADR-010-moss-image-recipe.md) |
 | R-18 | リスク | 既定の組み合わせは 8GB の GPU に載らない見込み | 16GB 以上を前提にと明記し、8GB は Q-15 の結論後 | FR-012 | [ADR-010](adr/ADR-010-moss-image-recipe.md) |
+| R-20 | リスク | acestep.cpp は公式の配布物がなく、作者のサイトの `/temp/` の Windows 版を使っている。sha256 の公開もなく、場所が消える恐れがある | 版 07abf07 の sha256 を ADR-013 に控えた。exe 段階までに自前のビルドに切り替える | FR-012 | [ADR-013](adr/ADR-013-acestep-cli.md) |
+| R-21 | リスク | この Windows 版には cublas64_13.dll が無く CUDA が読めないので、合成は Vulkan、LM は CPU で動く。LM は Vulkan だと結果が壊れる | LM は常に CPU を指定。合成の結果は CPU と波形が一致することを確認済み。CUDA 版が手に入れば見直す | FR-012 | [ADR-013](adr/ADR-013-acestep-cli.md) |
 
 番号の欠け（Q-01, Q-03, Q-04, Q-05, Q-07, Q-08, Q-09）は決着済み → [00 決定事項ログ](00_overview.md#決定事項ログ)（D-55, D-33, D-43, D-46, D-42, D-38, D-56）。Q-02 と Q-06 は exe 段階で決める（D-59）。
 
@@ -60,8 +62,10 @@ flowchart LR
 | [ADR-010](adr/ADR-010-moss-image-recipe.md) | MOSS-Image は部品のレシピとして複数ファイルで動かす | 承認 |
 | [ADR-011](adr/ADR-011-runtime-resolver.md) | llama-server の場所は worker が探し、無ければ自動に取得する | 承認・実装済み（無効な指定の扱いは ADR-012 で改訂） |
 | [ADR-012](adr/ADR-012-invalid-llama-override.md) | `LLM_PARTY_LLAMA_BIN` のパスが実在しなければ、警告して無視する | 承認・実装済み |
+| [ADR-013](adr/ADR-013-acestep-cli.md) | 音楽生成は acestep.cpp の CLI を生成のたびに起動する | 承認・実装済み |
 
 ## 最近の変更
+- 2026-11-07：音楽生成に対応（D-78、[ADR-013](adr/ADR-013-acestep-cli.md)、[変更記録](changes/2026-11-07-music-generation.md)）。R-20、R-21 を追加
 - 2026-11-07：`LLM_PARTY_LLAMA_BIN` の無効な指定で読み込みを止めないように変更（[ADR-012](adr/ADR-012-invalid-llama-override.md)、[変更レポート](changes/2026-11-07-invalid-llama-override.md)）。R-14 を決着として閉じ、R-19、D-74、CP-313 を追加
 - 2026-11-07：入力欄で思考の強さを選べるように変更（D-76。[変更記録](changes/2026-11-07-thinking-effort.md)）
 - 2026-11-06：localhost 段階の実装を反映。D-64〜D-68（容量は 10 進、内部の値、システムプロンプト、新しいスレッドで続ける、実装で足した文言）、API-030・031・050・056 の追記、CP-208 以降

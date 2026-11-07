@@ -6,6 +6,8 @@ export interface LocalConfig {
   llamaBin: string | null;
   /** sd-server（画像生成）の場所。未設定なら画像生成は使えない */
   sdBin: string | null;
+  /** ace-lm・ace-synth（音楽生成）のフォルダ。未設定なら <dataDir>/runtime/ace */
+  aceDir: string | null;
   backend: "cuda" | "vulkan" | "cpu";
 }
 
@@ -24,6 +26,7 @@ export function loadLocalConfig(env: NodeJS.ProcessEnv = process.env): LocalConf
     dataDir: path.resolve(env.LLM_PARTY_DATA_DIR ?? "data"),
     llamaBin: env.LLM_PARTY_LLAMA_BIN || null,
     sdBin: env.LLM_PARTY_SD_BIN || null,
+    aceDir: env.LLM_PARTY_ACE_DIR || null,
     backend,
   };
 }

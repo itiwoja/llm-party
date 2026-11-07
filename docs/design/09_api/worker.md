@@ -114,6 +114,19 @@ sequenceDiagram
 - 生成したものは `messages` に `role = image` で入る。内容は JSON（`imageId`・`prompt`・`modelName`・`width`・`height`）。履歴の文脈には入らない
 - 同時に1枚。チャットの生成中・評価中は断る（BUSY）
 
+## 音楽生成（D-78）
+
+| ID | メソッド | パス | 内容 | 対応 |
+|---|---|---|---|---|
+| API-103 | POST | `/api/threads/:id/music` | `{ modelId, prompt, lyrics?, duration?, seed? }` を受けて 202 `{ status: "running" }`。`duration` は 10〜240 秒（既定 60）。`lyrics` は空なら作詞を任せ、`[Instrumental]` なら歌なし。結果は SSE の `music` イベントで届く。音楽モデル（`use: music`）だけを受ける | FR-012, D-78 |
+| API-104 | POST | `/api/threads/:id/music/cancel` | 実行中の生成を止める。`{ status: "cancelling" }`、動いていなければ `{ status: "idle" }` | FR-012, D-78 |
+| API-105 | GET | `/api/music/:id` | 生成した MP3 を返す（`dataDir/music` の中だけ） | FR-012, D-78 |
+| API-106 | POST | `/api/music-recipes` | `{ recipe: "ace-step" }` を受けて、部品を DL の待ち行列に入れる（kind `music-set`）。形は API-097 と同じ | FR-012, D-78 |
+| API-107 | GET | `/api/music-recipes` | レシピの一覧。形は API-098 と同じ。`installed` は部品がそろい、モデルとして登録済みのときだけ true（API-098 も同じ） | FR-012, D-78 |
+
+- `music` イベント：`{ threadId, status: "progress", phase: "composing" | "rendering", reasoning? }`（`reasoning` は LM の思考のそれまでの全文）、`{ threadId, status: "completed", trackId }`、`{ threadId, status: "failed", error }`、`{ threadId, status: "cancelled" }`
+- 生成したものは `messages` に `role = music` で入る。内容は JSON（`trackId`・`prompt`・`lyrics`・`modelName`・`duration`・`bpm`・`keyscale`）。履歴の文脈には入らない
+
 ## 評価
 | ID | メソッド | パス | 概要 | 関連 |
 |---|---|---|---|---|

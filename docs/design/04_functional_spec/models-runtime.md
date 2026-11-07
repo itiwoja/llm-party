@@ -93,7 +93,7 @@ flowchart LR
   | チャット | `text-generation`, `image-text-to-text` | GGUF に絞る（`filter=gguf`）。動かせるのは GGUF だけなので |
   | 画像生成 | `text-to-image` | |
   | 映像生成 | `text-to-video` | |
-  | 音楽生成 | `text-to-audio` | |
+  | 音楽生成 | `text-to-audio` | 検索で見つけたモデルは保存だけ。生成に使うのは ACE-Step 1.5 のレシピ（D-78） |
   | 音声生成 | `text-to-speech` | |
   | 文字起こし | `automatic-speech-recognition` | |
   | Embedding | `feature-extraction`, `sentence-similarity` | |
@@ -120,6 +120,8 @@ flowchart LR
 - DL は同時に1つ。2つ目からは `queued` で待つ
 - HF トークン（任意）：ゲート付きリポジトリ用。設定で入れると main が暗号化して保存し（D-06）、worker には起動時にメモリで渡す
 - 初回のおすすめ：`unsloth/Qwen3.5-9B-GGUF` の `Qwen3.5-9B-Q4_K_M.gguf`（5.7GB）（D-33）
+
+- 音楽のレシピ（D-78、ADR-013）：ACE-Step 1.5 の部品 4 つを `music-set` の DL として一括で取り、音楽モデル（`use: music`）を1つ登録する。レシピの主の部品は `parts` の先頭
 
 ## FR-013：ファイル登録
 〔UC-004〕

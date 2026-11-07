@@ -5,7 +5,7 @@ export interface Preset { id: string; name: string; modelId: string; contextSize
 export interface Model {
   id: string;
   name: string;
-  /** 画像モデルは "image"（チャットのモデルは別の値） */
+  /** 画像モデルは "image"、音楽モデルは "music"（チャットのモデルは別の値） */
   use?: string;
   /** チャットテンプレートが思考の ON/OFF・段階を受け取るか（D-76） */
   supportsThinking: boolean;

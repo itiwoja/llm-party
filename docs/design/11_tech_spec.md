@@ -97,7 +97,7 @@ flowchart LR
 | 更新 | 動かさない | GitHub `itiwoja/llm-party` |
 
 - 同梱する設定：`runtime-manifest.json`（llama.cpp のビルド番号・各パックの URL・サイズ・sha256）、`app-update.yml`（electron-builder が生成）
-- 環境変数（localhost 段階のみ）：`LLM_PARTY_DATA_DIR`、`LLM_PARTY_LLAMA_BIN`、`LLM_PARTY_SD_BIN`（ADR-009）、`LLM_PARTY_BACKEND`、`LLM_PARTY_PORT`（[12](12_localhost_stage.md#起動のしかた)）
+- 環境変数（localhost 段階のみ）：`LLM_PARTY_DATA_DIR`、`LLM_PARTY_LLAMA_BIN`、`LLM_PARTY_SD_BIN`、`LLM_PARTY_ACE_DIR`（ADR-009）、`LLM_PARTY_BACKEND`、`LLM_PARTY_PORT`（[12](12_localhost_stage.md#起動のしかた)）
 
 ## 11. テスト方針
 | レベル | 観点 |

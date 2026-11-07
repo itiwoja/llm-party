@@ -7,6 +7,7 @@ import { ComposerInput } from "../../components/ComposerInput";
 import { SelectField } from "../../components/Controls";
 import { IconButton } from "../../components/IconButton";
 import { Metrics } from "../../components/Metrics";
+import { Collapsible } from "../../components/Collapsible";
 import { CP, MISSING_COPY } from "../../copy";
 import { WorkLayout } from "../../layouts";
 import { navigate, useRoute } from "../../router";
@@ -14,6 +15,7 @@ import { pickFolder } from "../../platform";
 import { thinkingChoice, thinkingOptions, thinkingPatch } from "../../thinking";
 import type { EngineState } from "../../types";
 import { Conversation } from "./Conversation";
+import { INSTRUMENTAL, MUSIC_DEFAULT_SECONDS, MusicOptions } from "./MusicOptions";
 import { PG1, MISSING } from "./copy";
 import { Panel, TERMINAL_MAX_CHARS } from "./Panel";
 import { ThreadList } from "./ThreadList";
@@ -85,24 +87,35 @@ export function ThreadsPage() {
   const [imageMode, setImageMode] = useState(false);
   const [imageModelId, setImageModelId] = useState("");
   const imageModels = useMemo(() => models.filter((m) => m.use === "image"), [models]);
+  /** 音楽モード：音楽モデルを選んだとき。入力を曲の説明として生成に回す（D-78）。画像モードとは同時に立たない */
+  const [musicMode, setMusicMode] = useState(false);
+  const [musicModelId, setMusicModelId] = useState("");
+  const musicModels = useMemo(() => models.filter((m) => m.use === "music"), [models]);
+  const [musicDuration, setMusicDuration] = useState(MUSIC_DEFAULT_SECONDS);
+  const [musicInstrumental, setMusicInstrumental] = useState(false);
+  const [musicLyrics, setMusicLyrics] = useState("");
   /** チャットのプリセットと画像モデルを1か所で選ぶ。値は種類:id */
   const modelOptions = useMemo(
     () => [
       ...presets.map((p) => ({ value: `preset:${p.id}`, label: p.name, group: PG1.chatGroup })),
       ...imageModels.map((m) => ({ value: `image:${m.id}`, label: m.name, group: PG1.imageGroup })),
+      ...musicModels.map((m) => ({ value: `music:${m.id}`, label: m.name, group: PG1.musicGroup })),
     ],
-    [presets, imageModels],
+    [presets, imageModels, musicModels],
   );
-  const modelChoice = imageMode ? `image:${imageModelId}` : `preset:${presetId}`;
+  const modelChoice = musicMode ? `music:${musicModelId}` : imageMode ? `image:${imageModelId}` : `preset:${presetId}`;
   /** 選んでいるプリセットのモデルで変えられる思考の選択肢（D-76）。無ければ欄を出さない */
   const preset = presets.find((p) => p.id === presetId);
   const presetModel = models.find((m) => m.id === preset?.modelId);
-  const thinkingChoices = imageMode ? [] : thinkingOptions(presetModel);
+  const thinkingChoices = imageMode || musicMode ? [] : thinkingOptions(presetModel);
   const [imageBusy, setImageBusy] = useState(false);
   // 生成中の依頼。文は生成が終わるまで DB に入らないので、画面には送った時点でこれを出す
   const [pendingImage, setPendingImage] = useState<{ threadId: string; prompt: string } | null>(null);
   // 画像生成中の表示文。進捗の数字は画面に出さない（"image" の progress は無視する）
-  const imageNote = PG1.imageGenerating;
+  const [musicPhase, setMusicPhase] = useState<"composing" | "rendering">("composing");
+  const [musicRunning, setMusicRunning] = useState(false);
+  const [musicThought, setMusicThought] = useState("");
+  const imageNote = musicRunning ? (musicPhase === "rendering" ? PG1.musicRendering : PG1.musicComposing) : PG1.imageGenerating;
 
   const composer = useRef<HTMLTextAreaElement>(null);
   const turnRef = useRef(turn);
@@ -321,6 +334,16 @@ export function ThreadsPage() {
       if (data.status === "failed") setError(data.error);
       else if (threadRef.current === data.threadId) void loadDetail(data.threadId).catch(() => undefined);
       void loadThreads().catch(() => undefined);
+    } else if (event === "music" && data.status === "progress") {
+      setMusicPhase(data.phase);
+      if (data.reasoning) setMusicThought(data.reasoning);
+    } else if (event === "music") {
+      setImageBusy(false);
+      setMusicRunning(false);
+      setPendingImage(null);
+      if (data.status === "failed") setError(data.error);
+      else if (threadRef.current === data.threadId) void loadDetail(data.threadId).catch(() => undefined);
+      void loadThreads().catch(() => undefined);
     } else if (event === "eval.progress") {
       setEvalProgress({ done: data.done, total: data.total });
     } else if (event === "eval.finished") {
@@ -334,17 +357,20 @@ export function ThreadsPage() {
     if (imageModels.length === 0) setImageMode(false);
   }, [imageModels]);
 
+  useEffect(() => {
+    setMusicModelId((current) => (musicModels.some((m) => m.id === current) ? current : musicModels[0]?.id ?? ""));
+    if (musicModels.length === 0) setMusicMode(false);
+  }, [musicModels]);
+
   /** 1 か所の選択。画像モデルなら画像モード、プリセットならチャット（presetId は常に持つ。スレッドの作成に要る） */
   function chooseModel(value: string) {
     const [kind, ...rest] = value.split(":");
     const id = rest.join(":");
-    if (kind === "image") {
-      setImageModelId(id);
-      setImageMode(true);
-    } else {
-      setPresetId(id);
-      setImageMode(false);
-    }
+    setImageMode(kind === "image");
+    setMusicMode(kind === "music");
+    if (kind === "image") setImageModelId(id);
+    else if (kind === "music") setMusicModelId(id);
+    else setPresetId(id);
   }
 
   /** プリセットごとに覚える（API-062）。次の送信から効く */
@@ -354,20 +380,33 @@ export function ThreadsPage() {
 
   async function send() {
     const content = input.trim();
-    if (!content || turn || imageBusy || !presetId || (imageMode && !imageModelId)) return;
+    if (!content || turn || imageBusy || !presetId || (imageMode && !imageModelId) || (musicMode && !musicModelId)) return;
     setError("");
     setTruncated(false);
     setLooped(false);
     try {
       const id = threadId ?? (await api<ThreadInfo>("/threads", { presetId, ...(projectId ? { workspaceId: projectId } : {}) })).id;
       threadRef.current = id;
-      if (imageMode) {
+      if (imageMode || musicMode) {
         setImageBusy(true);
         setPendingImage({ threadId: id, prompt: content });
+        if (musicMode) {
+          setMusicRunning(true);
+          setMusicPhase("composing");
+          setMusicThought("");
+        }
         try {
-          await api(`/threads/${id}/images`, { modelId: imageModelId, prompt: content });
+          if (musicMode) {
+            await api(`/threads/${id}/music`, {
+              modelId: musicModelId, prompt: content, duration: musicDuration,
+              lyrics: musicInstrumental ? INSTRUMENTAL : musicLyrics,
+            });
+          } else {
+            await api(`/threads/${id}/images`, { modelId: imageModelId, prompt: content });
+          }
         } catch (err) {
           setImageBusy(false);
+          setMusicRunning(false);
           setPendingImage(null);
           throw err;
         }
@@ -416,7 +455,7 @@ export function ThreadsPage() {
   async function stopImage() {
     const id = threadRef.current;
     if (!id) return;
-    await api.post(`/threads/${id}/images/cancel`).catch((err) => setError(errorText(err)));
+    await api.post(`/threads/${id}/${musicRunning ? "music" : "images"}/cancel`).catch((err) => setError(errorText(err)));
   }
 
   async function answerStepLimit(action: "continue" | "stop") {
@@ -503,6 +542,7 @@ export function ThreadsPage() {
           {pendingImage && pendingImage.threadId === threadId ? (
             <>
               <article className="message message-user"><div className="user-text">{pendingImage.prompt}</div></article>
+              {musicRunning && musicThought ? <Collapsible summary={CP.thinking}><div className="reasoning">{musicThought}</div></Collapsible> : null}
               <p className="image-message-state status-shimmer" role="status">{imageNote}</p>
             </>
           ) : null}
@@ -529,11 +569,21 @@ export function ThreadsPage() {
           ref={composer}
           id="composer"
           label={CP.instruction}
-          placeholder={CP.instructionPlaceholder}
+          placeholder={musicMode ? PG1.musicPlaceholder : CP.instructionPlaceholder}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onSubmit={() => void send()}
         />
+        {musicMode && !imageBusy ? (
+          <MusicOptions
+            duration={musicDuration}
+            instrumental={musicInstrumental}
+            lyrics={musicLyrics}
+            onDuration={setMusicDuration}
+            onInstrumental={setMusicInstrumental}
+            onLyrics={setMusicLyrics}
+          />
+        ) : null}
         <div className="composer-foot">
           <div className="composer-info">
             {workspaceName ? (
@@ -555,7 +605,7 @@ export function ThreadsPage() {
           </div>
           <div className="composer-model">
             {imageBusy ? <span className="composer-note" role="status">{imageNote}</span> : null}
-            {contextSize && !imageMode ? <span className="numeric head-context">{Math.round(contextSize / 1024)}K</span> : null}
+            {contextSize && !imageMode && !musicMode ? <span className="numeric head-context">{Math.round(contextSize / 1024)}K</span> : null}
             <SelectField
               compact
               hideLabel
@@ -585,7 +635,7 @@ export function ThreadsPage() {
                 <Square aria-hidden />
               </IconButton>
             ) : (
-              <IconButton className="composer-send" type="submit" label={CP.send} disabled={!input.trim() || !presetId || turn !== null || (imageMode && !imageModelId)}>
+              <IconButton className="composer-send" type="submit" label={CP.send} disabled={!input.trim() || !presetId || turn !== null || (imageMode && !imageModelId) || (musicMode && !musicModelId)}>
                 <ArrowUp aria-hidden />
               </IconButton>
             )}

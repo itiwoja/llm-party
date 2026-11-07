@@ -92,8 +92,8 @@ flowchart LR
 | size_bytes | INTEGER | NO | | | |
 | train_context | INTEGER | YES | | | 学習時の文脈長 |
 | sha256 | TEXT | YES | | | 分かっていれば |
-| kind | TEXT | NO | chat | | `chat` / `image`（D-72） |
-| parts | TEXT(JSON) | YES | | | 部品でできた画像モデルの `{diffusion, llm, vae, tokenizer}`（D-73） |
+| kind | TEXT | NO | chat | | `chat` / `image`（D-72）/ `music`（D-78） |
+| parts | TEXT(JSON) | YES | | | 部品でできた画像モデルの `{diffusion, llm, vae, tokenizer}`（D-73）、音楽モデルの `{lm, textEncoder, dit, vae}`（D-78） |
 | supports_thinking | INTEGER | YES | | | チャットテンプレートに `enable_thinking` があれば 1（D-76）。NULL はまだ読んでいない（起動時に読む） |
 | supports_effort | INTEGER | YES | | | チャットテンプレートに `reasoning_effort` があれば 1（D-76） |
 | created_at | TEXT | NO | | | |
@@ -237,6 +237,22 @@ LoRA の GGUF。主なカラム：`id`, `base_model_id`, `path`
 
 ### TBL-016：settings
 キーと値（JSON）の表。主なキー：`modelsDir`, `backend`（`auto` / 固定値）, `defaultAutoApprove`, `defaultContextSize`, `checkUpdatesOnStart`, `theme`, `setupCompletedAt`。HF トークンはここに置かない（`secrets\`）
+
+
+### TBL-018：tracks
+音楽生成の結果（D-78）。`images` と同じくスレッドの表示にだけ使い、チャットの文脈には入らない。音声は `dataDir/music/<id>.mp3`。
+
+| 列 | 型 | NULL | 既定 | キー | 説明 |
+|---|---|---|---|---|---|
+| id | TEXT | NO | | PK | ULID |
+| thread_id | TEXT | NO | | FK | threads.id（ON DELETE CASCADE） |
+| model_name | TEXT | NO | | | 生成時のモデル名 |
+| prompt | TEXT | NO | | | 曲の説明 |
+| lyrics | TEXT | NO | | | 使った歌詞（LM が作ったものを含む） |
+| duration | INTEGER | NO | | | 指定した長さ（秒） |
+| seed | INTEGER | NO | | | 使ったシード |
+| path | TEXT | NO | | | MP3 の絶対パス |
+| created_at | TEXT | NO | | | 作成日時 |
 
 ## データ保持・削除ポリシー
 | データ | 保持 | 消すとき |

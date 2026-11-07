@@ -12,18 +12,21 @@ export const COPY_MARGIN_BYTES = 2_000_000_000;
 /** 複数部品で読む画像モデルの部品（絶対パス）。単一ファイルの画像モデルは null */
 export interface ImageParts { diffusion: string; llm: string; vae: string; tokenizer: string }
 
+/** 音楽モデルの部品（絶対パス。D-78） */
+export interface MusicParts { lm: string; textEncoder: string; dit: string; vae: string }
+
 export interface ModelInput {
   name: string;
   path: string;
   source: "local_ref" | "local_copy" | "hf";
-  /** チャット用（llama-server）か画像生成用（sd-server）か。DB の列は kind */
-  use?: "chat" | "image";
+  /** チャット用（llama-server）か画像生成用（sd-server）か音楽生成用（acestep.cpp）か。DB の列は kind */
+  use?: "chat" | "image" | "music";
   architecture: string;
   quantization: string | null;
   sizeBytes: number;
   trainContext: number | null;
-  /** 部品でできた画像モデルだけ。単一ファイルは null（-m で読む） */
-  parts?: ImageParts | null;
+  /** 部品でできたモデルだけ。単一ファイルの画像モデルは null（-m で読む） */
+  parts?: ImageParts | MusicParts | null;
   /** チャットテンプレートから読んだ対応（D-76）。画像モデルには無い */
   supportsThinking?: boolean;
   supportsEffort?: boolean;
@@ -38,7 +41,7 @@ interface ModelRow {
 const toModel = (row: ModelRow) => ({
   id: row.id, name: row.name, path: row.path, source: row.source, use: row.kind, architecture: row.architecture,
   quantization: row.quantization, sizeBytes: row.size_bytes, trainContext: row.train_context,
-  parts: row.parts ? (JSON.parse(row.parts) as ImageParts) : null, createdAt: row.created_at,
+  parts: row.parts ? (JSON.parse(row.parts) as ImageParts | MusicParts) : null, createdAt: row.created_at,
   supportsThinking: row.supports_thinking === 1, supportsEffort: row.supports_effort === 1,
 });
 

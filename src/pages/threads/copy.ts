@@ -1,11 +1,21 @@
 /** PG-001 の文言。正本は docs/design/ui/08_copy.md（CP-ID をそのまま写す。言い換えない） */
 export const PG1 = {
-  modelSelect: "モデル", // チャットのプリセットと画像モデルを1か所で選ぶ（読み上げ名）
+  modelSelect: "モデル", // チャットのプリセットと画像・音楽のモデルを1か所で選ぶ（読み上げ名）
   chatGroup: "チャット", // 選択肢の見出し（チャットのプリセット）
   imageGroup: "画像", // 選択肢の見出し（画像モデル。選ぶと画像を生成する）
   imageGenerating: "画像を生成しています…",
   imageLoading: "画像を読み込んでいます",
   imageLoadFailed: "画像を表示できません",
+  musicGroup: "音楽", // CP-327 選択肢の見出し（音楽モデル。選ぶと曲を生成する）
+  musicComposing: "作詞と構成を考えています…", // CP-328
+  musicRendering: "曲を生成しています…", // CP-329
+  musicLoading: "曲を読み込んでいます", // CP-330
+  musicLoadFailed: "曲を再生できません", // CP-331
+  musicDuration: "長さ（秒）", // CP-332
+  musicInstrumental: "歌なし", // CP-333
+  musicLyrics: "歌詞", // CP-334
+  musicLyricsPlaceholder: "空欄ならおまかせで作詞します", // CP-335
+  musicPlaceholder: "どんな曲にするか書いてください", // CP-336
   pickFolder: "フォルダを選択", // CP-024
   workspace: (name: string) => `作業フォルダ：${name}`, // CP-025
   summarized: (n: number) => `要約済み（${n} 件）`, // CP-035

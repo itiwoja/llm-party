@@ -19,7 +19,6 @@ export interface ImageRequest extends ImageParams {
  * 画像モデルを読むときはチャットの llama-server を止める（VRAM を空ける）
  */
 export class ImageService {
-  private busy = false;
   /** 今動いている生成の取り消し口（止めるときに使う） */
   private running: { threadId: string; abort: AbortController } | null = null;
 
@@ -39,15 +38,15 @@ export class ImageService {
     const model = this.store.models.get(input.modelId);
     if (!model || model.use !== "image") throw new ApiError("NOT_FOUND", "画像モデルがありません");
     if (!this.image.available) throw new ApiError("ENGINE_FAILED", "LLM_PARTY_SD_BIN が設定されていません");
-    if (this.busy || this.chat.busy) throw new ApiError("BUSY", "別の生成が動いています");
+    if (this.slot.mediaBusy || this.chat.busy) throw new ApiError("BUSY", "別の生成が動いています");
     if (this.slot.evalPresetId) throw new ApiError("BUSY", "評価の実行中です");
 
     this.store.threads.titleFromPrompt(threadId, input.prompt);
-    this.busy = true;
+    this.slot.mediaBusy = true;
     const abort = new AbortController();
     this.running = { threadId, abort };
-    void this.run(threadId, model, input, abort.signal).finally(() => {
-      this.busy = false;
+    void this.run(threadId, { ...model, parts: model.parts as ImageParts | null }, input, abort.signal).finally(() => {
+      this.slot.mediaBusy = false;
       this.running = null;
     });
     return { status: "running" };

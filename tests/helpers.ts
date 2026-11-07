@@ -27,10 +27,10 @@ export interface TestWorker {
 
 export async function startWorker(
   bin: string | null = FAKE_LLAMA,
-  options: { hfBaseUrl?: string; extraRoutes?: AppOptions["extraRoutes"]; commandTimeoutMs?: number; sdBin?: string | null } = {},
+  options: { hfBaseUrl?: string; extraRoutes?: AppOptions["extraRoutes"]; commandTimeoutMs?: number; sdBin?: string | null; aceDir?: string | null } = {},
 ): Promise<TestWorker> {
   const { dir, remove } = tempDir();
-  const context = createContext({ bin, backend: "cpu", dataDir: dir, loadTimeoutMs: 3000, stopGraceMs: 500, hfBaseUrl: options.hfBaseUrl, commandTimeoutMs: options.commandTimeoutMs, sdBin: options.sdBin ?? null });
+  const context = createContext({ bin, backend: "cpu", dataDir: dir, loadTimeoutMs: 3000, stopGraceMs: 500, hfBaseUrl: options.hfBaseUrl, commandTimeoutMs: options.commandTimeoutMs, sdBin: options.sdBin ?? null, aceDir: options.aceDir ?? null });
   // Host の検査に実際のポートを使うので、先に空きポートを取ってから app を作る
   const probe = createApp({ port: 0, token: TOKEN, context }).listen(0, "127.0.0.1");
   await new Promise((resolve) => probe.once("listening", resolve));

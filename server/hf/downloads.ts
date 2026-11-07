@@ -9,7 +9,7 @@ import type { Store } from "../store";
 import type { DownloadRecord } from "../store/downloads";
 import { HfClient, RetryableError } from "./client";
 import { readSafetensors } from "../safetensors";
-import { RECIPES, type Recipe } from "./recipes";
+import { RECIPES, type Recipe, type RecipeKind } from "./recipes";
 import { assertFileName, assertGguf, assertRepo, assertSafetensors, expandSelection, insideDir, quantOf } from "./names";
 
 export interface DownloadOptions {
@@ -60,6 +60,8 @@ async function ensureSpace(dir: string, remaining: number): Promise<void> {
     throw new ApiError("INSUFFICIENT_STORAGE", `空き容量不足。${(need / 1e9).toFixed(1)} GB 必要。置き場の変更で解消`);
   }
 }
+
+const isRecipeKind = (kind: string): kind is RecipeKind => kind === "image-set" || kind === "music-set";
 
 function hasMagic(file: string): boolean {
   const fd = openSync(file, "r");
@@ -149,7 +151,7 @@ export class DownloadService {
   }
 
   /**
-   * レシピの部品を1つの DL（image-set）にして待ち行列に入れる（D-73）。
+   * レシピの部品を1つの DL（image-set・music-set）にして待ち行列に入れる（D-73）。
    * 部品ごとにリポジトリが違うので、file の name は `<repo>/<file>`、repo は部品のリポジトリ
    */
   async createRecipe(recipeId: Recipe["id"]): Promise<DownloadRecord> {
@@ -158,9 +160,9 @@ export class DownloadService {
     if (!recipe) throw new ApiError("VALIDATION_ERROR", "入力が正しくありません", [{ field: "recipe" }]);
     const destDir = store.downloads.modelsDir(this.options.dataDir);
     const pathOf = (part: { repo: string; file: string }) => insideDir(destDir, part.repo, part.file);
-    const diffusion = recipe.parts.find((part) => part.key === "diffusion")!;
+    const main = recipe.parts[0];
     const active = ["queued", "downloading", "retrying", "verifying"];
-    if (store.downloads.isRegistered("image-set", pathOf(diffusion)) || this.list().some((item) => item.kind === "image-set" && active.includes(item.status))) {
+    if (store.downloads.isRegistered(recipe.kind, pathOf(main)) || this.list().some((item) => item.kind === recipe.kind && active.includes(item.status))) {
       throw new ApiError("CONFLICT", "このモデルは登録済みか、取得中です");
     }
 
@@ -189,7 +191,7 @@ export class DownloadService {
     }
     await ensureSpace(destDir, files.reduce((sum, file) => sum + file.size, 0));
 
-    const record = store.downloads.create({ kind: "image-set", repo: diffusion.repo, files, destDir });
+    const record = store.downloads.create({ kind: recipe.kind, repo: main.repo, files, destDir });
     this.emit(record);
     this.pump();
     return record;
@@ -312,7 +314,7 @@ export class DownloadService {
       }
       mkdirSync(path.dirname(final), { recursive: true });
       const repo = file.repo ?? record.repo;
-      // image-set の name は `<repo>/<file>`。HF 上のファイル名は repo の後ろ
+      // レシピの DL の name は `<repo>/<file>`。HF 上のファイル名は repo の後ろ
       await this.fetchFile(job, repo, file.repo ? file.name.slice(repo.length + 1) : file.name, file.size, `${final}.part`);
       this.tick(job, true);
     }
@@ -323,7 +325,7 @@ export class DownloadService {
       const final = target(file.name);
       const part = `${final}.part`;
       if (!existsSync(part)) continue; // 前の回で外し終えている
-      await this.verify(job, part, file, record.kind === "model" || record.kind === "adapter" || (record.kind === "image-set" && file.name.endsWith(".gguf")));
+      await this.verify(job, part, file, record.kind === "model" || record.kind === "adapter" || (isRecipeKind(record.kind) && file.name.endsWith(".gguf")));
       toRename.push(final);
     }
     const total = record.files.reduce((sum, file) => sum + file.size, 0);
@@ -334,7 +336,7 @@ export class DownloadService {
       return;
     }
 
-    if (record.kind === "image-set") {
+    if (isRecipeKind(record.kind)) {
       for (const final of toRename) await rename(`${final}.part`, final);
       const recipe = RECIPES.find((item) => record.files.length === item.parts.length && item.parts.every((part) => record.files.some((file) => file.name === `${part.repo}/${part.file}`)));
       if (!recipe) throw new ApiError("VALIDATION_ERROR", "入力が正しくありません", [{ field: "recipe" }]);
@@ -342,10 +344,12 @@ export class DownloadService {
         const part = recipe.parts.find((item) => item.key === key)!;
         return target(`${part.repo}/${part.file}`);
       };
-      const parts = { diffusion: at("diffusion"), llm: at("llm"), vae: at("vae"), tokenizer: at("tokenizer") };
+      const parts = record.kind === "music-set"
+        ? { lm: at("lm"), textEncoder: at("textEncoder"), dit: at("dit"), vae: at("vae") }
+        : { diffusion: at("diffusion"), llm: at("llm"), vae: at("vae"), tokenizer: at("tokenizer") };
       const model = store.models.create({
-        name: recipe.name, path: parts.diffusion, source: "hf", architecture: recipe.id,
-        quantization: null, sizeBytes: total, trainContext: null, use: "image", parts,
+        name: recipe.name, path: at(recipe.parts[0].key), source: "hf", architecture: recipe.id,
+        quantization: null, sizeBytes: total, trainContext: null, use: record.kind === "music-set" ? "music" : "image", parts,
       });
       store.downloads.setModelRepo(model.id, record.repo);
       this.set(job.id, { status: "completed", receivedBytes: total, resultId: model.id });

@@ -12,6 +12,8 @@ export const GENERATION_SLOTS = 2;
 export class GenerationSlot {
   /** 評価の実行中はそのプリセット。別のプリセットの送信を断るのに使う（FR-016） */
   evalPresetId: string | null = null;
+  /** 画像か音楽を生成中。どちらも同時に1つだけ（D-72, D-78） */
+  mediaBusy = false;
   private holders = 0;
   private key: string | null = null;
   private waiting: { key: string; resolve(release: () => void): void }[] = [];

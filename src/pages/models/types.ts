@@ -3,8 +3,8 @@ export interface ModelItem {
   id: string;
   name: string;
   path: string;
-  /** チャット（llama-server）か画像生成（sd-server）か */
-  use: "chat" | "image";
+  /** チャット（llama-server）か画像生成（sd-server）か音楽生成（acestep.cpp）か */
+  use: "chat" | "image" | "music";
   source: "local_ref" | "local_copy" | "hf";
   architecture: string;
   quantization: string | null;

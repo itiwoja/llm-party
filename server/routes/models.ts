@@ -107,7 +107,7 @@ export function modelRoutes({ store, dataDir }: Context): Router {
     );
     const base = store.models.get(input.baseModelId);
     if (!base) throw new ApiError("NOT_FOUND", "モデルがありません");
-    if (base.use === "image") throw new ApiError("VALIDATION_ERROR", "画像モデルには LoRA を付けられません", [{ field: "baseModelId" }]);
+    if (base.use !== "chat") throw new ApiError("VALIDATION_ERROR", "画像・音楽のモデルには LoRA を付けられません", [{ field: "baseModelId" }]);
     const file = path.resolve(input.path);
     const info = readFileInfo(file);
     if (info.type !== "adapter") {

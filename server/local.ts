@@ -15,7 +15,7 @@ const token = loadOrCreateToken(config.dataDir);
 const logsDir = path.join(config.dataDir, "logs");
 logger.init(logsDir);
 pruneLogs(logsDir);
-const context = createContext({ bin: config.llamaBin, backend: config.backend, dataDir: config.dataDir, sdBin: config.sdBin });
+const context = createContext({ bin: config.llamaBin, backend: config.backend, dataDir: config.dataDir, sdBin: config.sdBin, aceDir: config.aceDir });
 const app = createApp({ port: config.port, token, context, extraRoutes: localRoutes });
 const server = createServer(app);
 

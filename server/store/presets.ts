@@ -145,7 +145,7 @@ export class PresetStore {
   /** 作成と編集で共通の検証（モデル・文脈長・LoRA のベースモデル一致・重複） */
   private validate(input: Pick<PresetInput, "modelId" | "contextSize" | "adapters">): void {
     const model = this.models.get(input.modelId);
-    if (model?.use === "image") throw new ApiError("VALIDATION_ERROR", "画像モデルはチャットのプリセットに使えません", [{ field: "modelId" }]);
+    if (model && model.use !== "chat") throw new ApiError("VALIDATION_ERROR", "画像・音楽のモデルはチャットのプリセットに使えません", [{ field: "modelId" }]);
     if (!model) throw new ApiError("NOT_FOUND", "モデルがありません");
     if (model.trainContext !== null && input.contextSize > model.trainContext) {
       throw new ApiError("VALIDATION_ERROR", `文脈長の範囲外。${CONTEXT_MIN}〜${model.trainContext} で指定`, [{ field: "contextSize" }]);

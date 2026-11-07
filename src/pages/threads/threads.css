@@ -93,3 +93,14 @@
 .image-message figcaption { color: var(--muted, #666); font-size: 0.875rem; white-space: pre-wrap; }
 .image-message-state { color: var(--muted, #666); font-size: 0.875rem; }
 .composer-note { color: var(--muted, #666); font-size: 0.8125rem; align-self: center; }
+
+/* 音楽（D-78） */
+.music-options { display: grid; gap: var(--space-2); padding: var(--space-1) var(--space-2); }
+.music-options-row { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-3); }
+.music-duration { width: 7rem; }
+.music-lyrics { width: 100%; min-height: 4.5rem; resize: vertical; }
+.music-message { display: grid; gap: var(--space-2); margin: 0; }
+.music-message audio { width: 100%; }
+.music-message figcaption { color: var(--color-muted-fg); }
+.music-facts { display: block; font-size: var(--text-xs, 0.75rem); }
+.music-lyrics-text { white-space: pre-wrap; }

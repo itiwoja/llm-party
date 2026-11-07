@@ -258,4 +258,19 @@ export const MIGRATIONS: string[] = [
   `
   ALTER TABLE presets ADD COLUMN gpu_ratio INTEGER;
   `,
+  // v7：音楽生成（D-78）。models.kind = 'music' で音楽モデルを区別し、parts は { lm, textEncoder, dit, vae } の絶対パス。
+  // 生成結果は tracks に持ち、スレッドの履歴には role = 'music' で入れる（チャットの文脈には入らない）
+  `
+  CREATE TABLE tracks (
+    id TEXT PRIMARY KEY,
+    thread_id TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+    model_name TEXT NOT NULL,
+    prompt TEXT NOT NULL,
+    lyrics TEXT NOT NULL,
+    duration INTEGER NOT NULL,
+    seed INTEGER NOT NULL,
+    path TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  `,
 ];
