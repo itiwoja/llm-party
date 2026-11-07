@@ -67,6 +67,7 @@ flowchart LR
 | [ADR-015](adr/ADR-015-music-page.md) | 音楽は専用の画面に一本化し、曲をスレッドから切り離す | 承認 |
 
 ## 最近の変更
+- 2026-11-08：入力欄の思考の段階を、カードで開くバーに変更（D-92、CMP-024、CP-368。[変更記録](changes/2026-11-08-effort-bar.md)）
 - 2026-11-07：音楽専用の画面と XL turbo への置き換えを設計（D-79〜D-83、[変更レポート](changes/2026-11-07-music-studio.md)）。実装はこれから
 - 2026-11-07：音楽生成に対応（D-78、[ADR-013](adr/ADR-013-acestep-cli.md)、[変更記録](changes/2026-11-07-music-generation.md)）。R-20、R-21 を追加
 - 2026-11-07：`LLM_PARTY_LLAMA_BIN` の無効な指定で読み込みを止めないように変更（[ADR-012](adr/ADR-012-invalid-llama-override.md)、[変更レポート](changes/2026-11-07-invalid-llama-override.md)）。R-14 を決着として閉じ、R-19、D-74、CP-313 を追加
