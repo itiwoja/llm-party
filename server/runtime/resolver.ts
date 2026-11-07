@@ -2,12 +2,12 @@ import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { isMissingBinaryPath } from "../binary";
-import { LLAMA_FLAVORS, type LlamaFlavor } from "./manifest";
+import { LLAMA_BIN_NAME, LLAMA_FLAVORS, type LlamaFlavor } from "./manifest";
 
 /** nvidia-smi が動けば NVIDIA の GPU があるとみなす（判断 D3） */
 export function hasNvidiaGpu(): Promise<boolean> {
   return new Promise((resolve) => {
-    execFile("nvidia-smi", ["-L"], { timeout: 5000 }, (error, stdout) => {
+    execFile("nvidia-smi", ["-L"], { timeout: 5000, windowsHide: true }, (error, stdout) => {
       resolve(!error && stdout.trim().length > 0);
     });
   });
@@ -36,7 +36,7 @@ export function ignoredOverrideWarning(override: string | null): string | null {
 export function resolveLlama(input: { override: string | null; dataDir: string; flavor: LlamaFlavor["id"] }): LlamaResolution {
   if (input.override && !isMissingBinaryPath(input.override)) return { status: "override", bin: input.override };
   const installDir = installDirFor(input.dataDir, input.flavor);
-  const bin = path.join(installDir, "llama-server");
+  const bin = path.join(installDir, LLAMA_BIN_NAME);
   if (existsSync(bin)) return { status: "installed", bin, flavor: input.flavor };
   return { status: "missing", flavor: input.flavor, installDir };
 }

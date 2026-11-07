@@ -1,12 +1,13 @@
 import { spawn } from "node:child_process";
 import { StringDecoder } from "node:string_decoder";
+import { killTree, treeSpawnOptions } from "../process-tree";
 
 /** D-23 */
 export const COMMAND_TIMEOUT_MS = 120_000;
 /** メモリを守るために持つ出力の量。先頭とは別に、末尾（エラーが出やすい）をこの量だけ持つ */
 const KEEP_HEAD_BYTES = 1024 * 1024;
 const KEEP_TAIL_BYTES = 1024 * 1024;
-/** bash が終わった後、孫プロセスがパイプを握り続けていても待たない時間 */
+/** シェルが終わった後、孫プロセスがパイプを握り続けていても待たない時間 */
 const DRAIN_MS = 100;
 
 export interface CommandResult {
@@ -47,16 +48,29 @@ class OutputBuffer {
   }
 }
 
-/** プロセスグループごと終了する。もう居ないなら何もしない */
-export function killGroup(pid: number): void {
-  try {
-    process.kill(-pid, "SIGKILL");
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error;
-  }
+/** モデルに伝えるシェルの名前（Q-06 の決着。D-86） */
+export const SHELL_NAME = process.platform === "win32" ? "Windows PowerShell 5.1" : "bash";
+
+/**
+ * シェルの起動コマンド。Windows は日本語や引用符が崩れないよう、本文を base64 で渡して実行の段階で解釈させる。
+ * 既定の出力は CP932 なので先に UTF-8 へ変える（構文エラーも UTF-8 になる）。-EncodedCommand はエラーが CLIXML になるので使わない。
+ * 終了コードは外部コマンドのものか、失敗なら 1 を返す。$? を見るので判定は本文と同じ実行に入れる
+ */
+export function shellInvocation(command: string, platform: NodeJS.Platform = process.platform): { file: string; args: string[] } {
+  if (platform !== "win32") return { file: "/bin/bash", args: ["-c", command] };
+  const body = `${command}\n$llmPartyOk = $?\nif ($LASTEXITCODE) { exit $LASTEXITCODE } elseif (-not $llmPartyOk) { exit 1 }`;
+  const encoded = Buffer.from(body, "utf8").toString("base64");
+  const script = [
+    "$ProgressPreference = 'SilentlyContinue'",
+    "[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false",
+    "$OutputEncoding = [Console]::OutputEncoding",
+    `Invoke-Expression ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${encoded}')))`,
+    "if (-not $?) { exit 1 }",
+  ].join("; ");
+  return { file: "powershell.exe", args: ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script] };
 }
 
-/** FR-009：/bin/bash -c で実行する。時間切れと停止はプロセスグループごと終了（12 WSL での違い） */
+/** FR-009：シェルで実行する。時間切れと停止は子孫ごと終了（12 実行環境での違い） */
 export function runShell(options: {
   command: string;
   cwd: string;
@@ -66,7 +80,8 @@ export function runShell(options: {
 }): Promise<CommandResult> {
   const { command, cwd, timeoutMs, signal, onOutput } = options;
   return new Promise((resolve) => {
-    const child = spawn("/bin/bash", ["-c", command], { cwd, detached: true, stdio: ["ignore", "pipe", "pipe"] });
+    const shell = shellInvocation(command);
+    const child = spawn(shell.file, shell.args, { cwd, stdio: ["ignore", "pipe", "pipe"], ...treeSpawnOptions });
     const buffer = new OutputBuffer();
     let timedOut = false;
     let aborted = false;
@@ -94,7 +109,7 @@ export function runShell(options: {
       resolve({ exitCode, timedOut, aborted, output: buffer.toString() });
     };
     const stop = () => {
-      if (child.pid !== undefined) killGroup(child.pid);
+      if (child.pid !== undefined) killTree(child.pid, "SIGKILL");
     };
     const timer = setTimeout(() => {
       timedOut = true;

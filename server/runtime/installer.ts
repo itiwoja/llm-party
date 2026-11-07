@@ -4,7 +4,7 @@ import { createReadStream, existsSync, mkdirSync, readdirSync, statSync } from "
 import { copyFile, mkdir, open, rename, rm, statfs } from "node:fs/promises";
 import path from "node:path";
 import { ApiError } from "../http-error";
-import { DOWNLOAD_RETRIES, LLAMA_FLAVORS, MAX_INSTALL_BYTES, type LlamaFlavor, type RuntimeAsset } from "./manifest";
+import { ARCHIVE_STRIP, DOWNLOAD_RETRIES, LLAMA_BIN_NAME, LLAMA_FLAVORS, MAX_INSTALL_BYTES, type LlamaFlavor, type RuntimeAsset } from "./manifest";
 import { installDirFor } from "./resolver";
 
 /** DL の途中の失敗（接続切れなど）。再試行の対象 */
@@ -32,7 +32,7 @@ export interface InstallInput {
 export async function installLlama(input: InstallInput): Promise<string> {
   const flavor = input.source ?? LLAMA_FLAVORS[input.flavor];
   const finalDir = installDirFor(input.dataDir, flavor.id);
-  const finalBin = path.join(finalDir, "llama-server");
+  const finalBin = path.join(finalDir, LLAMA_BIN_NAME);
   if (existsSync(finalBin)) return finalBin;
 
   const assets = [flavor.archive, ...flavor.extras];
@@ -67,21 +67,21 @@ export async function installLlama(input: InstallInput): Promise<string> {
     await fetchAsset(flavor.archive, archivePath, input.signal, report);
     for (let i = 0; i < flavor.extras.length; i++) await fetchAsset(flavor.extras[i], extraPaths[i], input.signal, report);
 
-    // 本体：アーカイブの中の llama-b<版>/ を1段はがして置く（実物で確かめた形）
-    await extractTar(archivePath, tmpDir, 1);
-    if (!existsSync(path.join(tmpDir, "llama-server"))) throw new Error("取得したアーカイブに llama-server が入っていませんでした");
+    // 本体：Linux 版はアーカイブの中の llama-b<版>/ を1段はがして置く（実物で確かめた形）
+    await extractArchive(archivePath, tmpDir, ARCHIVE_STRIP);
+    if (!existsSync(path.join(tmpDir, LLAMA_BIN_NAME))) throw new Error("取得したアーカイブに llama-server が入っていませんでした");
 
-    // cudart：展開先の形は決め打ちせず、中の .so を llama-server と同じフォルダへ集める
+    // cudart：展開先の形は決め打ちせず、中の .so / .dll を llama-server と同じフォルダへ集める
     for (const extra of extraPaths) {
       const extraDir = path.join(tmpDir, ".extra", path.basename(extra));
       await mkdir(extraDir, { recursive: true });
-      await extractTar(extra, extraDir, 0);
+      await extractArchive(extra, extraDir, 0);
       for (const so of findSharedLibraries(extraDir)) await copyFile(so, path.join(tmpDir, path.basename(so)));
       await rm(path.join(tmpDir, ".extra"), { recursive: true, force: true });
     }
 
     if (flavor.id === "cuda" && !input.skipDeviceCheck) {
-      const ok = await listsCudaDevices(path.join(tmpDir, "llama-server"));
+      const ok = await listsCudaDevices(path.join(tmpDir, LLAMA_BIN_NAME));
       if (!ok) {
         await rm(tmpDir, { recursive: true, force: true });
         throw new ApiError("ENGINE_FAILED", "CUDA の GPU が見えませんでした。NVIDIA ドライバを更新してください");
@@ -200,10 +200,16 @@ function sha256(file: string): Promise<string> {
   });
 }
 
-/** tar -xzf。strip は先頭の階層を捨てる数 */
-function extractTar(archive: string, dest: string, strip: number): Promise<void> {
+/** Windows 標準の tar は zip も展開できる。PATH の先に Git の tar（zip を読めない）があるので場所を決めて呼ぶ */
+function tarCommand(): string {
+  if (process.platform !== "win32") return "tar";
+  return path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "tar.exe");
+}
+
+/** tar で展開する（形式は tar が見分ける）。strip は先頭の階層を捨てる数 */
+function extractArchive(archive: string, dest: string, strip: number): Promise<void> {
   return new Promise((resolve, reject) => {
-    const child = spawn("tar", ["-xzf", archive, "-C", dest, `--strip-components=${strip}`], { stdio: ["ignore", "ignore", "pipe"] });
+    const child = spawn(tarCommand(), ["-xf", archive, "-C", dest, `--strip-components=${strip}`], { stdio: ["ignore", "ignore", "pipe"], windowsHide: true });
     let stderr = "";
     child.stderr.on("data", (chunk: Buffer) => { stderr += chunk.toString(); });
     child.on("error", reject);
@@ -219,7 +225,7 @@ function findSharedLibraries(dir: string): string[] {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) found.push(...findSharedLibraries(full));
-    else if (/\.so(\.|$)/.test(entry.name)) found.push(full);
+    else if (/\.so(\.|$)|\.dll$/i.test(entry.name)) found.push(full);
   }
   return found;
 }
@@ -227,7 +233,7 @@ function findSharedLibraries(dir: string): string[] {
 /** --list-devices で CUDA のデバイスが見えるか（FR-002 の確認） */
 function listsCudaDevices(bin: string): Promise<boolean> {
   return new Promise((resolve) => {
-    execFile(bin, ["--list-devices"], { timeout: 30_000 }, (error, stdout, stderr) => {
+    execFile(bin, ["--list-devices"], { timeout: 30_000, windowsHide: true }, (error, stdout, stderr) => {
       resolve(!error && /CUDA/i.test(`${stdout}\n${stderr}`));
     });
   });

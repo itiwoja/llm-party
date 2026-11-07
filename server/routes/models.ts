@@ -3,7 +3,6 @@ import path from "node:path";
 import { Router } from "express";
 import { z } from "zod";
 import type { Context } from "../context";
-import type { ImageParts } from "../store/models";
 import { readGguf } from "../gguf";
 import { ApiError } from "../http-error";
 import { COPY_MARGIN_BYTES } from "../store/models";
@@ -43,7 +42,7 @@ function removeOwnedFile(item: Location, deleteFile: boolean): void {
 
 const withMissing = <T extends { path: string }>(item: T) => ({ ...item, missing: !existsSync(item.path) });
 
-export function modelRoutes({ store, dataDir, image }: Context): Router {
+export function modelRoutes({ store, dataDir }: Context): Router {
   const api = Router();
   const deleteQuery = z.object({ deleteFile: z.enum(["true", "false"]).optional() });
 
@@ -93,8 +92,6 @@ export function modelRoutes({ store, dataDir, image }: Context): Router {
     }
     store.models.delete(model.id);
     removeOwnedFile(model, deleteFile === "true");
-    // Windows のディスクの写しは一覧から消えると使わないので残さない（D-85）。失敗しても削除は済んでいる
-    if (model.use === "image") void image.dropCopies({ path: model.path, parts: model.parts as ImageParts | null }).catch(() => undefined);
     res.status(204).end();
   });
 

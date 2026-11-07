@@ -58,7 +58,7 @@ server.listen(config.port, "127.0.0.1", () => {
   if (!config.sdBin) console.warn("LLM_PARTY_SD_BIN が未設定です。画像生成は使えません");
 });
 
-// Ctrl+C で生成を止めて DB を閉じ、llama-server も止める（12 WSL での違い）
+// Ctrl+C で生成を止めて DB を閉じ、llama-server も止める（12 実行環境での違い）
 let closing = false;
 async function shutdown(): Promise<void> {
   if (closing) return;

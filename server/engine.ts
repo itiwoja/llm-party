@@ -5,6 +5,7 @@ import { createServer } from "node:net";
 import path from "node:path";
 import { installLlama, type InstallInput } from "./runtime/installer";
 import type { LlamaFlavor } from "./runtime/manifest";
+import { killTree, processLabel, treeSpawnOptions } from "./process-tree";
 import { hasNvidiaGpu, ignoredOverrideWarning, resolveLlama } from "./runtime/resolver";
 import type { EventBus } from "./events";
 import { readGguf } from "./gguf";
@@ -139,8 +140,7 @@ export class EngineManager {
       return;
     }
     try {
-      const cmdline = readFileSync(`/proc/${pid}/cmdline`, "utf8");
-      if (cmdline.includes("llama-server")) process.kill(-pid, "SIGKILL");
+      if (processLabel(pid)?.includes("llama-server")) killTree(pid, "SIGKILL");
     } catch {
       // もう終わっている
     }
@@ -222,7 +222,7 @@ export class EngineManager {
     this.activeBackend = backend;
     const child = spawn(bin, buildArgs(spec, backend, port, this.apiKey, blockCountOf(spec)), {
       stdio: ["ignore", "pipe", "pipe"],
-      detached: true,
+      ...treeSpawnOptions,
     });
     this.child = child;
     const exited = new Promise<void>((resolve) => child.once("close", () => resolve()));
@@ -333,9 +333,9 @@ export class EngineManager {
       if (child.exitCode !== null || child.signalCode !== null) resolve();
       else child.once("close", () => resolve());
     });
-    const kill = (signal: NodeJS.Signals) => {
+    const kill = (signal: "SIGTERM" | "SIGKILL") => {
       try {
-        process.kill(-pid, signal);
+        killTree(pid, signal);
       } catch {
         // もう終わっている
       }

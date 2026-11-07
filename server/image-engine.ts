@@ -1,11 +1,11 @@
-import { type ChildProcess, execFileSync, spawn } from "node:child_process";
+import { type ChildProcess, spawn } from "node:child_process";
 import { missingBinaryMessage } from "./binary";
 import { randomUUID } from "node:crypto";
 import { appendFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import path from "node:path";
 import type { EventBus } from "./events";
-import { HostModelCache, windowsCacheDir } from "./host-model-cache";
+import { killTree, processLabel, treeSpawnOptions } from "./process-tree";
 import { ApiError } from "./http-error";
 import type { ImageParts } from "./store/models";
 
@@ -104,53 +104,13 @@ export class ImageEngine {
     return this.options.bin !== null;
   }
 
-  /** sd-cli（Windows の .exe も可）なら、生成のたびに起動する。待ち受けないので WSL から Windows の GPU 版を呼べる */
+  /** sd-cli なら、生成のたびに起動する（途中の画像とステップ数が取れる。D-85） */
   private get cliMode(): boolean {
     return this.options.bin !== null && /sd-cli[^/\\]*$/i.test(this.options.bin);
   }
 
   private cliModel: ImageModelSpec | null = null;
-  private hostCache: HostModelCache | null | undefined;
-
-  /** Windows の exe のときだけ、モデルを Windows のディスクの写しから読ませる */
-  private get modelCache(): HostModelCache | null {
-    if (this.hostCache === undefined) {
-      const dir = this.options.bin?.toLowerCase().endsWith(".exe") ? windowsCacheDir() : null;
-      this.hostCache = dir ? new HostModelCache(dir) : null;
-    }
-    return this.hostCache;
-  }
-
-  private async localModel(model: ImageModelSpec): Promise<ImageModelSpec> {
-    const cache = this.modelCache;
-    if (!cache) return model;
-    const { parts } = model;
-    if (!parts) return { path: await cache.localize(model.path), parts: null };
-    return {
-      path: model.path,
-      parts: {
-        diffusion: await cache.localize(parts.diffusion),
-        llm: await cache.localize(parts.llm),
-        vae: await cache.localize(parts.vae),
-        tokenizer: await cache.localize(parts.tokenizer),
-      },
-    };
-  }
-
-  /** モデルを消すときに写しも消す */
-  async dropCopies(model: ImageModelSpec): Promise<void> {
-    const cache = this.modelCache;
-    if (!cache) return;
-    const files = model.parts ? [model.parts.diffusion, model.parts.llm, model.parts.vae, model.parts.tokenizer] : [model.path];
-    await Promise.all(files.map((file) => cache.drop(file)));
-  }
   private cliChild: ChildProcess | null = null;
-
-  /** WSL から Windows の exe を呼ぶときは、パスを Windows 形式（\\wsl.localhost\...）に直す */
-  private toHostPath(file: string): string {
-    if (!this.options.bin?.toLowerCase().endsWith(".exe")) return file;
-    return execFileSync("wslpath", ["-w", file], { encoding: "utf8" }).trim();
-  }
 
   /** 前回のプロセスが残っていれば止める（PID の再利用を避けるため中身を確かめる） */
   private killLeftover(): void {
@@ -161,8 +121,7 @@ export class ImageEngine {
       return;
     }
     try {
-      const cmdline = readFileSync(`/proc/${pid}/cmdline`, "utf8");
-      if (this.options.bin && cmdline.includes(path.basename(this.options.bin))) process.kill(-pid, "SIGKILL");
+      if (this.options.bin && processLabel(pid)?.includes(path.basename(this.options.bin))) killTree(pid, "SIGKILL");
     } catch {
       // もう終わっている
     }
@@ -202,7 +161,7 @@ export class ImageEngine {
       : ["-m", model.path];
     const child = spawn(this.options.bin, [...modelArgs, "--listen-ip", "127.0.0.1", "--listen-port", String(port)], {
       stdio: ["ignore", "pipe", "pipe"],
-      detached: true,
+      ...treeSpawnOptions,
     });
     this.child = child;
     this.modelPath = model.path;
@@ -262,16 +221,15 @@ export class ImageEngine {
   /** sd-cli で 1 枚作る。時間を過ぎたら、または取り消されたら子プロセスを止める */
   private async doGenerateCli(params: ImageParams, signal: AbortSignal, onProgress?: (progress: ImageProgress) => void): Promise<Buffer> {
     if (!this.cliModel || !this.options.bin) throw new ApiError("ENGINE_FAILED", "画像モデルが読み込まれていません");
-    const model = await this.localModel(this.cliModel);
+    const model = this.cliModel;
     if (signal.aborted) throw new ApiError("ENGINE_FAILED", "画像の生成が取り消されました");
     const runDir = path.join(this.options.dataDir, "runtime");
     mkdirSync(runDir, { recursive: true });
     const out = path.join(runDir, `${randomUUID()}.png`);
     const previewFile = path.join(runDir, `${randomUUID()}-preview.png`);
-    const host = (file: string) => this.toHostPath(file);
     const modelArgs = model.parts
-      ? ["--diffusion-model", host(model.parts.diffusion), "--llm", host(model.parts.llm), "--vae", host(model.parts.vae), "--tokenizer", host(model.parts.tokenizer), ...PARTS_GPU]
-      : ["-m", host(model.path)];
+      ? ["--diffusion-model", model.parts.diffusion, "--llm", model.parts.llm, "--vae", model.parts.vae, "--tokenizer", model.parts.tokenizer, ...PARTS_GPU]
+      : ["-m", model.path];
     const args = [
       ...modelArgs,
       "-p", params.prompt,
@@ -280,11 +238,11 @@ export class ImageEngine {
       "--steps", String(params.steps),
       "--seed", String(params.seed),
       "--preview", PREVIEW_MODE,
-      "--preview-path", host(previewFile),
+      "--preview-path", previewFile,
       "--preview-interval", "1",
-      "-o", host(out),
+      "-o", out,
     ];
-    const child = spawn(this.options.bin, args, { stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(this.options.bin, args, { stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
     this.cliChild = child;
     let tail: string[] = [];
     let lastStep = 0;
@@ -446,9 +404,9 @@ export class ImageEngine {
       if (child.exitCode !== null || child.signalCode !== null) resolve();
       else child.once("close", () => resolve());
     });
-    const kill = (signal: NodeJS.Signals) => {
+    const kill = (signal: "SIGTERM" | "SIGKILL") => {
       try {
-        process.kill(-pid, signal);
+        killTree(pid, signal);
       } catch {
         // もう終わっている
       }

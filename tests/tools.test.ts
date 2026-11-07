@@ -3,7 +3,8 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { unifiedDiff } from "../server/agent/diff";
-import { checkWorkspace, PathDeniedError, resolveInWorkspace } from "../server/agent/paths";
+import { checkWorkspace, isSystemPath, PathDeniedError, resolveInWorkspace } from "../server/agent/paths";
+import { shellInvocation } from "../server/agent/shell";
 import { ToolCallAssembler } from "../server/agent/stream";
 import { planToolCall, toolDefinitions, type FileChange, type ToolContext } from "../server/agent/tools";
 import { truncateOutput } from "../server/agent/truncate";
@@ -326,5 +327,31 @@ describe("ストリームの tool_calls の組み立て", () => {
       { id: "c0", name: "read_file", arguments: "{\"path\":\"a.txt\"}" },
       { id: "made", name: "list_dir", arguments: "{\"path\":\".\"}" },
     ]);
+  });
+});
+
+describe("Windows の実行環境（D-86）", () => {
+  it("FR-007 の場所を Windows のパスで見分ける", () => {
+    for (const blocked of ["C:\\", "d:", "C:\\Windows", "c:\\windows\\system32", "C:\\Program Files", "C:\\Program Files (x86)\\app"]) {
+      expect(isSystemPath(blocked, "win32")).toBe(true);
+    }
+    for (const allowed of ["C:\\Users\\me\\work", "D:\\repos\\app", "C:\\WindowsApps"]) {
+      expect(isSystemPath(allowed, "win32")).toBe(false);
+    }
+  });
+
+  it("PowerShell へは日本語や引用符が崩れない形で渡す", () => {
+    const { file, args } = shellInvocation(`echo "日本語"`, "win32");
+    expect(file).toBe("powershell.exe");
+    const script = args.at(-1)!;
+    const body = /FromBase64String\('([^']+)'\)/.exec(script)![1];
+    const decoded = Buffer.from(body, "base64").toString("utf8");
+    expect(decoded.startsWith(`echo "日本語"\n`)).toBe(true);
+    expect(decoded).toMatch(/exit \$LASTEXITCODE/);
+    expect(script.indexOf("UTF8Encoding")).toBeLessThan(script.indexOf("Invoke-Expression"));
+  });
+
+  it("Linux では bash のまま", () => {
+    expect(shellInvocation("ls", "linux")).toEqual({ file: "/bin/bash", args: ["-c", "ls"] });
   });
 });

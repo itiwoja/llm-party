@@ -35,7 +35,7 @@ export const CP = {
   looped: "思考の繰り返しを検知して停止。指示を送り直して再試行", // CP-284
   pickFolderTitle: "フォルダのパス", // CP-200
   pickFileTitle: "ファイルのパス", // CP-201
-  pathHint: "WSL のパスを貼り付け", // CP-202
+  pathHint: "Windows のパスを貼り付け", // CP-202
   decide: "決定", // CP-203
   tokenTitle: "接続トークン", // CP-204
   tokenHint: "起動時にターミナルに出た URL を開く、またはトークンを貼り付け", // CP-205

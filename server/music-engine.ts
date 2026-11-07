@@ -1,4 +1,4 @@
-import { type ChildProcess, execFileSync, spawn } from "node:child_process";
+import { type ChildProcess, spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -75,7 +75,6 @@ function languageOf({ prompt, lyrics }: Pick<MusicParams, "prompt" | "lyrics">):
 /**
  * acestep.cpp を子プロセスで動かす（ADR-013）。
  * 常駐させず、1曲ごとに ace-lm（作詞と構成）→ ace-synth（音声）の順に起動する。
- * ace-server を使わないのは、WSL から Windows の exe を呼ぶとき Windows 側のポートへ届かないため
  */
 export class MusicEngine {
   private readonly dir: string;
@@ -101,12 +100,6 @@ export class MusicEngine {
     return this.binary("ace-lm") !== null && this.binary("ace-synth") !== null;
   }
 
-  /** WSL から Windows の exe を呼ぶときは、パスを Windows 形式（\\wsl.localhost\...）に直す */
-  private host(bin: string, file: string): string {
-    if (!bin.toLowerCase().endsWith(".exe") || process.platform !== "linux") return file;
-    return execFileSync("wslpath", ["-w", file], { encoding: "utf8" }).trim();
-  }
-
   /**
    * 歌詞だけを下書きする（FR-023）。ace-lm を CPU で動かすだけで、音声コードは作らない（VRAM を使わない）。
    * LM が返す bpm・keyscale・caption などは使わず、歌詞だけを返す
@@ -125,7 +118,7 @@ export class MusicEngine {
         vocal_language: languageOf({ prompt: input.prompt, lyrics: "" }),
         lm_model: path.basename(parts.lm),
       }));
-      await this.run(lm, ["--models", this.host(lm, path.dirname(parts.dit)), "--request", this.host(lm, request), "--device", "CPU"], signal, thoughtReader(onThought));
+      await this.run(lm, ["--models", path.dirname(parts.dit), "--request", request, "--device", "CPU"], signal, thoughtReader(onThought));
       const drafted = path.join(work, "request0.json");
       if (!existsSync(drafted)) throw new ApiError("ENGINE_FAILED", "歌詞の下書きに失敗しました");
       const lyrics = (JSON.parse(readFileSync(drafted, "utf8")) as { lyrics?: string }).lyrics?.trim() ?? "";
@@ -161,7 +154,7 @@ export class MusicEngine {
       onProgress("composing");
       let reasoning = "";
       // LM は Vulkan だと文字化けした結果を返す（ADR-013）。CPU でも実用の速さで動く
-      await this.run(lm, ["--models", this.host(lm, models), "--request", this.host(lm, request), "--device", "CPU"], signal, thoughtReader((text) => {
+      await this.run(lm, ["--models", models, "--request", request, "--device", "CPU"], signal, thoughtReader((text) => {
         reasoning = text;
         onProgress("composing", text);
       }));
@@ -170,7 +163,7 @@ export class MusicEngine {
       const filled = JSON.parse(readFileSync(composed, "utf8")) as { lyrics?: string; bpm?: number; keyscale?: string; seed?: number };
 
       onProgress("rendering");
-      await this.run(synth, ["--models", this.host(synth, models), "--request", this.host(synth, composed), "--vae-chunk", VAE_CHUNK], signal);
+      await this.run(synth, ["--models", models, "--request", composed, "--vae-chunk", VAE_CHUNK], signal);
       // 失敗しても終了コードは 0 のことがある（VRAM 不足など）ので、ファイルで確かめる
       const audio = path.join(work, "request00.mp3");
       if (!existsSync(audio)) throw new ApiError("ENGINE_FAILED", "曲の生成に失敗しました。VRAM が足りない可能性があります");
@@ -189,7 +182,7 @@ export class MusicEngine {
 
   private async run(bin: string, args: string[], signal: AbortSignal, onStderr?: (chunk: Buffer) => void): Promise<void> {
     if (signal.aborted) throw new ApiError("ENGINE_FAILED", "曲の生成が取り消されました");
-    const child: ChildProcess = spawn(bin, args, { stdio: ["ignore", "pipe", "pipe"] });
+    const child: ChildProcess = spawn(bin, args, { stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
     let tail: string[] = [];
     const log = (chunk: Buffer) => {
       const text = chunk.toString("utf8");
@@ -201,7 +194,6 @@ export class MusicEngine {
     child.stdout?.on("data", log);
     child.stderr?.on("data", log);
     if (onStderr) child.stderr?.on("data", onStderr);
-    // WSL 側のプロセスを止めると Windows 側の exe も止まる（実機で確認）
     const abort = () => child.kill("SIGKILL");
     signal.addEventListener("abort", abort, { once: true });
     try {

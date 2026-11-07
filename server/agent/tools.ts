@@ -3,7 +3,7 @@ import path from "node:path";
 import { z } from "zod";
 import { unifiedDiff } from "./diff";
 import { isInside, PathDeniedError, relativeTo, resolveInWorkspace, safeReal } from "./paths";
-import { runShell } from "./shell";
+import { runShell, SHELL_NAME } from "./shell";
 
 /** D-26 */
 const MAX_READ_BYTES = 2 * 1024 * 1024;
@@ -72,7 +72,7 @@ const SPECS = {
   },
   run_command: {
     kind: "command" as const,
-    description: "シェル（bash）でコマンドを実行し、終了コードと出力を返す。cwd はワークスペース内。120 秒で終了する",
+    description: `シェル（${SHELL_NAME}）でコマンドを実行し、終了コードと出力を返す。cwd はワークスペース内。120 秒で終了する`,
     schema: z.object({ command: z.string().min(1), cwd: path_.optional() }),
   },
 };
