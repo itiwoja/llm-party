@@ -5,8 +5,7 @@ export const PG3 = {
   tabHf: "Hugging Face を探す", // CP-082
   tabDownloads: "DL", // CP-083
   register: "ファイルを登録", // CP-084
-  columns: { name: "名前", quantization: "量子化", size: "サイズ", place: "場所", status: "状態" }, // CP-085
-  place: { reference: "参照", store: "置き場" }, // CP-086
+  columns: { name: "名前", quantization: "量子化", size: "サイズ", status: "状態" }, // CP-085
   emptyModels: "モデルなし。ファイル登録か Hugging Face から入手", // CP-087
   emptyAdapters: "LoRA なし。GGUF 形式の LoRA を登録", // CP-088
   emptySearch: "検索結果なし。語を変えて再検索", // CP-089

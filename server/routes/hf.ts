@@ -25,7 +25,7 @@ const searchQuery = z.object({
 );
 
 /** HF 検索・DL（API-053〜057） */
-export function hfRoutes({ downloads, hfBaseUrl, dataDir }: Context): Router {
+export function hfRoutes({ downloads, store, hfBaseUrl, dataDir }: Context): Router {
   const api = Router();
   const hf = new HfClient(hfBaseUrl, dataDir);
 
@@ -52,8 +52,10 @@ export function hfRoutes({ downloads, hfBaseUrl, dataDir }: Context): Router {
     ...rest,
     // 完了した LoRA の保存先。画面が POST /api/adapters の reference に使う
     ...(rest.kind === "adapter" && rest.status === "completed" ? { filePath: path.join(destDir, files[0].name) } : {}),
-    // 保存だけの DL の置き場。登録されないので、ここでしか場所が分からない
-    ...(rest.kind === "file" && rest.status === "completed" ? { savedDir: destDir } : {}),
+    // 保存だけの DL の置き場。登録されないので、ここでしか場所が分からない。モデルの本体や部品になったものは画面が行を出さない
+    ...(rest.kind === "file" && rest.status === "completed"
+      ? { savedDir: destDir, usedByModel: files.every((file) => store.downloads.isInModel(path.join(destDir, file.name))) }
+      : {}),
     files: files.map((file) => ({ name: file.name, sizeBytes: file.size })),
   });
 

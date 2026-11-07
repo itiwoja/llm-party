@@ -115,6 +115,12 @@ export class DownloadStore {
     return this.db.prepare(`SELECT 1 FROM ${kind === "adapter" ? "adapters" : "models"} WHERE path = ?`).get(file) !== undefined;
   }
 
+  /** そのファイルが登録済みのモデルの本体か部品か（保存だけの DL の行をモデルの行と重ねないため） */
+  isInModel(file: string): boolean {
+    const rows = this.db.prepare("SELECT path, parts FROM models").all() as { path: string; parts: string | null }[];
+    return rows.some((row) => row.path === file || (row.parts !== null && Object.values(JSON.parse(row.parts) as Record<string, string>).includes(file)));
+  }
+
   /** models.create は hf_repo を受けないので、できたモデルに由来のリポジトリを足す */
   setModelRepo(modelId: string, repo: string): void {
     this.db.prepare("UPDATE models SET hf_repo = ? WHERE id = ?").run(repo, modelId);

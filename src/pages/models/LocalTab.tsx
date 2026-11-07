@@ -69,18 +69,14 @@ export function LocalTab({ kind, models, adapters, downloads, etaSeconds, onChan
     }
   }
 
-  // 登録済みのモデルの DL（completed で resultId あり）は、手元のモデルの行と重なるので出さない。LoRA の DL は完了後も登録まで残す
-  const shown = downloads.filter((d) => (kind === "adapter" ? d.kind === "adapter" : d.kind !== "adapter" && !(d.status === "completed" && d.kind !== "file")));
+  // 登録済みのモデルの DL（completed で resultId あり）と、モデルの本体や部品になった保存だけの DL は、手元のモデルの行と重なるので出さない。LoRA の DL は完了後も登録まで残す
+  const shown = downloads.filter((d) => (kind === "adapter" ? d.kind === "adapter" : d.kind !== "adapter" && !(d.status === "completed" && (d.kind !== "file" || d.usedByModel))));
 
   const rows: Row[] = [
     ...(kind === "model" ? models.map((m) => ({ ...m, kind: "model" as const })) : adapters.map((a) => ({ ...a, kind: "adapter" as const }))),
     ...shown.map((download) => ({ kind: "download" as const, download })),
   ];
 
-  const place = (row: Row) => {
-    if (row.kind === "download") return row.download.savedDir ? PG3_MISSING.savedTo : "";
-    return row.source === "local_ref" ? PG3.place.reference : PG3.place.store;
-  };
   const baseName = (row: Row) => (row.kind === "adapter" ? models.find((m) => m.id === row.baseModelId)?.name ?? "" : "");
 
   const statusCell = (row: Row) => {
@@ -123,14 +119,12 @@ export function LocalTab({ kind, models, adapters, downloads, etaSeconds, onChan
         { key: "name", header: PG3.columns.name, render: (r) => <span className={r.kind === "download" ? "numeric" : undefined}>{name(r)}</span> },
         { key: "quant", header: PG3.columns.quantization, render: (r) => (r.kind === "model" ? r.quantization ?? "" : "") },
         { key: "size", header: PG3.columns.size, numeric: true, render: (r) => formatBytes(size(r)) },
-        { key: "place", header: PG3.columns.place, render: place },
         { key: "status", header: PG3.columns.status, render: statusCell },
         { key: "actions", header: "", render: actionCell },
       ]
     : [
         { key: "name", header: PG3.columns.name, render: name },
         { key: "base", header: PG3.baseModel, render: baseName },
-        { key: "place", header: PG3.columns.place, render: place },
         { key: "status", header: PG3.columns.status, render: statusCell },
         { key: "actions", header: "", render: actionCell },
       ];

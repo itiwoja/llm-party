@@ -45,6 +45,8 @@ export interface DownloadItem {
   filePath?: string;
   /** 完了した保存だけの DL の置き場 */
   savedDir?: string;
+  /** 保存だけの DL のファイルが全部、登録済みのモデルの本体か部品になっている */
+  usedByModel?: boolean;
 }
 
 export const isActive = (status: DownloadStatus) => status !== "completed" && status !== "failed" && status !== "cancelled";
