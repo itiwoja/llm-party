@@ -110,6 +110,8 @@ export function ThreadsPage() {
   const toolCallsRef = useRef(toolCalls);
   toolCallsRef.current = toolCalls;
   const listSeq = useRef(0);
+  /** 最初の読み込みが済んだスレッド。それまでの差分は読み込みの結果に含まれる */
+  const detailLoaded = useRef<string | undefined>(undefined);
 
   const thread = threads.find((t) => t.id === threadId);
   const isAgent = Boolean(thread?.workspaceId);
@@ -139,21 +141,24 @@ export function ThreadsPage() {
   const loadDetail = useCallback(async (id: string) => {
     const detail = await api<{ messages: ThreadMessage[]; turns: TurnInfo[]; toolCalls: ToolCall[] }>(`/threads/${id}/messages`);
     if (threadRef.current !== id) return;
-    // 生成中の文字は DB より画面の方が新しいので、長い方を残す
+    detailLoaded.current = id;
+    const last = detail.turns.at(-1);
+    const activeNow = last && ACTIVE_TURN.includes(last.status) ? last : null;
+    // 読み込んだ後は差分で追うので、生成中のメッセージは画面の方を残す。それ以外は長い方
     setMessages((prev) => detail.messages.map((m) => {
       const local = prev.find((p) => p.id === m.id);
-      return local && local.content.length > m.content.length ? { ...m, content: local.content, reasoning: local.reasoning } : m;
+      if (!local) return m;
+      const streaming = m.role === "assistant" && m.turnId === activeNow?.id;
+      return streaming || local.content.length > m.content.length ? { ...m, content: local.content, reasoning: local.reasoning } : m;
     }));
     setToolCalls(detail.toolCalls);
     setTurns(detail.turns);
-    const last = detail.turns.at(-1);
     // 開き直しても文脈の使用量を出す（FR-006）。生成中は turn.usage が上書きする
     const size = presetsRef.current.find((p) => p.id === last?.presetId)?.contextSize;
     if (last?.promptTokens != null && size) {
       const used = last.promptTokens + (last.completionTokens ?? 0);
       setUsage((current) => (current.percent === null ? { ...current, percent: (used / size) * 100 } : current));
     }
-    const activeNow = last && ACTIVE_TURN.includes(last.status) ? last : null;
     setRunning((list) => [...list.filter((r) => r.threadId !== id), ...(activeNow ? [{ id: activeNow.id, threadId: id }] : [])]);
     if (activeNow) setStepWait(activeNow.status === "step_limit");
     else if (turnRef.current?.threadId === id) setStepWait(false);
@@ -198,6 +203,8 @@ export function ThreadsPage() {
     setLive({});
     setWorkspaceError("");
     setPanelOpen(false);
+    detailLoaded.current = undefined;
+    pending.current.clear();
     if (threadId) {
       void loadDetail(threadId).catch((err) => setError(errorText(err)));
       void loadChanges(threadId);
@@ -262,7 +269,8 @@ export function ThreadsPage() {
     const here = active && active.threadId === threadRef.current ? active : null;
     // 終わったターンは、どのスレッドのものでも一覧から外す
     if (event === "turn.finished") setRunning((list) => list.filter((r) => r.id !== data.turnId));
-    if (event === "turn.delta" && here && data.turnId === here.id) {
+    if (event === "turn.delta") {
+      if (!here || data.turnId !== here.id || detailLoaded.current !== here.threadId) return;
       const entry = pending.current.get(data.messageId) ?? { content: "", reasoning: "", turnId: here.id };
       entry.content += data.content ?? "";
       entry.reasoning += data.reasoning ?? "";

@@ -49,7 +49,8 @@ export function threadRoutes({ store, chat }: Context): Router {
       const preview = call.status === "pending_approval" ? chat.pendingPreview(call.id) : undefined;
       return preview ? { ...call, preview } : call;
     });
-    res.json({ ...store.threads.threadDetail(req.params.id), toolCalls });
+    const detail = store.threads.threadDetail(req.params.id);
+    res.json({ ...detail, messages: chat.withPartial(detail.messages), toolCalls });
   });
   api.post("/threads/:id/turns", (req, res) => {
     const { presetId, content } = parse(z.object({ presetId: z.string().min(1), content: z.string().trim().min(1) }), req.body);

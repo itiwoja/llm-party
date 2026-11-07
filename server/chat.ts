@@ -53,6 +53,8 @@ export interface ChatOptions {
 export class ChatService {
   /** 動いているターン（turnId → 状態） */
   private active = new Map<string, Active>();
+  /** 生成中の文字。DB に入るのは止まったときなので、開き直した画面にはここから渡す */
+  private partial = new Map<string, { content: string; reasoning: string }>();
 
   constructor(private store: Store, private engine: EngineManager, private bus: EventBus, private slot: GenerationSlot, private options: ChatOptions) {}
 
@@ -87,6 +89,14 @@ export class ChatService {
       contextSize: preset.contextSize,
       gpuRatio: preset.gpuRatio,
       adapterPaths: this.store.presets.adapters(presetId).map((adapter) => adapter.path),
+    });
+  }
+
+  /** API-034 の応答に生成中の文字を重ねる */
+  withPartial<T extends { id: string; content: string; reasoning?: string | null }>(messages: T[]): T[] {
+    return messages.map((message) => {
+      const partial = this.partial.get(message.id);
+      return partial ? { ...message, content: partial.content, reasoning: partial.reasoning || null } : message;
     });
   }
 
@@ -306,6 +316,7 @@ export class ChatService {
       const messageId = this.store.threads.addMessage({ threadId, turnId, role: "assistant", content: "" });
       let content = "";
       let reasoning = "";
+      this.partial.set(messageId, { content, reasoning });
       try {
         const generation = await complete({
           baseUrl: this.engine.baseUrl, apiKey: this.engine.apiKey, signal, makeId: ulid,
@@ -320,6 +331,7 @@ export class ChatService {
           onDelta: (delta) => {
             content += delta.content ?? "";
             reasoning += delta.reasoning ?? "";
+            this.partial.set(messageId, { content, reasoning });
             this.bus.publish("turn.delta", { turnId, messageId, ...delta });
           },
           onChunk: (chunk, usage) => {
@@ -346,6 +358,7 @@ export class ChatService {
         return generation;
       } finally {
         this.store.threads.updateMessage(messageId, content, reasoning || null);
+        this.partial.delete(messageId);
       }
     };
 

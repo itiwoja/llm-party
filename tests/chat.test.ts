@@ -90,6 +90,18 @@ describe("チャット1往復", () => {
     expect(detail.body.messages[1]).toMatchObject({ content: "こんにちは", reasoning: "考え中" });
   });
 
+  it("生成中に読み直すと、そこまでの本文が返る（D-84）", async () => {
+    vi.stubEnv("FAKE_LLAMA_MODE", "slow");
+    const { presetId, threadId } = await setup(worker);
+    const { body } = await worker.api(`/threads/${threadId}/turns`, { body: { presetId, content: "長く" } });
+    await waitForEvent(worker.context.bus, (e) => e.event === "turn.delta");
+    const detail = await worker.api(`/threads/${threadId}/messages`);
+    expect(detail.body.messages[1].content.length).toBeGreaterThan(0);
+
+    await worker.api(`/turns/${body.turnId}/cancel`, { body: {} });
+    await finished(worker, body.turnId);
+  });
+
   it("停止すると途中までの本文を残して cancelled", async () => {
     vi.stubEnv("FAKE_LLAMA_MODE", "slow");
     const { presetId, threadId } = await setup(worker);
