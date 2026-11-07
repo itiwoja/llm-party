@@ -16,8 +16,9 @@ import type { HfFile, HfRepo } from "./types";
 
 
 type Genre = keyof typeof PG3_MISSING.genres;
+type Purpose = keyof typeof PG3_MISSING.purposes;
 /** VRAM・RAM は GB の上限。null は指定なし */
-interface Filters { query: string; genre: Genre; uncensored: boolean; vram: number | null; ram: number | null; gpuRatio: number }
+interface Filters { query: string; genre: Genre; uncensored: boolean; effort: boolean; thinking: boolean; purpose: Purpose; vram: number | null; ram: number | null; gpuRatio: number }
 
 /** 入力欄の文字を GB にする。空や 0 以下は指定なし */
 function parseGb(text: string): number | null {
@@ -49,6 +50,10 @@ function StrengthBar({ params, max }: { params: number | null; max: number }) {
 }
 
 const GENRE_OPTIONS = (Object.keys(PG3_MISSING.genres) as Genre[]).map((value) => ({ value, label: PG3_MISSING.genres[value] }));
+const PURPOSE_OPTIONS = (Object.keys(PG3_MISSING.purposes) as Purpose[]).map((value) => ({ value, label: PG3_MISSING.purposes[value] }));
+
+/** 思考・用途の絞り込みが入っているか。入っていれば結果はチャットのモデルだけ（D-90） */
+const narrowsChat = ({ effort, thinking, purpose }: Filters) => effort || thinking || purpose !== "all";
 
 /** mmproj（画像の入力部）と imatrix（量子化の計算用）は、どのリポジトリでもモデル本体ではないので出さない */
 const isAuxFile = (name: string) => /^(mmproj|imatrix)/i.test(name.split("/").pop() ?? name);
@@ -115,9 +120,9 @@ function RecipeRow({ url, id, note }: { url: string; id: string; note: string })
   );
 }
 
-/** Hugging Face を探す（API-053〜055）。語は Enter で送り、ジャンルと無検閲は変えた時点で探し直す */
+/** Hugging Face を探す（API-053〜055）。語は Enter で送り、ジャンル・無検閲・思考・用途は変えた時点で探し直す */
 export function HfTab({ onStarted }: { onStarted(): void }) {
-  const [filters, setFilters] = useState<Filters>({ query: "", genre: "all", uncensored: false, vram: null, ram: null, gpuRatio: DEFAULT_GPU_RATIO })
+  const [filters, setFilters] = useState<Filters>({ query: "", genre: "all", uncensored: false, effort: false, thinking: false, purpose: "all", vram: null, ram: null, gpuRatio: DEFAULT_GPU_RATIO })
   // バーを動かしている間の値。表はこの値ですぐ変え、絞り込みは離したときに探し直す
   const [gpuRatio, setGpuRatio] = useState(DEFAULT_GPU_RATIO);
   // 数字の入力中は文字のまま持ち、欄を離れたか Enter で絞り込む
@@ -138,7 +143,8 @@ export function HfTab({ onStarted }: { onStarted(): void }) {
   }, [repo, files]);
 
   /** keepOpen はバーからの探し直し。開いているファイル一覧を閉じない */
-  async function search({ query, genre, uncensored, vram, ram, gpuRatio: gpu }: Filters, keepOpen = false) {
+  async function search(current: Filters, keepOpen = false) {
+    const { query, genre, uncensored, effort, thinking, purpose, vram, ram, gpuRatio: gpu } = current;
     const q = query.trim();
     const id = (latestSearch.current += 1);
     setFailure(null);
@@ -146,14 +152,14 @@ export function HfTab({ onStarted }: { onStarted(): void }) {
       setRepo(null);
       setFiles(null);
     }
-    if (!q && genre === "all" && !uncensored && vram === null && ram === null) {
+    if (!q && genre === "all" && !uncensored && !narrowsChat(current) && vram === null && ram === null) {
       setRepos(null);
       setSearching(false);
       return;
     }
     setSearching(true);
     try {
-      const params = new URLSearchParams({ q, genre, uncensored: String(uncensored) });
+      const params = new URLSearchParams({ q, genre, uncensored: String(uncensored), effort: String(effort), thinking: String(thinking), purpose });
       if (vram !== null) params.set("vram", String(vram));
       if (ram !== null) params.set("ram", String(ram));
       if (vram !== null || ram !== null) params.set("gpu", String(gpu));
@@ -228,12 +234,13 @@ export function HfTab({ onStarted }: { onStarted(): void }) {
     { key: "repo", header: PG3_MISSING.colRepo, render: (r) => <button type="button" className="link-btn numeric">{r.repo}</button> },
     { key: "strength", header: PG3_MISSING.colStrength, render: (r) => <StrengthBar params={r.params} max={maxParams} /> },
     { key: "genre", header: PG3_MISSING.genre, render: (r) => <span className="models-nowrap">{PG3_MISSING.genres[r.use]}</span> },
+    { key: "thinking", header: PG3_MISSING.colThinking, render: (r) => <span className="models-nowrap">{r.supportsEffort ? PG3_MISSING.thinkingEffort : r.supportsThinking ? PG3_MISSING.thinkingSwitch : ""}</span> },
     { key: "license", header: PG3_MISSING.colLicense, render: (r) => <span className="numeric models-nowrap">{r.license ?? ""}</span> },
     { key: "vram", header: PG3_MISSING.colVram, numeric: true, render: (r) => { const need = repoNeed(r); return need ? gbText(need.vramGb) : ""; } },
     { key: "ram", header: PG3_MISSING.colRam, numeric: true, render: (r) => { const need = repoNeed(r); return need ? gbText(need.ramGb) : ""; } },
     { key: "downloads", header: PG3_MISSING.colDownloads, numeric: true, render: (r) => r.downloads.toLocaleString("en-US") },
     // updatedAt が null（HF が lastModified を返さない）ときは空にする。createdAt は出さない
-    { key: "updated", header: PG3_MISSING.colUpdated, numeric: true, render: (r) => formatDate(r.updatedAt) },
+    { key: "updated", header: PG3_MISSING.colUpdated, numeric: true, render: (r) => <span className="models-nowrap">{formatDate(r.updatedAt)}</span> },
   ];
   // ファイルごとの違う部分（同じ名前の並びでは共通部分を外して見せる）
   const labels = new Map((shownFiles ?? []).map((f, i, all) => [f.name, distinctLabels(all.map((x) => x.name))[i]]));
@@ -268,7 +275,14 @@ export function HfTab({ onStarted }: { onStarted(): void }) {
       <RecipeRow url="/image-recipes" id="moss-image" note={PG3_MISSING.recipeNote} />
       <RecipeRow url="/music-recipes" id="ace-step" note={PG3_MISSING.musicRecipeNote} />
       <div className="models-filters">
-        <SelectField label={PG3_MISSING.genre} hideLabel value={filters.genre} options={GENRE_OPTIONS} onValueChange={(v) => refine({ genre: v as Genre })} />
+        <SelectField label={PG3_MISSING.genre} hideLabel value={filters.genre} options={GENRE_OPTIONS} onValueChange={(v) => refine({ genre: v as Genre, ...(v === "image" ? { effort: false, thinking: false, purpose: "all" as const } : {}) })} />
+        {filters.genre === "image" ? null : (
+          <>
+            <SelectField label={PG3_MISSING.purpose} hideLabel value={filters.purpose} options={PURPOSE_OPTIONS} onValueChange={(v) => refine({ purpose: v as Purpose })} />
+            <SwitchField label={PG3_MISSING.effortOnly} checked={filters.effort} onCheckedChange={(effort) => refine({ effort })} />
+            <SwitchField label={PG3_MISSING.thinkingOnly} checked={filters.thinking} onCheckedChange={(thinking) => refine({ thinking })} />
+          </>
+        )}
         <SwitchField label={PG3_MISSING.uncensored} checked={filters.uncensored} onCheckedChange={(uncensored) => refine({ uncensored })} />
         {(["vram", "ram"] as const).map((key) => (
           <label key={key} className="field models-memory">
@@ -290,6 +304,7 @@ export function HfTab({ onStarted }: { onStarted(): void }) {
           </label>
         ))}
       </div>
+      {narrowsChat(filters) ? <p className="models-note">{PG3_MISSING.chatOnlyHint}</p> : null}
       {ratioField}
       <p className="models-note">{PG3_MISSING.splitHint}</p>
       {filters.vram !== null || filters.ram !== null ? <p className="models-note">{PG3_MISSING.memoryHint}</p> : null}

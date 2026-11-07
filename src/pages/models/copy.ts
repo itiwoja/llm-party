@@ -53,6 +53,19 @@ export const PG3_MISSING = {
     image: "画像生成",
   }, // CP-286
   uncensored: "無検閲のみ", // CP-287
+  effortOnly: "エフォートあり", // CP-360
+  thinkingOnly: "思考あり", // CP-361
+  purpose: "用途", // CP-362
+  purposes: {
+    all: "すべての用途",
+    japanese: "日本語",
+    coding: "コーディング",
+    roleplay: "ロールプレイ",
+  }, // CP-363
+  chatOnlyHint: "チャットのモデルだけを表示。エフォートと思考は DL 数の上位から絞り、用途は Hugging Face のタグで絞る", // CP-364
+  colThinking: "思考", // CP-365
+  thinkingEffort: "エフォート", // CP-366
+  thinkingSwitch: "オンオフ", // CP-367
   colLicense: "ライセンス", // CP-288
   imageHint: "画像生成に使える一体型の .safetensors だけを表示",
   fileCount: (n: number) => `${n} ファイル`, // CP-291
