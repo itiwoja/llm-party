@@ -12,6 +12,7 @@ import { PG3, PG3_MISSING } from "./copy";
 import { ErrorLine } from "./ErrorLine";
 import { distinctLabels } from "./fileLabel";
 import { BYTES_PER_GB, errorMessage, formatBytes, formatDate } from "./format";
+import { isModelFile } from "./modelFile";
 import type { HfFile, HfRepo } from "./types";
 
 
@@ -55,10 +56,6 @@ const PURPOSE_OPTIONS = (Object.keys(PG3_MISSING.purposes) as Purpose[]).map((va
 /** 思考・用途の絞り込みが入っているか。入っていれば結果はチャットのモデルだけ（D-90） */
 const narrowsChat = ({ effort, thinking, purpose }: Filters) => effort || thinking || purpose !== "all";
 
-/** mmproj（画像の入力部）・imatrix（量子化の計算用）・mtp（先読みの補助部分）は、どのリポジトリでもモデル本体ではないので出さない */
-const isAuxFile = (name: string) => /^(mmproj|imatrix|mtp)[-_.]/i.test(name.split("/").pop() ?? name);
-/** チャット用に出すのはモデル本体の GGUF だけ */
-const isModelFile = (name: string) => name.toLowerCase().endsWith(".gguf") && !isAuxFile(name);
 
 /** 401 は設定の HF トークンへ案内する（CP-096） */
 export function hfFailure(err: unknown): ReactNode {
