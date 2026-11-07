@@ -388,6 +388,7 @@ export class DownloadService {
       const model = store.models.create({
         name, path: first, source: "hf", architecture: info.architecture,
         quantization: info.quantization ?? quantOf(first), sizeBytes: total, trainContext: info.trainContext,
+        supportsThinking: info.supportsThinking, supportsEffort: info.supportsEffort,
       });
       store.downloads.setModelRepo(model.id, record.repo);
       resultId = model.id;

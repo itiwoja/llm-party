@@ -98,7 +98,7 @@ flowchart TD
 - 処理：
   1. ユーザーメッセージを保存し、ターンを `running` で作る
   2. FR-003 でエンジンを用意し、FR-006 で文脈を確かめる
-  3. `POST /v1/chat/completions`（API-101）を `stream: true` で呼ぶ。送るもの：システムプロンプト（エージェントならツールの使い方を足す）、会話、生成設定、`lora`（倍率）、`chat_template_kwargs.enable_thinking`、エージェントなら `tools`
+  3. `POST /v1/chat/completions`（API-101）を `stream: true` で呼ぶ。送るもの：システムプロンプト（エージェントならツールの使い方を足す）、会話、生成設定、`lora`（倍率）、`chat_template_kwargs.enable_thinking`（段階に対応するモデルは `reasoning_effort` も。D-76）、エージェントなら `tools`
   4. 受け取った差分を `turn.delta` イベントで画面へ流す。思考（`reasoning_content`）と本文を分けて保存する
   5. 応答の終わりで、ツール呼び出しがあれば FR-008 へ。なければターンを `completed`
 - 上限：1回の生成は 8,192 トークンまで（D-61）。上限に達したら本文を保存してターンを `completed` にし、CP-207 を出す
@@ -182,5 +182,5 @@ flowchart TD
   3. 戻したことも `file_changes` に記録する（`reverted_at`）
 
 ## このドキュメントで決まったこと
-- D-22〜D-24, D-26, D-27, D-32, D-36, D-42, D-44（[00 決定事項ログ](../00_overview.md#決定事項ログ)）
+- D-22〜D-24, D-26, D-27, D-32, D-36, D-42, D-44, D-76（[00 決定事項ログ](../00_overview.md#決定事項ログ)）
 - [ADR-002](../adr/ADR-002-llama-server-child.md)、[ADR-005](../adr/ADR-005-approval-policy.md)、[ADR-006](../adr/ADR-006-auto-compaction.md)

@@ -31,6 +31,7 @@ export function createContext({ hfBaseUrl = "https://huggingface.co", commandTim
   const db = openDatabase(options.dataDir);
   const bus = new EventBus();
   const store = new Store(db);
+  store.models.fillThinkingSupport();
   store.threads.failUnfinishedTurns();
   const slot = new GenerationSlot();
   // 画像生成（sd-server）と推論（llama-server）は同時に1つだけ常駐させる（D-72）

@@ -14,6 +14,7 @@ import type { GenerationSlot } from "../generation-slot";
 import { ApiError } from "../http-error";
 import type { Store } from "../store";
 import type { EvalCase, EvalResult, EvalRun, PresetSnapshot, ResultUpdate } from "../store/eval";
+import { thinkingKwargs } from "../thinking";
 import { gradeMatch, summarize } from "./grade";
 
 /** D-29：1ケースの時間切れ */
@@ -142,10 +143,11 @@ export class EvalService {
 
     const runIds = presets.map((preset) => {
       const model = store.models.get(preset.modelId)!;
+      const kwargs = thinkingKwargs(model, preset);
       const snapshot: PresetSnapshot = {
         presetId: preset.id, name: preset.name, modelId: model.id, modelName: model.name, modelPath: model.path,
         modelSha256: this.evals.modelSha256(model.id), adapters: store.presets.adapters(preset.id),
-        sampling: preset.sampling, systemPrompt: preset.systemPrompt, thinking: preset.thinking, contextSize: preset.contextSize,
+        sampling: preset.sampling, systemPrompt: preset.systemPrompt, thinking: kwargs.enable_thinking, effort: kwargs.reasoning_effort ?? null, contextSize: preset.contextSize,
       };
       const id = this.evals.createRun({ evalSetId: set.id, snapshot, backend, tags, cases });
       this.controllers.set(id, new AbortController());
@@ -506,7 +508,7 @@ export class EvalService {
         presence_penalty: sampling.presencePenalty,
         repeat_penalty: sampling.repeatPenalty,
         ...(snapshot.adapters.length ? { lora: snapshot.adapters.map((adapter, id) => ({ id, scale: adapter.scale })) } : {}),
-        chat_template_kwargs: { enable_thinking: snapshot.thinking },
+        chat_template_kwargs: { enable_thinking: snapshot.thinking, ...(snapshot.effort ? { reasoning_effort: snapshot.effort } : {}) },
       },
       onDelta: (delta) => {
         trace.answer += delta.content ?? "";

@@ -11,6 +11,7 @@ import { CP, MISSING_COPY } from "../../copy";
 import { WorkLayout } from "../../layouts";
 import { navigate, useRoute } from "../../router";
 import { pickFolder } from "../../platform";
+import { thinkingChoice, thinkingOptions, thinkingPatch } from "../../thinking";
 import type { EngineState } from "../../types";
 import { Conversation } from "./Conversation";
 import { PG1, MISSING } from "./copy";
@@ -57,7 +58,7 @@ export function ThreadsPage() {
   const threadId = route.page === "threads" ? route.id : undefined;
   /** 新しいスレッドの入力画面で選んでいるプロジェクト */
   const projectId = route.page === "threads" ? route.projectId : undefined;
-  const { presets, models, engine } = useAppData();
+  const { presets, models, engine, reloadPresets } = useAppData();
 
   const [threads, setThreads] = useState<ThreadInfo[]>([]);
   const [projects, setProjects] = useState<Workspace[]>([]);
@@ -93,6 +94,10 @@ export function ThreadsPage() {
     [presets, imageModels],
   );
   const modelChoice = imageMode ? `image:${imageModelId}` : `preset:${presetId}`;
+  /** 選んでいるプリセットのモデルで変えられる思考の選択肢（D-76）。無ければ欄を出さない */
+  const preset = presets.find((p) => p.id === presetId);
+  const presetModel = models.find((m) => m.id === preset?.modelId);
+  const thinkingChoices = imageMode ? [] : thinkingOptions(presetModel);
   const [imageBusy, setImageBusy] = useState(false);
   // 生成中の依頼。文は生成が終わるまで DB に入らないので、画面には送った時点でこれを出す
   const [pendingImage, setPendingImage] = useState<{ threadId: string; prompt: string } | null>(null);
@@ -171,6 +176,8 @@ export function ThreadsPage() {
   useEffect(() => { void loadProjects().catch(() => undefined); }, [loadProjects]);
 
   // プリセットは初期値として先頭。スレッドを開いたら最後に使ったものへ、プロジェクトの新規ならその既定へ
+  // 中身の更新（思考の変更）で選び直さないよう、見るのは id の顔ぶれだけ
+  const presetIds = presets.map((p) => p.id).join();
   useEffect(() => {
     setPresetId((current) => {
       const last = threads.find((t) => t.id === threadId)?.lastPresetId ?? (threadId ? null : project?.defaultPresetId);
@@ -179,7 +186,7 @@ export function ThreadsPage() {
     });
     // threads は一覧の更新ごとに変わるので、開いたスレッドが変わったときとプリセットが届いたときだけ見る
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [threadId, presets, project?.defaultPresetId]);
+  }, [threadId, presetIds, project?.defaultPresetId]);
 
   useEffect(() => {
     setError("");
@@ -337,6 +344,11 @@ export function ThreadsPage() {
       setPresetId(id);
       setImageMode(false);
     }
+  }
+
+  /** プリセットごとに覚える（API-062）。次の送信から効く */
+  function chooseThinking(value: string) {
+    void api.patch(`/presets/${presetId}`, thinkingPatch(value)).then(reloadPresets).catch((err) => setError(errorText(err)));
   }
 
   async function send() {
@@ -552,6 +564,17 @@ export function ThreadsPage() {
               options={modelOptions}
               disabled={generating || imageBusy}
             />
+            {preset && presetModel && thinkingChoices.length > 0 ? (
+              <SelectField
+                compact
+                hideLabel
+                label={CP.thinkingSelect}
+                value={thinkingChoice(presetModel, preset)}
+                onValueChange={chooseThinking}
+                options={thinkingChoices}
+                disabled={generating || imageBusy}
+              />
+            ) : null}
             {generating ? (
               <IconButton className="composer-stop" label={CP.stop} disabled={stepWait} onClick={() => turn && void api.post(`/turns/${turn.id}/cancel`).catch((err) => setError(errorText(err)))}>
                 <Square aria-hidden />

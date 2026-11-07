@@ -14,6 +14,7 @@ import { GENERATION_SLOTS, type GenerationSlot } from "./generation-slot";
 import { ApiError } from "./http-error";
 import type { Store } from "./store";
 import { sha256 } from "./store/changes";
+import { thinkingKwargs } from "./thinking";
 
 const ENGINE_STOPPED = "推論エンジンが停止しました";
 /** 画面の数字の更新間隔。毎トークン送ると無駄が多い */
@@ -225,7 +226,7 @@ export class ChatService {
     const adapters = this.store.presets.adapters(presetId);
     const thread = this.store.threads.get(threadId)!;
     const workspace = thread.workspaceId ? this.store.agent.workspace(thread.workspaceId) : null;
-    const { sampling, thinking, contextSize } = preset;
+    const { sampling, contextSize } = preset;
     // llama-server は -c を枠の数で割って使うので、1本ぶんの文脈で数える
     const slotContext = Math.floor(contextSize / GENERATION_SLOTS);
 
@@ -313,7 +314,7 @@ export class ChatService {
             ...(workspace ? { tools: toolDefinitions() } : {}),
             max_tokens: MAX_TOKENS,
             ...samplingBody,
-            chat_template_kwargs: { enable_thinking: thinking },
+            chat_template_kwargs: thinkingKwargs(model, preset),
           },
           onDelta: (delta) => {
             content += delta.content ?? "";

@@ -1,6 +1,7 @@
 import { ulid } from "ulid";
 import type { Db } from "../db";
 import { ApiError } from "../http-error";
+import { DEFAULT_EFFORT, type Effort } from "../thinking";
 import type { ModelStore } from "./models";
 import { isUniqueError, now } from "./shared";
 
@@ -28,12 +29,14 @@ export interface PresetInput {
   sampling: Sampling;
   systemPrompt?: string | null;
   thinking: boolean;
+  /** 省けば DEFAULT_EFFORT。段階に対応するモデルでだけ使う（D-76） */
+  effort?: Effort;
   contextSize: number;
 }
 
 interface PresetRow {
   id: string; name: string; model_id: string; sampling: string; system_prompt: string | null;
-  thinking: number; context_size: number; created_at: string; updated_at: string;
+  thinking: number; effort: string; context_size: number; created_at: string; updated_at: string;
 }
 
 export class PresetStore {
@@ -55,9 +58,9 @@ export class PresetStore {
     const time = now();
     try {
       this.db.transaction(() => {
-        this.db.prepare(`INSERT INTO presets (id, name, model_id, sampling, system_prompt, thinking, context_size, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-          .run(id, input.name, input.modelId, JSON.stringify(input.sampling), input.systemPrompt ?? null, input.thinking ? 1 : 0, input.contextSize, time, time);
+        this.db.prepare(`INSERT INTO presets (id, name, model_id, sampling, system_prompt, thinking, effort, context_size, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+          .run(id, input.name, input.modelId, JSON.stringify(input.sampling), input.systemPrompt ?? null, input.thinking ? 1 : 0, input.effort ?? DEFAULT_EFFORT, input.contextSize, time, time);
         this.writeAdapters(id, input.adapters ?? []);
       })();
     } catch (error) {
@@ -78,6 +81,7 @@ export class PresetStore {
       sampling: current.sampling,
       systemPrompt: current.systemPrompt,
       thinking: current.thinking,
+      effort: current.effort,
       contextSize: current.contextSize,
       ...patch,
     };
@@ -86,9 +90,9 @@ export class PresetStore {
     const time = now();
     try {
       this.db.transaction(() => {
-        this.db.prepare(`UPDATE presets SET name = ?, model_id = ?, sampling = ?, system_prompt = ?, thinking = ?, context_size = ?, updated_at = ?
+        this.db.prepare(`UPDATE presets SET name = ?, model_id = ?, sampling = ?, system_prompt = ?, thinking = ?, effort = ?, context_size = ?, updated_at = ?
           WHERE id = ?`)
-          .run(next.name, next.modelId, JSON.stringify(next.sampling), next.systemPrompt ?? null, next.thinking ? 1 : 0, next.contextSize, time, id);
+          .run(next.name, next.modelId, JSON.stringify(next.sampling), next.systemPrompt ?? null, next.thinking ? 1 : 0, next.effort ?? DEFAULT_EFFORT, next.contextSize, time, id);
         this.db.prepare("DELETE FROM preset_adapters WHERE preset_id = ?").run(id);
         this.writeAdapters(id, next.adapters ?? []);
       })();
@@ -120,7 +124,7 @@ export class PresetStore {
   private toPreset(row: PresetRow) {
     return {
       id: row.id, name: row.name, modelId: row.model_id, adapters: this.presetAdapters(row.id),
-      sampling: JSON.parse(row.sampling) as Sampling, systemPrompt: row.system_prompt, thinking: row.thinking === 1,
+      sampling: JSON.parse(row.sampling) as Sampling, systemPrompt: row.system_prompt, thinking: row.thinking === 1, effort: row.effort as Effort,
       contextSize: row.context_size, createdAt: row.created_at, updatedAt: row.updated_at,
     };
   }

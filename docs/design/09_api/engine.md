@@ -65,6 +65,7 @@ sequenceDiagram
 - `timings_per_token` は生成中の速度（`turn.usage`）を出すために付ける
 - `lora` の `id` は起動時の `--lora` の並び順。省いたアダプタは倍率 0（R-04）。`lora` を空配列にすると起動時の倍率に戻る。登録していない `id` はエラーにならず無視される
 - 思考 OFF のプリセットは `chat_template_kwargs.enable_thinking = false`（Qwen3.5 のモデルカードの指定。`/think` `/nothink` は使えない）
+- 段階に対応するモデル（テンプレートに `reasoning_effort` がある）は `chat_template_kwargs.reasoning_effort` に `low` / `medium` / `high` を足す。b12125 でテンプレートへ届くことを `/apply-template` で確認済み（D-76）。テンプレートに段階だけあるモデルは思考を切れないので、`enable_thinking` は常に `true`
 
 ## API-102：POST /tokenize
 - `{ "content": "…" }` → `{ "tokens": [ … ] }`。FR-006 の計測と FR-009 の出力の切り詰めに使う

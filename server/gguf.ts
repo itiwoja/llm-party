@@ -1,7 +1,8 @@
 import { closeSync, openSync, readSync, statSync } from "node:fs";
 import { ApiError } from "./http-error";
+import { thinkingSupport, type ThinkingSupport } from "./thinking";
 
-export interface GgufInfo {
+export interface GgufInfo extends ThinkingSupport {
   type: string;
   architecture: string;
   name: string | null;
@@ -92,6 +93,7 @@ export function readGguf(file: string): GgufInfo {
     const context = kv.get(`${architecture}.context_length`);
     const name = kv.get("general.name");
     const type = kv.get("general.type");
+    const template = kv.get("tokenizer.chat_template");
     return {
       type: typeof type === "string" ? type : "model",
       architecture,
@@ -99,6 +101,7 @@ export function readGguf(file: string): GgufInfo {
       quantization: typeof fileType === "number" ? (FILE_TYPES[fileType] ?? null) : null,
       trainContext: typeof context === "number" ? context : null,
       sizeBytes,
+      ...thinkingSupport(typeof template === "string" ? template : undefined),
     };
   } catch (error) {
     if (error instanceof RangeError) throw new ApiError("INVALID_GGUF", "GGUF を読めません");

@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { Context } from "../context";
 import { ApiError } from "../http-error";
 import { CONTEXT_MIN } from "../store/presets";
+import { EFFORTS } from "../thinking";
 import { parse } from "./parse";
 
 const samplingSchema = z.object({
@@ -21,6 +22,7 @@ const presetSchema = z.object({
   sampling: samplingSchema,
   systemPrompt: z.string().nullish(),
   thinking: z.boolean(),
+  effort: z.enum(EFFORTS).optional(),
   contextSize: z.number().int().min(CONTEXT_MIN),
 });
 

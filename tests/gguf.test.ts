@@ -17,6 +17,18 @@ describe("readGguf", () => {
     });
   });
 
+  it.each([
+    [undefined, false, false],
+    ["{{ messages }}", false, false],
+    ["{% if enable_thinking is defined %}", true, false],
+    ["{{ reasoning_effort }}", false, true],
+    ["{{ enable_thinking }}{{ reasoning_effort }}", true, true],
+  ])("チャットテンプレートから思考の対応を読む（%s）", (chatTemplate, supportsThinking, supportsEffort) => {
+    const file = path.join(temp.dir, "t.gguf");
+    writeGguf(file, { chatTemplate });
+    expect(readGguf(file)).toMatchObject({ supportsThinking, supportsEffort });
+  });
+
   it("GGUF でなければ INVALID_GGUF", () => {
     const file = path.join(temp.dir, "x.gguf");
     writeFileSync(file, "this is not a gguf file at all!!");

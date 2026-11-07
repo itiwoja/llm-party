@@ -2,6 +2,7 @@ import { statfsSync } from "node:fs";
 import path from "node:path";
 import { ulid } from "ulid";
 import type { Db } from "../db";
+import { readGguf } from "../gguf";
 import { ApiError } from "../http-error";
 import { isUniqueError, now } from "./shared";
 
@@ -23,18 +24,25 @@ export interface ModelInput {
   trainContext: number | null;
   /** 部品でできた画像モデルだけ。単一ファイルは null（-m で読む） */
   parts?: ImageParts | null;
+  /** チャットテンプレートから読んだ対応（D-76）。画像モデルには無い */
+  supportsThinking?: boolean;
+  supportsEffort?: boolean;
 }
 
 interface ModelRow {
   id: string; name: string; path: string; source: string; kind: string; architecture: string;
   quantization: string | null; size_bytes: number; train_context: number | null; created_at: string; parts: string | null;
+  supports_thinking: number | null; supports_effort: number | null;
 }
 
 const toModel = (row: ModelRow) => ({
   id: row.id, name: row.name, path: row.path, source: row.source, use: row.kind, architecture: row.architecture,
   quantization: row.quantization, sizeBytes: row.size_bytes, trainContext: row.train_context,
   parts: row.parts ? (JSON.parse(row.parts) as ImageParts) : null, createdAt: row.created_at,
+  supportsThinking: row.supports_thinking === 1, supportsEffort: row.supports_effort === 1,
 });
+
+const flag = (value: boolean | undefined) => (value === undefined ? null : value ? 1 : 0);
 
 export class ModelStore {
   constructor(private db: Db) {}
@@ -52,14 +60,28 @@ export class ModelStore {
     const id = ulid();
     const time = now();
     try {
-      this.db.prepare(`INSERT INTO models (id, name, path, source, kind, architecture, quantization, size_bytes, train_context, parts, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-        .run(id, input.name, input.path, input.source, input.use ?? "chat", input.architecture, input.quantization, input.sizeBytes, input.trainContext, input.parts ? JSON.stringify(input.parts) : null, time, time);
+      this.db.prepare(`INSERT INTO models (id, name, path, source, kind, architecture, quantization, size_bytes, train_context, parts, supports_thinking, supports_effort, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .run(id, input.name, input.path, input.source, input.use ?? "chat", input.architecture, input.quantization, input.sizeBytes, input.trainContext, input.parts ? JSON.stringify(input.parts) : null, flag(input.supportsThinking), flag(input.supportsEffort), time, time);
     } catch (error) {
       if (isUniqueError(error)) throw new ApiError("CONFLICT", "このファイルは登録済みです");
       throw error;
     }
     return this.get(id)!;
+  }
+
+  /** v5 より前に登録したチャットモデルの対応を読む。ファイルが読めなければ NULL のままにして次の起動でまた読む */
+  fillThinkingSupport(): void {
+    const rows = this.db.prepare("SELECT id, path FROM models WHERE kind = 'chat' AND supports_thinking IS NULL").all() as { id: string; path: string }[];
+    const update = this.db.prepare("UPDATE models SET supports_thinking = ?, supports_effort = ? WHERE id = ?");
+    for (const row of rows) {
+      try {
+        const info = readGguf(row.path);
+        update.run(flag(info.supportsThinking), flag(info.supportsEffort), row.id);
+      } catch {
+        // 外部ドライブが外れている等
+      }
+    }
   }
 
   delete(id: string): void {

@@ -11,6 +11,8 @@ export interface ModelItem {
   sizeBytes: number;
   trainContext: number | null;
   missing: boolean;
+  supportsThinking: boolean;
+  supportsEffort: boolean;
 }
 
 export interface AdapterItem {

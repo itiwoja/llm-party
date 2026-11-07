@@ -69,6 +69,8 @@ export function modelRoutes({ store, dataDir }: Context): Router {
         quantization: info.quantization,
         sizeBytes: info.sizeBytes,
         trainContext: info.trainContext,
+        supportsThinking: info.supportsThinking,
+        supportsEffort: info.supportsEffort,
       });
       res.status(201).json(model);
     } catch (error) {

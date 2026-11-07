@@ -3,6 +3,7 @@ import type { Db } from "../db";
 import { ApiError } from "../http-error";
 import { PASS_SCORE, summarize } from "../eval/grade";
 import type { CaseInput, Grader } from "../eval/schema";
+import type { Effort } from "../thinking";
 import { isUniqueError, now } from "./shared";
 
 export interface SetInput {
@@ -35,6 +36,8 @@ export interface PresetSnapshot {
   sampling: { temperature: number; topP: number; topK: number; minP: number; presencePenalty: number; repeatPenalty: number };
   systemPrompt: string | null;
   thinking: boolean;
+  /** 送った段階。送っていない・この項目ができる前のランは無い（D-76） */
+  effort?: Effort | null;
   contextSize: number;
 }
 

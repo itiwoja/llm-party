@@ -95,7 +95,7 @@ function str(value: string): Buffer {
 }
 
 /** 語彙の配列を含む、最小の GGUF を書く */
-export function writeGguf(file: string, options: { type?: string; contextLength?: number } = {}): void {
+export function writeGguf(file: string, options: { type?: string; contextLength?: number; chatTemplate?: string } = {}): void {
   const tokens = ["a", "b", "c"];
   const entries = [
     ...kvString("general.architecture", "testarch"),
@@ -104,8 +104,10 @@ export function writeGguf(file: string, options: { type?: string; contextLength?
     ...kvU32("general.file_type", 15),
     str("tokenizer.ggml.tokens"), u32(9), u32(8), u64(tokens.length), ...tokens.map(str),
     ...kvU32("testarch.context_length", options.contextLength ?? 65536),
+    ...(options.chatTemplate === undefined ? [] : kvString("tokenizer.chat_template", options.chatTemplate)),
   ];
-  writeFileSync(file, Buffer.concat([Buffer.from("GGUF"), u32(3), u64(0), u64(6), ...entries]));
+  const count = options.chatTemplate === undefined ? 6 : 7;
+  writeFileSync(file, Buffer.concat([Buffer.from("GGUF"), u32(3), u64(0), u64(count), ...entries]));
 }
 
 /** sd-server の代役（画像生成のテスト用） */

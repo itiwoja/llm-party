@@ -78,7 +78,7 @@ flowchart LR
 ベースモデルの GGUF。主なカラム：`id`, `name`, `path`, `source`
 
 <details>
-<summary>カラム定義（12列）</summary>
+<summary>カラム定義（16列）</summary>
 
 | カラム | 型 | NULL | デフォルト | キー | 説明 |
 |---|---|---|---|---|---|
@@ -92,6 +92,10 @@ flowchart LR
 | size_bytes | INTEGER | NO | | | |
 | train_context | INTEGER | YES | | | 学習時の文脈長 |
 | sha256 | TEXT | YES | | | 分かっていれば |
+| kind | TEXT | NO | chat | | `chat` / `image`（D-72） |
+| parts | TEXT(JSON) | YES | | | 部品でできた画像モデルの `{diffusion, llm, vae, tokenizer}`（D-73） |
+| supports_thinking | INTEGER | YES | | | チャットテンプレートに `enable_thinking` があれば 1（D-76）。NULL はまだ読んでいない（起動時に読む） |
+| supports_effort | INTEGER | YES | | | チャットテンプレートに `reasoning_effort` があれば 1（D-76） |
 | created_at | TEXT | NO | | | |
 | updated_at | TEXT | NO | | | |
 
@@ -120,7 +124,7 @@ LoRA の GGUF。主なカラム：`id`, `base_model_id`, `path`
 主なカラム：`id`, `name`, `model_id`, `sampling`
 
 <details>
-<summary>カラム定義（9列）</summary>
+<summary>カラム定義（10列）</summary>
 
 | カラム | 型 | NULL | デフォルト | キー | 説明 |
 |---|---|---|---|---|---|
@@ -130,6 +134,7 @@ LoRA の GGUF。主なカラム：`id`, `base_model_id`, `path`
 | sampling | TEXT(JSON) | NO | | | `{temperature, topP, topK, minP, presencePenalty, repeatPenalty}` |
 | system_prompt | TEXT | YES | | | |
 | thinking | INTEGER | NO | 0 | | 0 / 1 |
+| effort | TEXT | NO | medium | | `low` / `medium` / `high`（D-76） |
 | context_size | INTEGER | NO | 32768 | | |
 | created_at | TEXT | NO | | | |
 | updated_at | TEXT | NO | | | |
@@ -208,7 +213,7 @@ LoRA の GGUF。主なカラム：`id`, `base_model_id`, `path`
 | eval_set_id | TEXT | NO | | FK → eval_sets（CASCADE） | |
 | preset_id | TEXT | YES | | FK → presets（SET NULL） | 参考 |
 | preset_name | TEXT | NO | | | 推移の線の名前 |
-| preset_snapshot | TEXT(JSON) | NO | | | モデルのパス・sha256・LoRA と倍率・生成設定・システム・思考・文脈長 |
+| preset_snapshot | TEXT(JSON) | NO | | | モデルのパス・sha256・LoRA と倍率・生成設定・システム・思考・段階（`effort`）・文脈長 |
 | backend | TEXT | NO | | | `cuda` / `vulkan` / `cpu` |
 | tag_filter | TEXT(JSON) | YES | | | 絞り込んだタグ |
 | status | TEXT | NO | `queued` | | 04 の値 |

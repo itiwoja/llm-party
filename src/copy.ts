@@ -25,6 +25,12 @@ export const CP = {
   renameThread: "名前を変更", // CP-032
   confirmDeleteThread: (title: string) => `「${title}」を削除。会話は戻せない。作業フォルダのファイルは残る`, // CP-033
   thinking: "思考", // CP-034
+  thinkingSelect: "思考の強さ", // CP-314（読み上げ名）
+  thinkingOff: "思考 オフ", // CP-315
+  thinkingOn: "思考 オン", // CP-316
+  effortLow: "思考 低", // CP-317
+  effortMedium: "思考 中", // CP-318
+  effortHigh: "思考 高", // CP-319
   truncated: "生成の上限に到達。続きは次の指示で", // CP-207
   looped: "思考の繰り返しを検知して停止。指示を送り直して再試行", // CP-284
   pickFolderTitle: "フォルダのパス", // CP-200

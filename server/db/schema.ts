@@ -248,4 +248,10 @@ export const MIGRATIONS: string[] = [
   `
   ALTER TABLE models ADD COLUMN parts TEXT;
   `,
+  // v5：思考の段階（D-76）。models の2列はチャットテンプレートから読んだ対応で、NULL はまだ読んでいない（起動時に読む）
+  `
+  ALTER TABLE models ADD COLUMN supports_thinking INTEGER;
+  ALTER TABLE models ADD COLUMN supports_effort INTEGER;
+  ALTER TABLE presets ADD COLUMN effort TEXT NOT NULL DEFAULT 'medium';
+  `,
 ];

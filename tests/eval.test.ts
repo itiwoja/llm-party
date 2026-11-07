@@ -101,6 +101,18 @@ describe("評価の実行（fake-llama）", () => {
     expect(worker.context.slot.evalPresetId).toBeNull();
   });
 
+  it("段階に対応するモデルでは、ランに段階を写して送る", async () => {
+    const file = path.join(worker.dir, "effort.gguf");
+    writeGguf(file, { chatTemplate: "{{ reasoning_effort }}" });
+    const model = await worker.api("/models", { body: { path: file, mode: "reference" } });
+    const preset = await worker.api("/presets", { body: { name: "段階", modelId: model.body.id, sampling: SAMPLING, thinking: true, effort: "high", contextSize: 4096 } });
+    const set = await makeSet([chat("含む", contains("にちは"))]);
+    const [runId] = await start(set.id, [preset.body.id]);
+    await finished(runId);
+    expect((await detail(runId)).run.snapshot).toMatchObject({ thinking: true, effort: "high" });
+    expect(requests(worker).at(-1).chat_template_kwargs).toEqual({ enable_thinking: true, reasoning_effort: "high" });
+  });
+
   it("agent のケースは fixture のコピーで動き、test の採点がフォルダの状態を見る。ランの削除でフォルダが消える", async () => {
     script([{ toolCalls: [{ id: "c1", name: "write_file", arguments: { path: "hello.txt", content: "やあ\n" } }] }, { content: "書きました" }]);
     const set = await makeSet([

@@ -63,6 +63,7 @@ flowchart LR
 
 ## 最近の変更
 - 2026-11-07：`LLM_PARTY_LLAMA_BIN` の無効な指定で読み込みを止めないように変更（[ADR-012](adr/ADR-012-invalid-llama-override.md)、[変更レポート](changes/2026-11-07-invalid-llama-override.md)）。R-14 を決着として閉じ、R-19、D-74、CP-313 を追加
+- 2026-11-07：入力欄で思考の強さを選べるように変更（D-76。[変更記録](changes/2026-11-07-thinking-effort.md)）
 - 2026-11-06：localhost 段階の実装を反映。D-64〜D-68（容量は 10 進、内部の値、システムプロンプト、新しいスレッドで続ける、実装で足した文言）、API-030・031・050・056 の追記、CP-208 以降
 - 2026-11-06：Q-01・Q-09 が決着（D-55, D-56）。AI の回答の Markdown 表示（D-57、CMP-022）、日本語検索（D-58）、localhost 段階の開発環境（D-59）を追加
 - 2026-11-06：開発を2段階に変更。先に localhost で試し、OK が出てから exe にする（[12](12_localhost_stage.md)、[ADR-008](adr/ADR-008-localhost-first.md)、D-49〜D-54）。API-093〜094 と R-14〜R-16 を追加

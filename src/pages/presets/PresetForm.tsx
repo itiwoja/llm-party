@@ -8,6 +8,8 @@ import { IconButton } from "../../components/IconButton";
 import { DropdownMenu } from "../../components/Menu";
 import { useToast } from "../../components/Toast";
 import { CP } from "../../copy";
+import { DEFAULT_EFFORT, thinkingChoice, thinkingOptions, thinkingPatch } from "../../thinking";
+import type { Effort } from "../../types";
 import type { AdapterItem, ModelItem } from "../models/types";
 import { PG4, PG4_MISSING } from "./copy";
 import { contextFor } from "./defaults";
@@ -23,6 +25,7 @@ export interface PresetFull {
   sampling: Sampling;
   systemPrompt: string | null;
   thinking: boolean;
+  effort: Effort;
   contextSize: number;
 }
 
@@ -34,6 +37,7 @@ export interface FormValues {
   sampling: Record<keyof Sampling, string>;
   systemPrompt: string;
   thinking: boolean;
+  effort: Effort;
   contextSize: string;
 }
 
@@ -50,6 +54,7 @@ export function valuesOf(preset: PresetFull): FormValues {
     sampling: strings(preset.sampling),
     systemPrompt: preset.systemPrompt ?? "",
     thinking: preset.thinking,
+    effort: preset.effort,
     contextSize: String(preset.contextSize),
   };
 }
@@ -64,6 +69,7 @@ export function newValues(models: ModelItem[], defaultContextSize: number): Form
     sampling: strings(QWEN_CHAT.sampling),
     systemPrompt: "",
     thinking: QWEN_CHAT.thinking,
+    effort: DEFAULT_EFFORT,
     contextSize: String(contextFor(defaultContextSize, model?.trainContext ?? null)),
   };
 }
@@ -130,6 +136,7 @@ export function PresetForm({ preset, initial, models, adapters, onSaved }: Props
         sampling: Object.fromEntries(SAMPLING_FIELDS.map((f) => [f.key, Number(values.sampling[f.key])])),
         systemPrompt: values.systemPrompt.trim() ? values.systemPrompt : null,
         thinking: values.thinking,
+        effort: values.effort,
         contextSize,
       };
       const saved = preset ? await api.patch<PresetFull>(`/presets/${preset.id}`, body) : await api.post<PresetFull>("/presets", body);
@@ -197,7 +204,11 @@ export function PresetForm({ preset, initial, models, adapters, onSaved }: Props
       </div>
 
       <TextArea label={PG4.systemPrompt} rows={4} value={values.systemPrompt} onChange={(e) => set("systemPrompt", e.target.value)} />
-      <SwitchField label={PG4.thinking} checked={values.thinking} onCheckedChange={(v) => set("thinking", v)} />
+      {model?.supportsEffort ? (
+        <SelectField label={PG4.thinking} value={thinkingChoice(model, values)} onValueChange={(v) => setValues((current) => ({ ...current, ...thinkingPatch(v) }))} options={thinkingOptions(model)} />
+      ) : (
+        <SwitchField label={PG4.thinking} checked={values.thinking} onCheckedChange={(v) => set("thinking", v)} />
+      )}
       <TextField label={PG4.contextSize} type="number" min={CONTEXT_MIN} step={1} value={values.contextSize} onChange={(e) => set("contextSize", e.target.value)} error={errors.contextSize} required />
 
       {errors.general ? <p className="field-error" role="alert">{errors.general}</p> : null}
