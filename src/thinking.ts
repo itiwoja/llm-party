@@ -20,6 +20,12 @@ export function thinkingOptions(model: Support | undefined): { value: string; la
   return model?.supportsThinking ? [OFF, ON] : [];
 }
 
+/** 入力欄のセレクトに出す段階。オンオフはボタンが持つので、オフの間と段階の無いモデルでは空（D-37） */
+export function thinkingLevels(model: Support, preset: Thinking): { value: string; label: string }[] {
+  if (!model.supportsEffort) return [];
+  return preset.thinking || !model.supportsThinking ? LEVELS : [];
+}
+
 /** 段階だけのモデルは thinking が false でも段階を見せる（サーバーも ON で送る。server/thinking.ts） */
 export function thinkingChoice(model: Support, preset: Thinking): string {
   if (model.supportsEffort && (preset.thinking || !model.supportsThinking)) return preset.effort;

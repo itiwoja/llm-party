@@ -108,9 +108,10 @@ svg.lucide, .btn svg, .icon-btn svg { width: var(--icon-size); height: var(--ico
 /* CMP-015 選択部品 */
 .select-trigger { display: inline-flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-height: var(--control-height); padding: 0 var(--space-3); background: var(--color-surface); border: var(--line-width) solid var(--color-control); border-radius: var(--radius); cursor: pointer; font-family: var(--font-sans); }
 .select-trigger svg { width: 16px; height: 16px; color: var(--color-muted-fg); }
-.select-compact { max-width: 100%; min-height: var(--control-height-sm); font-size: 14px; border-color: transparent; background: transparent; padding: 0 var(--space-2); }
+.select-compact { max-width: 100%; min-height: var(--control-height-sm); font-size: 14px; border-color: transparent; background: transparent; gap: var(--space-1); padding: 0 var(--space-1) 0 var(--space-2); justify-content: flex-start; }
 .select-compact:hover:not(:disabled) { background: var(--color-hover); }
 .select-compact:disabled { cursor: default; color: var(--color-muted-fg); }
+.select-compact svg { width: 14px; height: 14px; }
 .select-compact > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .select-compact > span:last-child { display: inline-flex; flex: none; }
 .select-item { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
@@ -230,22 +231,23 @@ svg.lucide, .btn svg, .icon-btn svg { width: var(--icon-size); height: var(--ico
 
 /* PG-001 */
 .thread-head { display: flex; align-items: center; padding: var(--space-3) 0 0; }
-.head-context { font-size: 14px; color: var(--color-muted-fg); }
 .log { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-4) 0; }
 /* スクロールバーだけを隠す（スクロールはできる） */
-.log { scrollbar-width: none; }
-.log::-webkit-scrollbar { display: none; }
+.log, .list-pane, .composer { scrollbar-width: none; }
+.log::-webkit-scrollbar, .list-pane::-webkit-scrollbar, .composer::-webkit-scrollbar { display: none; }
 .log-inner { display: grid; gap: var(--space-5); }
 .user-text { padding: var(--space-3); background: var(--color-hover); border-radius: var(--radius); white-space: pre-wrap; overflow-wrap: anywhere; }
 .reasoning { margin: var(--space-1) 0 var(--space-3); padding-left: var(--space-3); border-left: 2px solid var(--color-line); color: var(--color-muted-fg); font-size: 14px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
 /* 入力・フォルダ・数字・プリセット・送信を1つの枠にまとめる */
-.composer-form { margin: var(--space-3) 0; padding: var(--space-2); background: var(--color-surface); border: var(--line-width) solid var(--color-control); border-radius: var(--radius-lg); }
-.composer-form .composer { min-height: 0; padding: var(--space-1) var(--space-2); background: transparent; border: 0; }
-.composer-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-1) var(--space-3); margin-top: var(--space-1); }
+.composer-form { margin: var(--space-3) 0; padding: var(--space-3); background: var(--color-surface); border: var(--line-width) solid var(--color-control); border-radius: var(--radius-lg); }
+.composer-form .composer { min-height: 0; padding: 0; background: transparent; border: 0; }
+.composer-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-1) var(--space-3); margin-top: var(--space-2); }
 .composer-foot .metrics { margin: 0; gap: var(--space-3); }
 .composer-info { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
 .composer-info .icon-btn { margin-right: calc(var(--space-2) * -1); }
-.composer-model { display: flex; align-items: center; gap: var(--space-2); min-width: 0; margin-left: auto; }
+.composer-model { display: flex; align-items: center; gap: var(--space-1); min-width: 0; margin-left: auto; }
+.composer-thinking:disabled { background: transparent; cursor: default; }
+.composer-thinking-on, .composer-thinking-on:hover { color: var(--color-primary); }
 .composer-send { background: var(--button-primary-bg); color: var(--button-primary-fg); }
 @media (hover: hover) { .composer-send:hover:not(:disabled) { background: var(--color-primary-hover); color: var(--button-primary-fg); } }
 .composer-send:disabled { background: var(--color-hover); color: var(--color-muted-fg); cursor: default; }

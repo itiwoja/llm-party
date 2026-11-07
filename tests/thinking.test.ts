@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { thinkingKwargs } from "../server/thinking";
-import { thinkingChoice, thinkingOptions, thinkingPatch } from "../src/thinking";
+import { thinkingChoice, thinkingLevels, thinkingOptions, thinkingPatch } from "../src/thinking";
 import { SAMPLING, startWorker, type TestWorker, waitForEvent, writeGguf } from "./helpers";
 
 const NONE = { supportsThinking: false, supportsEffort: false };
@@ -27,6 +27,14 @@ describe("thinkingKwargs", () => {
 });
 
 describe("思考の選択肢", () => {
+  it("入力欄の段階は、思考がオンのときだけ出す。段階だけのモデルは常に出す", () => {
+    const values = (model: typeof NONE, thinking: boolean) => thinkingLevels(model, { thinking, effort: "medium" }).map((o) => o.value);
+    expect(values(TOGGLE, true)).toEqual([]);
+    expect(values(BOTH, false)).toEqual([]);
+    expect(values(BOTH, true)).toEqual(["low", "medium", "high"]);
+    expect(values(LEVELS, false)).toEqual(["low", "medium", "high"]);
+  });
+
   it("モデルの対応で選択肢が決まる", () => {
     const values = (model?: typeof NONE) => thinkingOptions(model).map((o) => o.value);
     expect(values(undefined)).toEqual([]);
