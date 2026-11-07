@@ -20,7 +20,7 @@ export function thinkingOptions(model: Support | undefined): { value: string; la
   return model?.supportsThinking ? [OFF, ON] : [];
 }
 
-/** 入力欄のセレクトに出す段階。オンオフはボタンが持つので、オフの間と段階の無いモデルでは空（D-37） */
+/** 入力欄のバーに出す段階。オンオフはボタンが持つので、オフの間と段階の無いモデルでは空（D-92） */
 export function thinkingLevels(model: Support, preset: Thinking): { value: string; label: string }[] {
   if (!model.supportsEffort) return [];
   return preset.thinking || !model.supportsThinking ? LEVELS : [];

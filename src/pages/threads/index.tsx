@@ -5,13 +5,14 @@ import { useAppData, useBand, useServerEvent } from "../../app-data";
 import { Button } from "../../components/Button";
 import { ComposerInput } from "../../components/ComposerInput";
 import { SelectField } from "../../components/Controls";
+import { EffortPicker } from "../../components/EffortPicker";
 import { IconButton } from "../../components/IconButton";
 import { Metrics } from "../../components/Metrics";
 import { CP, MISSING_COPY } from "../../copy";
 import { WorkLayout } from "../../layouts";
 import { navigate, useRoute } from "../../router";
 import { pickFolder } from "../../platform";
-import { thinkingLevels, thinkingPatch } from "../../thinking";
+import { DEFAULT_EFFORT, thinkingLevels, thinkingPatch } from "../../thinking";
 import type { EngineState } from "../../types";
 import { Conversation } from "./Conversation";
 import { imageStore, useImageState } from "./imageStore";
@@ -570,13 +571,12 @@ export function ThreadsPage() {
               disabled={generating || imageBusy}
             />
             {preset && levelChoices.length > 0 ? (
-              <SelectField
-                compact
-                hideLabel
+              <EffortPicker
                 label={CP.thinkingSelect}
                 value={preset.effort}
-                onValueChange={chooseThinking}
                 options={levelChoices}
+                defaultValue={DEFAULT_EFFORT}
+                onValueChange={chooseThinking}
                 disabled={generating || imageBusy}
               />
             ) : null}
