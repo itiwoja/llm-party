@@ -1,18 +1,14 @@
-import type { ReactNode } from "react";
-
 interface Props {
   /** 状態の点と語（準備完了など） */
   status: { tone: "ok" | "busy" | "error" | "idle"; label: string };
-  /** 文脈の使用率（0〜100）。不明なら null */
-  contextPercent: number | null;
+  /** 文脈の円と文脈長。渡さなければどちらも出さない。percent は 0〜100、不明なら null（輪だけ） */
+  context?: { percent: number | null; length?: string };
   tokensPerSecond: number | null;
   /** エージェントのスレッドだけ。チャットでは渡さない */
   tools?: { used: number; max: number };
   generating?: boolean;
   contextLabel: string;
   toolLabel: string;
-  /** 先頭に足す要素（文脈長の表示など） */
-  extra?: ReactNode;
 }
 
 /** 文脈がこの割合を超えたら警告色（自動要約が近い） */
@@ -32,13 +28,13 @@ function ContextRing({ percent, warn, label }: { percent: number | null; warn: b
 }
 
 /** CMP-008。押せない。t/s は数字があるときだけ出す。生成中だけ横に脈打つ点 */
-export function Metrics({ status, contextPercent, tokensPerSecond, tools, generating, contextLabel, toolLabel, extra }: Props) {
-  const warn = contextPercent !== null && contextPercent > CONTEXT_WARNING_PERCENT;
+export function Metrics({ status, context, tokensPerSecond, tools, generating, contextLabel, toolLabel }: Props) {
+  const percent = context?.percent ?? null;
+  const warn = percent !== null && percent > CONTEXT_WARNING_PERCENT;
   return (
     <p className="metrics numeric" aria-live="off">
       <span className="metrics-item"><span className={`dot dot-${status.tone}`} aria-hidden />{status.label}</span>
-      {extra}
-      <ContextRing percent={contextPercent} warn={warn} label={contextLabel} />
+      {context ? <span className="metrics-item"><ContextRing percent={percent} warn={warn} label={contextLabel} />{context.length}</span> : null}
       {tokensPerSecond !== null || generating ? (
         <span className="metrics-item">
           {tokensPerSecond === null ? "—" : tokensPerSecond.toFixed(1)} t/s

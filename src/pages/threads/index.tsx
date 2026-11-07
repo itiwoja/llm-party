@@ -549,7 +549,7 @@ export function ThreadsPage() {
             ) : null}
             <Metrics
               status={ENGINE_STATUS[engine.state]}
-              contextPercent={usage.percent}
+              context={imageMode ? undefined : { percent: usage.percent, length: contextSize ? `${Math.round(contextSize / 1024)}K` : undefined }}
               tokensPerSecond={usage.tokensPerSecond}
               generating={generating}
               tools={agentView ? { used: lastTurn?.stepCount ?? 0, max: lastTurn?.stepLimit ?? STEP_LIMIT } : undefined}
@@ -559,7 +559,6 @@ export function ThreadsPage() {
           </div>
           <div className="composer-model">
             {imageBusy ? <span className="composer-note" role="status">{PG1.imageGenerating}</span> : null}
-            {contextSize && !imageMode ?<span className="numeric head-context">{Math.round(contextSize / 1024)}K</span> : null}
             <SelectField
               compact
               hideLabel
