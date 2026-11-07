@@ -1,5 +1,5 @@
 # 04. 機能仕様
-- プロジェクト：LLM-PARTY ／ 版数：v0.1（2026-11-05） ／ インプット：[03_use_cases](../03_use_cases.md)
+- プロジェクト：LLM-PARTY ／ 版数：v0.2（2026-11-07） ／ インプット：[03_use_cases](../03_use_cases.md)
 
 > **3行で**
 > 1. 機能は FR-001〜FR-021。分野ごとに4ファイルに分けた（下の表）。
@@ -52,7 +52,7 @@ flowchart LR
 
 | ID | 機能名 | 概要 | 関連UC | 優先度 | 詳細 | 段階 |
 |---|---|---|---|---|---|---|
-| FR-001 | GPU 判定・実行バックエンド選択 | 起動時に使えるバックエンドを調べ、CUDA → Vulkan → CPU の順に選ぶ | UC-001 | Must | [models-runtime](models-runtime.md#fr-001gpu-判定実行バックエンド選択) | exe（localhost は手動指定） |
+| FR-001 | GPU 判定・実行バックエンド選択 | 起動時に使えるバックエンドを調べ、CUDA → Vulkan → CPU の順に選ぶ | UC-001 | Must | [models-runtime](models-runtime.md#fr-001gpu-判定実行バックエンド選択) | exe（localhost は ADR-011 の D3 で自動） |
 | FR-002 | ランタイムパック導入 | CUDA 版 llama-server を DL・検証・展開 | UC-001 | Must | [models-runtime](models-runtime.md#fr-002ランタイムパック導入) | exe |
 | FR-003 | 推論エンジン管理 | llama-server の起動・停止・切替・死活確認 | UC-002, UC-007 | Must | [chat-agent](chat-agent.md#fr-003推論エンジン管理) | localhost |
 | FR-004 | スレッド管理 | 作成・一覧・名前変更・削除・検索 | UC-002 | Must | [app](app.md#fr-004スレッド管理) | localhost |

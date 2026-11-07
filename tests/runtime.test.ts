@@ -6,7 +6,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { installLlama } from "../server/runtime/installer";
 import type { LlamaFlavor, RuntimeAsset } from "../server/runtime/manifest";
-import { installDirFor, resolveLlama } from "../server/runtime/resolver";
+import { ignoredOverrideWarning, installDirFor, resolveLlama } from "../server/runtime/resolver";
 import { tempDir } from "./helpers";
 
 const sha = (file: string) => createHash("sha256").update(readFileSync(file)).digest("hex");
@@ -22,10 +22,19 @@ describe("resolveLlama", () => {
     expect(resolveLlama({ override: bin, dataDir: temp.dir, flavor: "cpu" })).toEqual({ status: "override", bin });
   });
 
-  it("上書きのパスが実在しなければ override-missing（パスを名指し）", () => {
-    const res = resolveLlama({ override: "/no/such/llama-server", dataDir: temp.dir, flavor: "cpu" });
-    expect(res.status).toBe("override-missing");
-    expect(res.status === "override-missing" && res.message).toContain("/no/such/llama-server");
+  it("上書きのパスが実在しなければ無視して、指定がないときと同じに解決する（ADR-012）", () => {
+    const none = resolveLlama({ override: null, dataDir: temp.dir, flavor: "cpu" });
+    expect(resolveLlama({ override: "/no/such/llama-server", dataDir: temp.dir, flavor: "cpu" })).toEqual(none);
+    expect(none.status).toBe("missing");
+
+    const dir = installDirFor(temp.dir, "cpu");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, "llama-server"), "");
+    expect(resolveLlama({ override: "/no/such/llama-server", dataDir: temp.dir, flavor: "cpu" })).toEqual({ status: "installed", bin: path.join(dir, "llama-server"), flavor: "cpu" });
+  });
+
+  it("名前だけの指定は、そのまま override で返す", () => {
+    expect(resolveLlama({ override: "llama-server", dataDir: temp.dir, flavor: "cpu" })).toEqual({ status: "override", bin: "llama-server" });
   });
 
   it("取得済みの llama-server があれば installed", () => {
@@ -38,6 +47,20 @@ describe("resolveLlama", () => {
   it("無ければ missing で、取得先のフォルダを返す", () => {
     const res = resolveLlama({ override: null, dataDir: temp.dir, flavor: "cpu" });
     expect(res).toEqual({ status: "missing", flavor: "cpu", installDir: installDirFor(temp.dir, "cpu") });
+  });
+});
+
+describe("ignoredOverrideWarning", () => {
+  it("指定なし・実在するパス・名前だけは null", () => {
+    expect(ignoredOverrideWarning(null)).toBeNull();
+    expect(ignoredOverrideWarning(process.execPath)).toBeNull();
+    expect(ignoredOverrideWarning("llama-server")).toBeNull();
+  });
+
+  it("実在しないパスなら CP-313 の文", () => {
+    expect(ignoredOverrideWarning("/no/such/llama-server")).toBe(
+      "LLM_PARTY_LLAMA_BIN のパスが見つからないので、指定を無視しました: /no/such/llama-server。起動コマンドから外すと消えます",
+    );
   });
 });
 

@@ -5,7 +5,7 @@ import { createServer } from "node:net";
 import path from "node:path";
 import { installLlama, type InstallInput } from "./runtime/installer";
 import type { LlamaFlavor } from "./runtime/manifest";
-import { hasNvidiaGpu, resolveLlama } from "./runtime/resolver";
+import { hasNvidiaGpu, ignoredOverrideWarning, resolveLlama } from "./runtime/resolver";
 import type { EventBus } from "./events";
 import { ApiError } from "./http-error";
 import { GENERATION_SLOTS } from "./generation-slot";
@@ -80,6 +80,8 @@ export class EngineManager {
   state: EngineState = "stopped";
   presetId: string | null = null;
   error: string | null = null;
+  /** 実在しない LLM_PARTY_LLAMA_BIN を無視したときの警告（ADR-012）。無ければ null */
+  warning: string | null = null;
   baseUrl = "";
   apiKey = "";
 
@@ -101,6 +103,7 @@ export class EngineManager {
     this.logsDir = path.join(options.dataDir, "logs");
     this.loadTimeoutMs = options.loadTimeoutMs ?? 60_000;
     this.stopGraceMs = options.stopGraceMs ?? 5_000;
+    this.warning = ignoredOverrideWarning(options.bin);
     mkdirSync(path.dirname(this.pidFile), { recursive: true });
     mkdirSync(this.logsDir, { recursive: true });
     this.killLeftover();
@@ -133,6 +136,7 @@ export class EngineManager {
       presetId: this.presetId,
       backend: this.backend,
       ...(this.error ? { error: this.error } : {}),
+      ...(this.warning ? { warning: this.warning } : {}),
       ...(this.state === "installing" && this.installPercent !== null ? { installPercent: this.installPercent } : {}),
     });
   }
@@ -168,13 +172,11 @@ export class EngineManager {
       return;
     }
     await this.options.beforeLoad?.();
+    this.warning = ignoredOverrideWarning(this.options.bin);
     const resolution = resolveLlama({ override: this.options.bin, dataDir: this.options.dataDir, flavor: await this.preferredFlavor() });
     let bin: string;
     let backend: EngineOptions["backend"];
-    if (resolution.status === "override-missing") {
-      this.setState("failed", resolution.message);
-      throw new ApiError("ENGINE_FAILED", resolution.message);
-    } else if (resolution.status === "override") {
+    if (resolution.status === "override") {
       bin = resolution.bin;
       backend = this.options.backend;
     } else if (resolution.status === "installed") {

@@ -90,7 +90,7 @@ export function AppDataProvider({ children, onUnauthorized }: { children: ReactN
     void reloadPresets().catch(unauthorized);
     void reloadModels().catch(unauthorized);
     return subscribeEvents((event) => {
-      if (event.event === "engine") setEngine({ state: event.data.state, presetId: event.data.presetId ?? null, error: event.data.error ?? null, installPercent: event.data.installPercent ?? null });
+      if (event.event === "engine") setEngine({ state: event.data.state, presetId: event.data.presetId ?? null, error: event.data.error ?? null, installPercent: event.data.installPercent ?? null, warning: event.data.warning ?? null });
       listeners.current.forEach((l) => l(event));
     });
   }, [onUnauthorized, reloadPresets, reloadModels]);
@@ -116,7 +116,11 @@ export function AppDataProvider({ children, onUnauthorized }: { children: ReactN
     return null;
   }, [engine, presets]);
 
-  const band = useMemo(() => pickBand([...(engineBand ? [engineBand] : []), ...Object.values(bands)]), [engineBand, bands]);
+  // CP-313 は worker が作る。警告は直すまで出続けるので、ほかの帯（warning・info を含む）がないときだけ出す
+  const band = useMemo<BandItem | null>(
+    () => pickBand([...(engineBand ? [engineBand] : []), ...Object.values(bands)]) ?? (engine.warning ? { kind: "warning", message: engine.warning } : null),
+    [engineBand, bands, engine.warning],
+  );
 
   const value = useMemo(
     () => ({ presets, models, modelsLoaded, engine, reloadPresets, reloadModels, setBand, band, listen }),

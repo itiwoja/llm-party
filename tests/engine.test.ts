@@ -1,8 +1,9 @@
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildArgs, EngineManager, type EngineSpec } from "../server/engine";
 import { EventBus } from "../server/events";
+import { installDirFor } from "../server/runtime/resolver";
 import { FAKE_LLAMA, tempDir, waitForEvent } from "./helpers";
 
 const SPEC: EngineSpec = { presetId: "p1", modelPath: "/m.gguf", contextSize: 32768, adapterPaths: [] };
@@ -87,9 +88,42 @@ describe("EngineManager", () => {
     expect(existsSync(path.join(temp.dir, "runtime", "engine.pid"))).toBe(false);
   });
 
-  it("存在しないバイナリは failed", async () => {
-    await expect(create("/no/such/llama-server").load(SPEC)).rejects.toThrow(/見つかりません.*\/no\/such\/llama-server/);
+  it("存在しないパスの指定は警告して無視し、取得してから ready になる（ADR-012）", async () => {
+    const events: { state: string; warning?: string }[] = [];
+    bus.subscribe((event) => { if (event.event === "engine") events.push(event.data as never); });
+    engine = new EngineManager({
+      bin: "/no/such/llama-server", backend: "cpu", dataDir: temp.dir, bus, loadTimeoutMs: 1500, stopGraceMs: 300,
+      installer: async () => FAKE_LLAMA,
+    });
+    expect(engine.warning).toContain("/no/such/llama-server");
+    await engine.load(SPEC);
+    expect(engine.state).toBe("ready");
+    expect(engine.warning).toContain("/no/such/llama-server");
+    expect(events.some((e) => e.state === "ready" && e.warning?.includes("/no/such/llama-server"))).toBe(true);
+  });
+
+  it("存在しないパスの指定でも、取得済みならそれを使う（取得しない）", async () => {
+    // GPU の有無は実機で変わるので、どちらの種類にも置く
+    for (const flavor of ["cpu", "cuda"] as const) {
+      const dir = installDirFor(temp.dir, flavor);
+      mkdirSync(dir, { recursive: true });
+      copyFileSync(FAKE_LLAMA, path.join(dir, "llama-server"));
+      chmodSync(path.join(dir, "llama-server"), 0o755);
+    }
+    const installer = vi.fn(async () => FAKE_LLAMA);
+    engine = new EngineManager({
+      bin: "/no/such/llama-server", backend: "cpu", dataDir: temp.dir, bus, loadTimeoutMs: 1500, stopGraceMs: 300, installer,
+    });
+    await engine.load(SPEC);
+    expect(engine.state).toBe("ready");
+    expect(installer).not.toHaveBeenCalled();
+    expect(engine.warning).toContain("/no/such/llama-server");
+  });
+
+  it("名前だけの指定で起動できなければ failed（警告は出さない）", async () => {
+    await expect(create("no-such-llama-server-name").load(SPEC)).rejects.toThrow(/起動できません/);
     expect(engine.state).toBe("failed");
+    expect(engine.warning).toBeNull();
   });
 
   it("指定がなく取得もまだなら、取得してから読み込む（installing → ready・進捗つき）", async () => {

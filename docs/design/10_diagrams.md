@@ -1,5 +1,5 @@
 # 10. ER図 / シーケンス図 / 状態遷移図
-- プロジェクト：LLM-PARTY ／ 版数：v0.1（2026-11-05） ／ インプット：[08](08_database.md)、[09](09_api/README.md)、[04 状態の定義](04_functional_spec/README.md#状態の定義)
+- プロジェクト：LLM-PARTY ／ 版数：v0.2（2026-11-07） ／ インプット：[08](08_database.md)、[09](09_api/README.md)、[04 状態の定義](04_functional_spec/README.md#状態の定義)
 
 > **3行で**
 > 1. ER 図は 08 の 17 テーブル。シーケンスは主要4本（初回・エージェント・評価・更新）とエラー1本（エンジン停止）。
@@ -248,6 +248,9 @@ stateDiagram-v2
 stateDiagram-v2
   [*] --> stopped
   stopped --> starting: 読み込み
+  stopped --> installing: 読み込み（未導入）
+  installing --> starting: 取得の完了
+  installing --> failed: 取得の失敗
   starting --> ready: /health 200
   starting --> failed: 60 秒・異常終了
   ready --> starting: 別のプリセット

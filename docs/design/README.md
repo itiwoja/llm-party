@@ -16,13 +16,12 @@
 | R-08 | リスク | ネイティブモジュールのビルド | asarUnpack と検査 | — | [07](07_architecture.md#-判断してほしいこと) |
 | R-09 | リスク | cudart の再配布条件 | 公開前に確認、だめなら公式から直接 DL | FR-002 | [models-runtime](04_functional_spec/models-runtime.md#-判断してほしいこと) |
 | R-10 | リスク | コマンドはワークスペース外にも影響しうる | 承認制、自動承認は明示 ON のみ | — | [04](04_functional_spec/README.md#-判断してほしいこと) |
-| R-14 | リスク | WSL 用の CUDA 版 llama-server は自分で用意する | 公式の Ubuntu 用 CUDA 版が GPU で動くことを確認済み（D-59）。手順は [12](12_localhost_stage.md#llama-server-の用意) | 動作確認 | [12](12_localhost_stage.md#-判断してほしいこと) |
+| R-19 | リスク | `LLM_PARTY_LLAMA_BIN` の打ち間違いでも読み込みが止まらず、別の本体が動くことがある（未取得なら約 780MB の自動取得も始まる） | 警告で気づけるようにする（CP-313） | — | [ADR-012](adr/ADR-012-invalid-llama-override.md) |
 | R-15 | リスク | Windows 固有の動きは exe 段階まで確かめられない | exe 段階の確認に入れる | exe 段階 | 同上 |
 | R-16 | リスク | 他のサイトから localhost の API を叩かれる | トークン＋Host・Origin の確認 | — | 同上 |
 | Q-14 | 未決 | MOSS-Image の DiT の版：unsloth の UD-Q4_K_XL か、leejet の MOSS-Image-SFT-GGUF か | unsloth の UD-Q4_K_XL（手順が検証済みの card に合う） | API-097 の部品一覧 | [ADR-010](adr/ADR-010-moss-image-recipe.md) |
 | Q-15 | 未決 | 既定のエンコーダ（Qwen3.5-9B Q8_0 は約 9GB 級）を、小さい量子化に替えるか | 替えない（品質を優先）。8GB 機は後で決める | R-18 の扱い | [ADR-010](adr/ADR-010-moss-image-recipe.md) |
 | R-17 | リスク | 同梱の sd-server を master-975 以降に上げても、MOSS の複数ファイル指定が未確認 | 実機で1枚生成を確かめる。だめなら版を上げ直す | FR-012 | [ADR-010](adr/ADR-010-moss-image-recipe.md) |
-| Q-16 | 決定 | llama-server の取得：初回の読み込みで自動に取る（D1）。取得元は ggml-org の Releases 直接（D2）、NVIDIA があれば CUDA（D3）、置き場は `data/runtime/`（D4）、上限 1GB・再試行 3 回（D5）、sd-server は後回し（D6） | — | 環境変数だけに頼る現状を変える（R-14） | [ADR-011](adr/ADR-011-runtime-resolver.md) |
 | R-18 | リスク | 既定の組み合わせは 8GB の GPU に載らない見込み | 16GB 以上を前提にと明記し、8GB は Q-15 の結論後 | FR-012 | [ADR-010](adr/ADR-010-moss-image-recipe.md) |
 
 番号の欠け（Q-01, Q-03, Q-04, Q-05, Q-07, Q-08, Q-09）は決着済み → [00 決定事項ログ](00_overview.md#決定事項ログ)（D-55, D-33, D-43, D-46, D-42, D-38, D-56）。Q-02 と Q-06 は exe 段階で決める（D-59）。
@@ -57,8 +56,13 @@ flowchart LR
 | [ADR-006](adr/ADR-006-auto-compaction.md) | 文脈 80% で自動要約（直近 6 メッセージは残す） | 承認 |
 | [ADR-007](adr/ADR-007-update-flow.md) | 起動時に確認、DL と適用は利用者の操作 | 承認 |
 | [ADR-008](adr/ADR-008-localhost-first.md) | 先に localhost で試し、OK が出てから exe にする | 承認 |
+| [ADR-009](adr/ADR-009-sd-server-child.md) | 画像生成は sd-server を子プロセスで動かす | 承認 |
+| [ADR-010](adr/ADR-010-moss-image-recipe.md) | MOSS-Image は部品のレシピとして複数ファイルで動かす | 承認 |
+| [ADR-011](adr/ADR-011-runtime-resolver.md) | llama-server の場所は worker が探し、無ければ自動に取得する | 承認・実装済み（無効な指定の扱いは ADR-012 で改訂） |
+| [ADR-012](adr/ADR-012-invalid-llama-override.md) | `LLM_PARTY_LLAMA_BIN` のパスが実在しなければ、警告して無視する | 承認・実装済み |
 
 ## 最近の変更
+- 2026-11-07：`LLM_PARTY_LLAMA_BIN` の無効な指定で読み込みを止めないように変更（[ADR-012](adr/ADR-012-invalid-llama-override.md)、[変更レポート](changes/2026-11-07-invalid-llama-override.md)）。R-14 を決着として閉じ、R-19、D-74、CP-313 を追加
 - 2026-11-06：localhost 段階の実装を反映。D-64〜D-68（容量は 10 進、内部の値、システムプロンプト、新しいスレッドで続ける、実装で足した文言）、API-030・031・050・056 の追記、CP-208 以降
 - 2026-11-06：Q-01・Q-09 が決着（D-55, D-56）。AI の回答の Markdown 表示（D-57、CMP-022）、日本語検索（D-58）、localhost 段階の開発環境（D-59）を追加
 - 2026-11-06：開発を2段階に変更。先に localhost で試し、OK が出てから exe にする（[12](12_localhost_stage.md)、[ADR-008](adr/ADR-008-localhost-first.md)、D-49〜D-54）。API-093〜094 と R-14〜R-16 を追加

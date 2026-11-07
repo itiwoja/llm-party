@@ -1,5 +1,5 @@
 # 01. 要件定義
-- プロジェクト：LLM-PARTY ／ 版数：v0.1（2026-11-05） ／ インプット：[00_overview](00_overview.md)
+- プロジェクト：LLM-PARTY ／ 版数：v0.2（2026-11-07） ／ インプット：[00_overview](00_overview.md)
 
 > **3行で**
 > 1. 手元の Windows PC で Qwen3.5 9B などの GGUF を動かし、対話・コーディング・評価を1つのアプリで行う（REQ-001〜REQ-009 が Must）。
@@ -76,7 +76,7 @@ flowchart LR
 | REQ-004 | Hugging Face のモデルをジャンルで絞って検索・DL でき、手元の GGUF と LoRA（GGUF 形式）を登録できる。チャットで動かせるのは GGUF だけで、ほかは保存まで | Must | チューニングしたモデルを試す | localhost |
 | REQ-005 | モデル・LoRA と倍率・生成設定・システムプロンプト・思考モード・文脈長を「プリセット」として保存し切り替えられる | Must | 比較の単位 | localhost |
 | REQ-006 | 評価セットをアプリ内で作り、JSONL で取込・書出できる。プリセットを選んで一括実行し、文字列一致/正規表現・人手・テストコマンドで採点し、ランどうしの比較と推移を見られる | Must | 主目的 | localhost |
-| REQ-007 | GPU に合わせて実行バックエンドを選ぶ。Vulkan・CPU は同梱、CUDA は NVIDIA の人だけ追加 DL | Must | 知人の PC がバラバラ | exe（localhost は手動指定） |
+| REQ-007 | GPU に合わせて実行バックエンドを選ぶ。Vulkan・CPU は同梱、CUDA は NVIDIA の人だけ追加 DL | Must | 知人の PC がバラバラ | exe（localhost は ADR-011 の D3 で自動） |
 | REQ-008 | NSIS インストーラーで配り、GitHub Releases の新版を起動時に知らせて更新できる | Must | 配布 | exe |
 | REQ-009 | 会話・評価結果・設定を端末内に保存し、続きから再開できる。ログを残して不具合を追える | Must | 普段使い | localhost |
 | REQ-010 | エージェントが書き換えたファイルを1件ずつ元に戻せる | Should | 9B の誤操作対策 | localhost |

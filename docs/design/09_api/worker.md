@@ -1,5 +1,5 @@
 # 09-2. API設計：worker（画面 ↔ worker の HTTP＋SSE）
-- プロジェクト：LLM-PARTY ／ 版数：v0.1（2026-11-05） ／ 親：[09 README](README.md)
+- プロジェクト：LLM-PARTY ／ 版数：v0.2（2026-11-07） ／ 親：[09 README](README.md)
 
 > **3行で**
 > 1. REST 風の `/api/*` が API-020〜094、通知は SSE の `/api/events`（API-099）。
@@ -40,7 +40,7 @@ sequenceDiagram
 | API-020 | GET | `/api/health` | worker の死活 | 全般 |
 | API-021 | GET | `/api/system` | GPU 判定の結果、使用中のバックエンド、CUDA パックの状態、空き容量 | FR-001, SCR-002, SCR-008 |
 | API-022 | POST | `/api/runtime-packs/install` | CUDA パックの導入を始める（202。`runtime.*` イベント）。`DELETE` で削除。exe 段階だけ | FR-002 |
-| API-023 | GET | `/api/engine` | エンジンの状態・読み込み中のプリセット | FR-003, SCR-001 |
+| API-023 | GET | `/api/engine` | エンジンの状態・読み込み中のプリセット・警告（`warning?`） | FR-003, SCR-001 |
 | API-024 | POST | `/api/engine/load` | `{ presetId }` を読み込む（202。`engine` イベント） | FR-003 |
 | API-025 | POST | `/api/engine/unload` | 止める | FR-003 |
 
@@ -153,7 +153,7 @@ SSE。1本の接続で全種類を流す。切れたら画面がつなぎ直し�
 
 | event | data の主な中身 | 使う画面 |
 |---|---|---|
-| `engine` | `{ state, presetId, backend, error? }` | SCR-001 |
+| `engine` | `{ state, presetId, backend, error?, warning?, installPercent? }`（`warning` は読み込みを止めない注意。ADR-012） | SCR-001 |
 | `turn.delta` | `{ turnId, messageId, content?, reasoning? }`（差分） | SCR-001 |
 | `turn.usage` | `{ turnId, usedTokens, contextSize, tokensPerSecond? }`（生成中は速度も送る） | SCR-001 |
 | `turn.compacted` | `{ threadId, summaryMessageId, count }` | SCR-001 |

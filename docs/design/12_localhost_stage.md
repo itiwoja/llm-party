@@ -1,5 +1,5 @@
 # 12. localhost 段階の仕様
-- プロジェクト：LLM-PARTY ／ 版数：v0.1（2026-11-06） ／ インプット：[ADR-008](adr/ADR-008-localhost-first.md)、[07](07_architecture.md)、[09](09_api/README.md)
+- プロジェクト：LLM-PARTY ／ 版数：v0.2（2026-11-07） ／ インプット：[ADR-008](adr/ADR-008-localhost-first.md)、[07](07_architecture.md)、[09](09_api/README.md)
 
 > **3行で**
 > 1. 最初は Electron なしで作り、WSL の worker が `http://127.0.0.1:8787` で画面と API を出す。ブラウザで色々試す。
@@ -9,7 +9,7 @@
 ## 🧭 判断してほしいこと
 | # | 種類 | 論点 | 選択肢 | おすすめ（理由） | 決まらないと止まるもの |
 |---|---|---|---|---|---|
-| R-14 | リスク | ~~WSL 用の CUDA 版 llama-server は利用者が自分で用意する~~ → 利用者にパスを書かせる設計は不適切と判明（指摘）。worker が探し、無ければ取得を案内する | 案：[ADR-011](adr/ADR-011-runtime-resolver.md)（判断 D1〜D6 が未決） | 公式の `llama-b12125-bin-ubuntu-cuda-12.8-x64` が RTX 4060 で動くことを確認済み（D-59）。取得の仕組みは ADR-011 | 全機能の動作確認 |
+| R-19 | リスク | `LLM_PARTY_LLAMA_BIN` の打ち間違いでも読み込みは止まらないので、自分でビルドした本体を試すつもりで別の本体が動くことがある。何も取得していなければ約 780MB の自動取得も始まる | — | 警告を画面とターミナルに出して気づけるようにする（CP-313、[ADR-012](adr/ADR-012-invalid-llama-override.md)） | — |
 | R-15 | リスク | PowerShell・ジャンクション・Windows のパスなどの動きは、exe 段階まで確かめられない | — | [exe 段階でやること](#exe-段階でやること)に Windows での確認を入れる。パスとシェルは差し替えられる形で作る | exe 段階 |
 | R-16 | リスク | エージェントがコマンドを動かす API をブラウザから呼ぶので、他のサイトから叩かれないようにする必要がある | — | トークンに加えて Host と Origin を確かめる（[接続と認証](#接続と認証)） | — |
 
@@ -62,16 +62,29 @@ WSL で動かすのは検証のためで、Linux 版の配布ではない。D-19
 
 | 環境変数 | 既定 | 説明 |
 |---|---|---|
-| `LLM_PARTY_LLAMA_BIN` | なし（任意） | 使う llama-server のパスを上書きする。未設定なら worker が `data/runtime/` を見て、無ければ取得を案内する（[ADR-011](adr/ADR-011-runtime-resolver.md)） |
+| `LLM_PARTY_LLAMA_BIN` | なし（任意） | 使う llama-server のパスを上書きする。未設定なら worker が `data/runtime/` を見て、無ければ自動に取得する（[ADR-011](adr/ADR-011-runtime-resolver.md)）。パスが実在しなければ、警告を出して未設定と同じに動く（[ADR-012](adr/ADR-012-invalid-llama-override.md)） |
 | `LLM_PARTY_SD_BIN` | なし（画像生成だけ使えない） | 使う sd-server のパス（ADR-009） |
-| `LLM_PARTY_BACKEND` | `cuda` | 表示と記録に使うバックエンド名（`cuda` / `vulkan` / `cpu`） |
+| `LLM_PARTY_BACKEND` | `cuda` | `LLM_PARTY_LLAMA_BIN` の本体を使うときのバックエンド名（`cuda` / `vulkan` / `cpu`）。自動で決めた本体には効かない |
 | `LLM_PARTY_PORT` | `8787` | 待ち受けポート |
 | `LLM_PARTY_DATA_DIR` | リポジトリの `data/` | データの置き場。`data/` は Git に入れない |
 
 ## llama-server の用意
 初回のモデル読み込みで、worker が自動に取得する（[ADR-011](adr/ADR-011-runtime-resolver.md)）。取得先は `<LLM_PARTY_DATA_DIR>/runtime/llama/b12125-<種類>/`。NVIDIA の GPU があれば CUDA 版（約 780MB：本体＋cudart）、無ければ CPU 版（約 23MB）。
 
-自分で用意した llama-server を使うときだけ、`LLM_PARTY_LLAMA_BIN` にそのパスを書く（上書き。このときは自動取得をしない）。
+自分で用意した llama-server を使うときだけ、`LLM_PARTY_LLAMA_BIN` にそのパスを書く（上書き）。
+
+```mermaid
+flowchart TD
+  S[モデルを読み込む] --> A{LLM_PARTY_LLAMA_BIN<br/>は設定されている？}
+  A -- いいえ --> C{"data/runtime に<br/>取得済み？"}
+  A -- はい --> B{パスの形で<br/>実在しない？}
+  B -- いいえ --> O[指定の本体を使う]
+  B -- はい --> W[CP-313 の警告を出す<br/>指定を無視する]
+  W --> C
+  C -- はい --> I[取得済みの本体を使う]
+  C -- いいえ --> D[自動に取得してから使う]
+```
+見てほしいところ：指定が間違っていても読み込みは止まらない。止まるのは、実在する本体が動かなかったときと、取得に失敗したとき。
 
 ## 接続と認証
 - 待ち受けは `127.0.0.1` だけ（NFR-011）。LAN から見えるアドレスでは待ち受けない
@@ -95,7 +108,7 @@ WSL で動かすのは検証のためで、Linux 版の配布ではない。D-19
 
 | ID | メソッド | パス | 概要 |
 |---|---|---|---|
-| API-093 | GET | `/api/local/info` | `{ version, llamaBuild, isPackaged: false, dataDir, logsDir }`。localhost 段階の `llamaBuild` は `null`（版は利用者が用意するので分からない） |
+| API-093 | GET | `/api/local/info` | `{ version, llamaBuild, isPackaged: false, dataDir, logsDir }`。localhost 段階の `llamaBuild` は `null`（動いている本体の版を返す方法は未設計） |
 | API-094 | GET / PUT | `/api/local/hf-token` | GET は `{ has }` だけ返す。PUT は `{ token \| null }`。`data/secrets/hf-token`（権限 600）に平文で保存し、画面には返さない |
 
 API-093 と API-094 は localhost 段階の起動の入口でだけ有効にする。exe 段階の worker には載せない。
@@ -107,7 +120,7 @@ API-093 と API-094 は localhost 段階の起動の入口でだけ有効にす�
 |---|---|---|
 | ワークスペースにできない場所（FR-007） | `/`、`/mnt/<ドライブ>`、`$HOME` 直下、`/etc` `/usr` `/bin` `/sbin` `/lib*` `/boot` `/proc` `/sys` `/dev` `/var`、データフォルダ | [FR-007](04_functional_spec/app.md#fr-007ワークスペース選択) の Windows の表 |
 | `run_command` のシェル | `/bin/bash -c`。時間切れはプロセスグループごと終了 | Q-06 |
-| GPU | 環境変数で手動指定。`--list-devices` の判定はしない | FR-001 |
+| GPU | `nvidia-smi` が動けば CUDA、無ければ CPU（ADR-011 の D3）。`LLM_PARTY_LLAMA_BIN` の本体を使うときだけ `LLM_PARTY_BACKEND` に従う | FR-001 |
 | CUDA パック | なし（`GET /api/system` のパックの状態は空、画面に出さない） | FR-002 |
 | 初回セットアップ（UC-001） | GPU の手順を飛ばし、モデルの準備から始める | UC-001 全部 |
 | 更新（FR-019） | なし | FR-019 |

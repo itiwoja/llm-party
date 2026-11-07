@@ -14,7 +14,7 @@ export function engineRoutes({ store, engine, bus }: Context): Router {
   api.get("/events", eventsHandler(bus));
 
   // エンジン（API-023〜025）
-  const engineStatus = () => ({ state: engine.state, presetId: engine.presetId, error: engine.error });
+  const engineStatus = () => ({ state: engine.state, presetId: engine.presetId, error: engine.error, warning: engine.warning });
   api.get("/engine", (_req, res) => {
     res.json(engineStatus());
   });

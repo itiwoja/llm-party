@@ -1,5 +1,5 @@
 # 04-1. 機能仕様：準備（GPU・モデル・プリセット）
-- プロジェクト：LLM-PARTY ／ 版数：v0.1（2026-11-05） ／ 親：[04 README](README.md)
+- プロジェクト：LLM-PARTY ／ 版数：v0.2（2026-11-07） ／ 親：[04 README](README.md)
 
 > **3行で**
 > 1. 実行バックエンドは CUDA → Vulkan → CPU の順に、使えるものを自動で選ぶ。CUDA は追加のランタイムパックとして DL する。
@@ -46,7 +46,7 @@ flowchart LR
 以下は詳細層。
 
 ## FR-001：GPU 判定・実行バックエンド選択
-〔UC-001〕 exe 段階で作る。localhost 段階は環境変数で手動指定する（D-52、[12](../12_localhost_stage.md#wsl-での違い)）。
+〔UC-001〕 exe 段階で作る。localhost 段階は NVIDIA の有無だけで選ぶ（ADR-011 の D3、[12](../12_localhost_stage.md#wsl-での違い)）。
 
 - 処理：
   1. 入っている各バックエンドの `llama-server.exe --list-devices` を実行し、見つかったデバイス（名前・VRAM）を集める

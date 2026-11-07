@@ -1,5 +1,5 @@
 # 11. 技術仕様書
-- プロジェクト：LLM-PARTY ／ 版数：v0.1（2026-11-05） ／ インプット：00〜10 すべて
+- プロジェクト：LLM-PARTY ／ 版数：v0.2（2026-11-07） ／ インプット：00〜10 すべて
 
 > **3行で**
 > 1. LLM-PARTY は Electron（main・画面・worker）＋同梱の llama-server で、GGUF モデルとの対話・ワークスペース内のエージェント・評価セットの一括実行を行う Windows アプリ。
@@ -92,7 +92,7 @@ flowchart LR
 |---|---|---|
 | 画面 | worker が `127.0.0.1:8787` で配る（開発中は Vite をミドルウェアに） | `app://llm-party` |
 | worker | tsx または Node で起動 | utilityProcess（asar の外） |
-| llama-server | WSL 用を `LLM_PARTY_LLAMA_BIN` で指定 | `resources\llama\<ビルド番号>-<cpu\|vulkan>\`、CUDA は `runtime\` |
+| llama-server | `data/runtime/llama/` に自動で取得（ADR-011）。`LLM_PARTY_LLAMA_BIN` は上書き用で、パスが実在しなければ警告して無視する（ADR-012） | `resources\llama\<ビルド番号>-<cpu\|vulkan>\`、CUDA は `runtime\` |
 | データ | リポジトリの `data/` | `%LOCALAPPDATA%\llm-party\` |
 | 更新 | 動かさない | GitHub `itiwoja/llm-party` |
 
@@ -120,7 +120,7 @@ flowchart LR
 | R-08 | ネイティブモジュールのビルド | asarUnpack と検査 | [07](07_architecture.md) |
 | R-09 | cudart の再配布条件 | 公開前に確認、だめなら公式から直接 DL | [models-runtime](04_functional_spec/models-runtime.md) |
 | R-10 | コマンドはワークスペース外に影響しうる | 承認制、自動承認は明示 ON だけ | [04 README](04_functional_spec/README.md) |
-| R-14 | WSL 用 llama-server を自分で用意する | 公式の Ubuntu 用 CUDA 版で確認済み。手順は 12 | [12](12_localhost_stage.md) |
+| R-19 | `LLM_PARTY_LLAMA_BIN` の打ち間違いでも読み込みが止まらず、別の本体が動くことがある | 警告で気づけるようにする（CP-313） | [ADR-012](adr/ADR-012-invalid-llama-override.md) |
 | R-15 | Windows 固有の動きは exe 段階まで確かめられない | exe 段階の確認に入れる | 同上 |
 | R-16 | 他のサイトから localhost の API を叩かれる | トークン＋Host・Origin の確認 | 同上 |
 

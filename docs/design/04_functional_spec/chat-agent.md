@@ -1,5 +1,5 @@
 # 04-2. 機能仕様：会話とエージェント
-- プロジェクト：LLM-PARTY ／ 版数：v0.1（2026-11-05） ／ 親：[04 README](README.md)
+- プロジェクト：LLM-PARTY ／ 版数：v0.2（2026-11-07） ／ 親：[04 README](README.md)
 
 > **3行で**
 > 1. 推論エンジン（llama-server）を1つだけ動かし、会話もエージェントも評価もそこへ OpenAI 互換の `/v1/chat/completions` で投げる。
@@ -71,7 +71,7 @@ flowchart TD
      </details>
   4. `GET /health`（API-100）を 500 ミリ秒ごとに確かめ、200 になったら `ready`。60 秒で `failed`（D-32）
   5. 状態を `engine` イベント（API-099）で画面に知らせる
-- 出力：エンジンの状態（`stopped` / `starting` / `ready` / `failed`）、読み込み中のプリセット ID、使用中のバックエンド
+- 出力：エンジンの状態（`stopped` / `starting` / `ready` / `failed` / `installing`）、読み込み中のプリセット ID、使用中のバックエンド、警告（任意）
 - エラー・例外：
 
   | 条件 | 挙動 | メッセージ |
@@ -80,6 +80,7 @@ flowchart TD
   | 起動直後に終了（VRAM 不足など） | `failed`。標準エラーの末尾 20 行を表示 | 「モデルの読み込みに失敗しました」＋末尾 |
   | 動作中に終了 | `failed`。生成中のターンは `failed` | 「推論エンジンが停止しました。再読み込み」 |
 - その他：
+  - localhost 段階の本体の決め方は [12](../12_localhost_stage.md#llama-server-の用意)。`LLM_PARTY_LLAMA_BIN` のパスが実在しないときは `failed` にせず、警告（CP-313）を出して続ける（[ADR-012](../adr/ADR-012-invalid-llama-override.md)）
   - 標準出力・標準エラーは `logs/llama-server-YYYYMMDD.log` に書く（FR-021）
   - worker の起動時、前回のプロセスが残っていれば（`runtime/engine.pid`）止める
   - アプリ終了時は必ず止める

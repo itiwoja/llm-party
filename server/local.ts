@@ -5,7 +5,7 @@ import { createApp } from "./app";
 import { loadLocalConfig } from "./config";
 import { createContext } from "./context";
 import { logger, pruneLogs } from "./logger";
-import { missingBinaryMessage } from "./binary";
+import { ignoredOverrideWarning } from "./runtime/resolver";
 import { localRoutes } from "./routes/local";
 import { loadOrCreateToken } from "./token";
 
@@ -51,8 +51,8 @@ server.listen(config.port, "127.0.0.1", () => {
   console.log(`LLM-PARTY: http://127.0.0.1:${config.port}/#token=${token}`);
   if (!config.llamaBin) console.log("llama-server は未指定です。取得していなければ、初回のモデル読み込みで自動に取得します（ADR-011）");
   else {
-    const missing = missingBinaryMessage(config.llamaBin, "LLM_PARTY_LLAMA_BIN");
-    if (missing) console.warn(`${missing}。モデルを読み込むときに失敗します`);
+    const ignored = ignoredOverrideWarning(config.llamaBin);
+    if (ignored) console.warn(ignored);
   }
   if (!config.sdBin) console.warn("LLM_PARTY_SD_BIN が未設定です。画像生成は使えません");
 });
