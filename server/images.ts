@@ -42,6 +42,7 @@ export class ImageService {
     if (this.busy || this.chat.busy) throw new ApiError("BUSY", "別の生成が動いています");
     if (this.slot.evalPresetId) throw new ApiError("BUSY", "評価の実行中です");
 
+    this.store.threads.titleFromPrompt(threadId, input.prompt);
     this.busy = true;
     const abort = new AbortController();
     this.running = { threadId, abort };

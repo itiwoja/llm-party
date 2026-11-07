@@ -320,6 +320,7 @@ export function ThreadsPage() {
       setPendingImage(null);
       if (data.status === "failed") setError(data.error);
       else if (threadRef.current === data.threadId) void loadDetail(data.threadId).catch(() => undefined);
+      void loadThreads().catch(() => undefined);
     } else if (event === "eval.progress") {
       setEvalProgress({ done: data.done, total: data.total });
     } else if (event === "eval.finished") {

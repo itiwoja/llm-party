@@ -67,6 +67,11 @@ export class ThreadStore {
     })();
   }
 
+  /** 題名がまだ無ければ、依頼の1行目を題名にする（一覧に空の行を出さないため） */
+  titleFromPrompt(id: string, prompt: string): void {
+    this.db.prepare("UPDATE threads SET title = ? WHERE id = ? AND title = ''").run(prompt.split("\n", 1)[0], id);
+  }
+
   setAutoApprove(id: string, value: boolean): void {
     this.db.prepare("UPDATE threads SET auto_approve = ? WHERE id = ?").run(value ? 1 : 0, id);
   }

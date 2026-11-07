@@ -138,6 +138,8 @@ describe("画像生成の経路", () => {
 
     const started = await worker.api(`/threads/${thread.id}/images`, { body: { modelId: model.id, prompt: "a cat", width: 64, height: 64, steps: 2 } });
     expect(started.status).toBe(202);
+    // 一覧に空の行を出さないよう、受け付けた時点で題名が付いている
+    expect(worker.context.store.threads.get(thread.id)?.title).toBe("a cat");
     const done = await waitForEvent(worker.context.bus, (e) => e.event === "image" && (e.data as { threadId: string; status: string }).status !== "progress" && (e.data as { threadId: string }).threadId === thread.id, 10_000);
     const imageId = (done.data as { imageId: string; status: string }).imageId;
     expect((done.data as { status: string }).status).toBe("completed");
