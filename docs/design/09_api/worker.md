@@ -51,7 +51,7 @@ sequenceDiagram
 | API-031 | POST | `/api/threads` | `{ workspaceId?, presetId, summaryFromThreadId? }` で作る。`summaryFromThreadId` は「新しいスレッドで続ける」（D-67） | FR-004, FR-006 |
 | API-032 | PATCH | `/api/threads/:id` | `{ title?, autoApprove? }` | FR-004, FR-010 |
 | API-033 | DELETE | `/api/threads/:id` | 削除（動いているターンは止める） | FR-004 |
-| API-034 | GET | `/api/threads/:id/messages` | メッセージ・ターン・ツール呼び出し | FR-004, SCR-001 |
+| API-034 | GET | `/api/threads/:id/messages` | メッセージ・ターン・ツール呼び出し。生成中の assistant はそこまでの文字を返す（D-84） | FR-004, SCR-001 |
 | API-035 | POST | `/api/threads/:id/turns` | 送信（下に詳細） | FR-005, FR-008 |
 | API-036 | POST | `/api/turns/:id/cancel` | 停止 | FR-005 |
 | API-037 | POST | `/api/turns/:id/continue` | 40 回上限の後に `{ action: "continue" \| "stop" }` | FR-008 |
@@ -108,6 +108,7 @@ sequenceDiagram
 |---|---|---|---|---|
 | API-095 | POST | `/api/threads/:id/images` | `{ modelId, prompt, width?, height?, steps?, seed? }` を受けて 202 `{ status: "running" }`。結果は SSE の `image` イベント（`{ threadId, status: "completed", imageId }` または `{ threadId, status: "failed", error }`）で届く。画像モデル（`use: image`）だけを受ける | FR-012, D-72 |
 | API-096 | GET | `/api/images/:id` | 生成した PNG を返す（`dataDir/images` の中だけ） | FR-012, D-72 |
+| API-115 | GET | `/api/images/status` | 今の状態。`{ status: "idle" }` か `{ status: "running", threadId, prompt, modelId }` | FR-012, D-84 |
 | API-097 | POST | `/api/image-recipes` | `{ recipe: "moss-image" }` を受けて、レシピの部品を DL の待ち行列に入れる（kind `image-set`）。202 で DL の行を返す。空き容量が部品の合計＋2GB に足りなければ断る（INSUFFICIENT_STORAGE）。DL が終わると画像モデル（`use: image`）が1つ登録される | FR-012, D-73, ADR-010 |
 | API-098 | GET | `/api/image-recipes` | レシピの一覧。各レシピの部品（ファイル名・取得元・サイズ）、合計サイズ、登録済みかどうか | FR-012, D-73 |
 
