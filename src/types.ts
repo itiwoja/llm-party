@@ -1,7 +1,7 @@
 export interface Thread { id: string; title: string; lastPresetId: string | null }
 export interface Message { id: string; role: string; content: string; reasoning: string | null }
 export type Effort = "low" | "medium" | "high";
-export interface Preset { id: string; name: string; modelId: string; contextSize: number; thinking: boolean; effort: Effort }
+export interface Preset { id: string; name: string; modelId: string; contextSize: number; gpuRatio: number | null; thinking: boolean; effort: Effort }
 export interface Model {
   id: string;
   name: string;

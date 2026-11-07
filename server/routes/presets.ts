@@ -24,6 +24,7 @@ const presetSchema = z.object({
   thinking: z.boolean(),
   effort: z.enum(EFFORTS).optional(),
   contextSize: z.number().int().min(CONTEXT_MIN),
+  gpuRatio: z.number().int().min(0).max(100).nullish(),
 });
 
 export function presetRoutes({ store }: Context): Router {

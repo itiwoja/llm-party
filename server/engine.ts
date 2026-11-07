@@ -7,6 +7,7 @@ import { installLlama, type InstallInput } from "./runtime/installer";
 import type { LlamaFlavor } from "./runtime/manifest";
 import { hasNvidiaGpu, ignoredOverrideWarning, resolveLlama } from "./runtime/resolver";
 import type { EventBus } from "./events";
+import { readGguf } from "./gguf";
 import { ApiError } from "./http-error";
 import { GENERATION_SLOTS } from "./generation-slot";
 
@@ -16,6 +17,8 @@ export interface EngineSpec {
   presetId: string;
   modelPath: string;
   contextSize: number;
+  /** GPU に載せる割合（0〜100）。null か省略は自動（llama-server が空き VRAM に合わせる） */
+  gpuRatio?: number | null;
   /** --lora に渡す順。リクエストの lora の id はこの並び順になる */
   adapterPaths: string[];
 }
@@ -36,12 +39,30 @@ export interface EngineOptions {
 const POLL_MS = 500;
 const ERROR_TAIL_LINES = 20;
 
+/** -ngl の値。層は block_count に出力層を足した数。層の数が分からないと計算できないので自動にする */
+export function gpuLayersArg(gpuRatio: number | null | undefined, blockCount: number | null): string {
+  if (gpuRatio === null || gpuRatio === undefined) return "auto";
+  if (gpuRatio === 0) return "0";
+  if (gpuRatio === 100) return "all";
+  return blockCount === null ? "auto" : String(Math.round(((blockCount + 1) * gpuRatio) / 100));
+}
+
+/** 層の数を読むのは、割合から層数を計算するときだけ。読めないファイルの失敗は llama-server に報告させる */
+function blockCountOf({ gpuRatio, modelPath }: EngineSpec): number | null {
+  if (gpuRatio === null || gpuRatio === undefined || gpuRatio === 0 || gpuRatio === 100) return null;
+  try {
+    return readGguf(modelPath).blockCount;
+  } catch {
+    return null;
+  }
+}
+
 /** FR-003 の起動引数 */
-export function buildArgs(spec: EngineSpec, backend: EngineOptions["backend"], port: number, apiKey: string): string[] {
+export function buildArgs(spec: EngineSpec, backend: EngineOptions["backend"], port: number, apiKey: string, blockCount: number | null = null): string[] {
   const args = [
     "-m", spec.modelPath,
     "-c", String(spec.contextSize),
-    "-ngl", backend === "cpu" ? "0" : "auto",
+    "-ngl", backend === "cpu" ? "0" : gpuLayersArg(spec.gpuRatio, blockCount),
     "--host", "127.0.0.1",
     "--port", String(port),
     "--api-key", apiKey,
@@ -67,8 +88,8 @@ function freePort(): Promise<number> {
 }
 
 /** 読み込みの同一性。同じ key なら llama-server を読み直さず、生成の枠を一緒に持てる */
-export function loadKey(spec: Pick<EngineSpec, "modelPath" | "contextSize" | "adapterPaths">): string {
-  return JSON.stringify([spec.modelPath, spec.contextSize, spec.adapterPaths]);
+export function loadKey(spec: Pick<EngineSpec, "modelPath" | "contextSize" | "gpuRatio" | "adapterPaths">): string {
+  return JSON.stringify([spec.modelPath, spec.contextSize, spec.gpuRatio ?? null, spec.adapterPaths]);
 }
 
 function sameLoad(a: EngineSpec, b: EngineSpec): boolean {
@@ -199,7 +220,7 @@ export class EngineManager {
     this.baseUrl = `http://127.0.0.1:${port}`;
     // 終了はプロセスグループごと行うので、自分のグループを持たせる
     this.activeBackend = backend;
-    const child = spawn(bin, buildArgs(spec, backend, port, this.apiKey), {
+    const child = spawn(bin, buildArgs(spec, backend, port, this.apiKey, blockCountOf(spec)), {
       stdio: ["ignore", "pipe", "pipe"],
       detached: true,
     });

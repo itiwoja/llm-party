@@ -39,6 +39,8 @@ export interface PresetSnapshot {
   /** 送った段階。送っていない・この項目ができる前のランは無い（D-76） */
   effort?: Effort | null;
   contextSize: number;
+  /** GPU に載せる割合。null は自動。この項目ができる前のランは無い（D-77） */
+  gpuRatio?: number | null;
 }
 
 export type RunStatus = "queued" | "running" | "completed" | "cancelled" | "failed";

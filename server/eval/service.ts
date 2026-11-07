@@ -147,7 +147,7 @@ export class EvalService {
       const snapshot: PresetSnapshot = {
         presetId: preset.id, name: preset.name, modelId: model.id, modelName: model.name, modelPath: model.path,
         modelSha256: this.evals.modelSha256(model.id), adapters: store.presets.adapters(preset.id),
-        sampling: preset.sampling, systemPrompt: preset.systemPrompt, thinking: kwargs.enable_thinking, effort: kwargs.reasoning_effort ?? null, contextSize: preset.contextSize,
+        sampling: preset.sampling, systemPrompt: preset.systemPrompt, thinking: kwargs.enable_thinking, effort: kwargs.reasoning_effort ?? null, contextSize: preset.contextSize, gpuRatio: preset.gpuRatio,
       };
       const id = this.evals.createRun({ evalSetId: set.id, snapshot, backend, tags, cases });
       this.controllers.set(id, new AbortController());
@@ -389,7 +389,7 @@ export class EvalService {
       try {
         await abortable(
           engine.load({
-            presetId: snapshot.presetId, modelPath: snapshot.modelPath, contextSize: snapshot.contextSize,
+            presetId: snapshot.presetId, modelPath: snapshot.modelPath, contextSize: snapshot.contextSize, gpuRatio: snapshot.gpuRatio,
             adapterPaths: snapshot.adapters.map((adapter) => adapter.path),
           }),
           runSignal,

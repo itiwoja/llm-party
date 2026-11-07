@@ -1,7 +1,7 @@
 import { chmodSync, copyFileSync, existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { buildArgs, EngineManager, type EngineSpec } from "../server/engine";
+import { buildArgs, EngineManager, gpuLayersArg, loadKey, type EngineSpec } from "../server/engine";
 import { EventBus } from "../server/events";
 import { installDirFor } from "../server/runtime/resolver";
 import { FAKE_LLAMA, tempDir, waitForEvent } from "./helpers";
@@ -21,6 +21,28 @@ describe("buildArgs", () => {
 
   it("CPU では GPU に載せない", () => {
     expect(buildArgs(SPEC, "cpu", 1, "k").join(" ")).toContain("-ngl 0");
+  });
+
+  it("GPU の割合を層数にする（自動・0%・100% は層の数が要らない）", () => {
+    expect(gpuLayersArg(null, 32)).toBe("auto");
+    expect(gpuLayersArg(undefined, null)).toBe("auto");
+    expect(gpuLayersArg(0, null)).toBe("0");
+    expect(gpuLayersArg(100, null)).toBe("all");
+    expect(gpuLayersArg(60, 32)).toBe("20");
+  });
+
+  it("層の数が分からないときは割合を使えないので自動", () => {
+    expect(gpuLayersArg(60, null)).toBe("auto");
+  });
+
+  it("割合を -ngl に渡す。CPU では割合より 0 を優先する", () => {
+    expect(buildArgs({ ...SPEC, gpuRatio: 50 }, "cuda", 1, "k", 32).join(" ")).toContain("-ngl 17");
+    expect(buildArgs({ ...SPEC, gpuRatio: 50 }, "cpu", 1, "k", 32).join(" ")).toContain("-ngl 0");
+  });
+
+  it("割合を変えると読み直す", () => {
+    expect(loadKey({ ...SPEC, gpuRatio: 50 })).not.toBe(loadKey({ ...SPEC, gpuRatio: 60 }));
+    expect(loadKey({ ...SPEC, gpuRatio: null })).toBe(loadKey(SPEC));
   });
 
   it("LoRA はカンマ区切りで、倍率をかけずに読み込む", () => {

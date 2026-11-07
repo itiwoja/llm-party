@@ -32,11 +32,13 @@ export interface PresetInput {
   /** 省けば DEFAULT_EFFORT。段階に対応するモデルでだけ使う（D-76） */
   effort?: Effort;
   contextSize: number;
+  /** GPU に載せる割合（0〜100）。null か省略は自動（D-77） */
+  gpuRatio?: number | null;
 }
 
 interface PresetRow {
   id: string; name: string; model_id: string; sampling: string; system_prompt: string | null;
-  thinking: number; effort: string; context_size: number; created_at: string; updated_at: string;
+  thinking: number; effort: string; context_size: number; gpu_ratio: number | null; created_at: string; updated_at: string;
 }
 
 export class PresetStore {
@@ -58,9 +60,9 @@ export class PresetStore {
     const time = now();
     try {
       this.db.transaction(() => {
-        this.db.prepare(`INSERT INTO presets (id, name, model_id, sampling, system_prompt, thinking, effort, context_size, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-          .run(id, input.name, input.modelId, JSON.stringify(input.sampling), input.systemPrompt ?? null, input.thinking ? 1 : 0, input.effort ?? DEFAULT_EFFORT, input.contextSize, time, time);
+        this.db.prepare(`INSERT INTO presets (id, name, model_id, sampling, system_prompt, thinking, effort, context_size, gpu_ratio, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+          .run(id, input.name, input.modelId, JSON.stringify(input.sampling), input.systemPrompt ?? null, input.thinking ? 1 : 0, input.effort ?? DEFAULT_EFFORT, input.contextSize, input.gpuRatio ?? null, time, time);
         this.writeAdapters(id, input.adapters ?? []);
       })();
     } catch (error) {
@@ -83,6 +85,7 @@ export class PresetStore {
       thinking: current.thinking,
       effort: current.effort,
       contextSize: current.contextSize,
+      gpuRatio: current.gpuRatio,
       ...patch,
     };
     this.validate(next);
@@ -90,9 +93,9 @@ export class PresetStore {
     const time = now();
     try {
       this.db.transaction(() => {
-        this.db.prepare(`UPDATE presets SET name = ?, model_id = ?, sampling = ?, system_prompt = ?, thinking = ?, effort = ?, context_size = ?, updated_at = ?
+        this.db.prepare(`UPDATE presets SET name = ?, model_id = ?, sampling = ?, system_prompt = ?, thinking = ?, effort = ?, context_size = ?, gpu_ratio = ?, updated_at = ?
           WHERE id = ?`)
-          .run(next.name, next.modelId, JSON.stringify(next.sampling), next.systemPrompt ?? null, next.thinking ? 1 : 0, next.effort ?? DEFAULT_EFFORT, next.contextSize, time, id);
+          .run(next.name, next.modelId, JSON.stringify(next.sampling), next.systemPrompt ?? null, next.thinking ? 1 : 0, next.effort ?? DEFAULT_EFFORT, next.contextSize, next.gpuRatio ?? null, time, id);
         this.db.prepare("DELETE FROM preset_adapters WHERE preset_id = ?").run(id);
         this.writeAdapters(id, next.adapters ?? []);
       })();
@@ -125,7 +128,7 @@ export class PresetStore {
     return {
       id: row.id, name: row.name, modelId: row.model_id, adapters: this.presetAdapters(row.id),
       sampling: JSON.parse(row.sampling) as Sampling, systemPrompt: row.system_prompt, thinking: row.thinking === 1, effort: row.effort as Effort,
-      contextSize: row.context_size, createdAt: row.created_at, updatedAt: row.updated_at,
+      contextSize: row.context_size, gpuRatio: row.gpu_ratio, createdAt: row.created_at, updatedAt: row.updated_at,
     };
   }
 

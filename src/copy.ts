@@ -54,6 +54,9 @@ export const MISSING_COPY = {
   copiedCode: "コピー済み", // 同、押した後
   presetSelect: "プリセット", // CMP-015 のラベル（読み上げ）
   engineReady: "準備完了", // 05 のワイヤーにだけ出てくる
+  gpuRatio: "GPU に載せる割合", // CP-322
+  gpuRatioValue: (percent: number) => `VRAM ${percent}% ・ RAM ${100 - percent}%`, // CP-323
+  gpuNeed: (vram: string, ram: string) => `VRAM推奨 ${vram}GB ・ RAM推奨 ${ram}GB`, // CP-325
   engineStarting: "読み込み中", // 04 CMP-012 の説明にだけ出てくる
   engineInstalling: "取得中", // ADR-011：llama-server を初回に取得している
   engineStopped: "停止中", // 仮

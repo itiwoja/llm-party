@@ -66,8 +66,11 @@ export const PG3_MISSING = {
   savedTo: "保存先", // CP-292
   vram: "VRAM まで（GB）", // CP-309
   ram: "RAM まで（GB）", // CP-310
-  colMemory: "目安メモリ", // CP-311
-  memoryHint: "目安は Q4_K_M で計算（文脈が長いと増える）。パラメータ数の分からないモデルは外す", // CP-312
+  colFileSize: "容量", // CP-326
+  colVram: "VRAM推奨", // CP-311
+  colRam: "RAM推奨", // CP-320
+  memoryHint: "検索結果の推奨は Q4_K_M で計算。パラメータ数の分からないモデルは外す", // CP-312
+  splitHint: "推奨はこの割合で動かすときの目安。RAM は OS とアプリの分（4GB）を含む。文脈が長いと増える", // CP-321
   colStrength: "強さ", // HF 検索結果の列。強さはパラメータ数で測る（HF は性能の点数を返さない）
   modelsOnlyHint: "モデル（GGUF）だけを表示。画像の入力部（mmproj）と量子化の計算用（imatrix）は外す", // 同
   noModelFile: "GGUF のモデルがない。チャットでは動かせない", // 同

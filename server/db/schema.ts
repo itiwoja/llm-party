@@ -254,4 +254,8 @@ export const MIGRATIONS: string[] = [
   ALTER TABLE models ADD COLUMN supports_effort INTEGER;
   ALTER TABLE presets ADD COLUMN effort TEXT NOT NULL DEFAULT 'medium';
   `,
+  // v6：GPU に載せる割合（D-77）。NULL は自動
+  `
+  ALTER TABLE presets ADD COLUMN gpu_ratio INTEGER;
+  `,
 ];

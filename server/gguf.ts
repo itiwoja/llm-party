@@ -8,6 +8,8 @@ export interface GgufInfo extends ThinkingSupport {
   name: string | null;
   quantization: string | null;
   trainContext: number | null;
+  /** 層の数。-ngl の計算に使う */
+  blockCount: number | null;
   sizeBytes: number;
 }
 
@@ -91,6 +93,7 @@ export function readGguf(file: string): GgufInfo {
     }
     const fileType = kv.get("general.file_type");
     const context = kv.get(`${architecture}.context_length`);
+    const blocks = kv.get(`${architecture}.block_count`);
     const name = kv.get("general.name");
     const type = kv.get("general.type");
     const template = kv.get("tokenizer.chat_template");
@@ -100,6 +103,7 @@ export function readGguf(file: string): GgufInfo {
       name: typeof name === "string" ? name : null,
       quantization: typeof fileType === "number" ? (FILE_TYPES[fileType] ?? null) : null,
       trainContext: typeof context === "number" ? context : null,
+      blockCount: typeof blocks === "number" ? blocks : null,
       sizeBytes,
       ...thinkingSupport(typeof template === "string" ? template : undefined),
     };

@@ -37,6 +37,10 @@ svg.lucide, .btn svg, .icon-btn svg { width: var(--icon-size); height: var(--ico
 .input.numeric { text-align: right; }
 .composer { resize: none; overflow-y: auto; line-height: 1.7; display: block; }
 .field-hint { margin: 0; font-size: 14px; color: var(--color-muted-fg); }
+/* VRAM と RAM の割り振りのバー。検索の絞り込みとプリセットの編集で使う */
+.gpu-ratio { display: grid; gap: var(--space-1); max-width: var(--form-max); }
+.gpu-ratio input { width: 100%; margin: 0; accent-color: var(--color-primary); }
+.gpu-ratio-value { font-size: 14px; color: var(--color-muted-fg); }
 .field-error { display: flex; align-items: flex-start; gap: var(--space-1); margin: 0; font-size: 14px; line-height: 1.5; color: var(--color-danger); white-space: pre-wrap; }
 .field-error svg { margin-top: 2px; width: 16px; height: 16px; flex: none; }
 

@@ -25,8 +25,8 @@ export interface AdapterItem {
   missing: boolean;
 }
 
-export interface HfRepo { repo: string; downloads: number; updatedAt: string | null; createdAt: string | null; gated: boolean; pipelineTag: string | null; license: string | null; params: number | null; memoryGb: number | null }
-export interface HfFile { name: string; quantization: string | null; sizeBytes: number; split: boolean; complete: boolean; parts: { name: string; sizeBytes: number }[]; memoryGb: number }
+export interface HfRepo { repo: string; downloads: number; updatedAt: string | null; createdAt: string | null; gated: boolean; pipelineTag: string | null; license: string | null; params: number | null }
+export interface HfFile { name: string; quantization: string | null; sizeBytes: number; split: boolean; complete: boolean; parts: { name: string; sizeBytes: number }[] }
 
 export type DownloadStatus = "queued" | "downloading" | "retrying" | "verifying" | "completed" | "failed" | "cancelled";
 

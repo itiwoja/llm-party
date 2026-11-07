@@ -85,6 +85,7 @@ export class ChatService {
     return loadKey({
       modelPath: model.path,
       contextSize: preset.contextSize,
+      gpuRatio: preset.gpuRatio,
       adapterPaths: this.store.presets.adapters(presetId).map((adapter) => adapter.path),
     });
   }
@@ -356,6 +357,7 @@ export class ChatService {
         presetId,
         modelPath: model.path,
         contextSize: preset.contextSize,
+        gpuRatio: preset.gpuRatio,
         adapterPaths: adapters.map((adapter) => adapter.path),
       });
       signal.throwIfAborted();

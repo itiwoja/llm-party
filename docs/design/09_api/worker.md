@@ -86,7 +86,7 @@ sequenceDiagram
 | API-050 | GET | `/api/models` | モデル一覧（ファイルの有無を確かめて `missing` を付ける。思考の対応を `supportsThinking`・`supportsEffort` で返す。D-76）。LoRA の一覧も `adapters` で返す | FR-013, SCR-003 |
 | API-051 | POST | `/api/models` | `{ path, mode: "reference" \| "copy", name? }` で登録 | FR-013 |
 | API-052 | DELETE | `/api/models/:id?deleteFile=` | 削除。プリセットで使用中 → 409 `CONFLICT`（`details` にプリセット名） | FR-013 |
-| API-053 | GET | `/api/hf/search?q=&genre=&uncensored=&vram=&ram=` | HF のリポジトリ検索。`genre` は `all` / `chat` / `image` / `video` / `music` / `speech` / `transcribe` / `embedding`。`q` が空でも `genre`・`uncensored=true`・`vram`・`ram` のどれかがあれば一覧する（どれもなければ 400）。`vram`・`ram` は GB の上限（1〜1024、省略か空は指定なし）。`pipelineTag`・`license`・`params`・`memoryGb`（Q4 の目安）も返す | FR-012 |
+| API-053 | GET | `/api/hf/search?q=&genre=&uncensored=&vram=&ram=&gpu=` | HF のリポジトリ検索。`genre` は `all` / `chat` / `image` / `video` / `music` / `speech` / `transcribe` / `embedding`。`q` が空でも `genre`・`uncensored=true`・`vram`・`ram` のどれかがあれば一覧する（どれもなければ 400）。`vram`・`ram` は GB の上限（1〜1024、省略か空は指定なし）。`gpu` は絞り込みで使う GPU に載せる割合（0〜100、既定 100）。`pipelineTag`・`license`・`params` も返す（推奨の値は画面が `params` とバーの値から計算する） | FR-012 |
 | API-054 | GET | `/api/hf/files?repo=` | 全ファイルの一覧（量子化・サイズ・分割）。モデル本体が先 | FR-012 |
 | API-055 | POST | `/api/downloads` | `{ repo, files[]?, kind }` で DL を始める（202。容量不足 → 507）。`kind` は `model` / `adapter` / `file`。`model` / `adapter` は `.gguf` だけ。`files` を省くとリポジトリ全体（`file` だけ） | FR-012 |
 | API-056 | GET | `/api/downloads` | DL の一覧と進捗。完了した LoRA は `filePath` を返し、画面がベースモデルを選ばせて API-058 で登録する。完了した `file` は `savedDir` を返す | FR-012 |
@@ -98,7 +98,7 @@ sequenceDiagram
 | ID | メソッド | パス | 概要 | 関連 |
 |---|---|---|---|---|
 | API-060 | GET | `/api/presets` | 一覧 | FR-014 |
-| API-061 | POST | `/api/presets` | 作成（`{ name, modelId, adapters[], sampling, systemPrompt, thinking, effort?, contextSize }`） | FR-014 |
+| API-061 | POST | `/api/presets` | 作成（`{ name, modelId, adapters[], sampling, systemPrompt, thinking, effort?, contextSize, gpuRatio? }`。`gpuRatio` は GPU に載せる割合（0〜100）で、省略か null は自動） | FR-014 |
 | API-062 | PATCH | `/api/presets/:id` | 編集 | FR-014 |
 | API-063 | DELETE | `/api/presets/:id` | 削除（ランは残る） | FR-014 |
 

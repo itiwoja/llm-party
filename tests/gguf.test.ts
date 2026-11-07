@@ -13,7 +13,7 @@ describe("readGguf", () => {
     const file = path.join(temp.dir, "m.gguf");
     writeGguf(file, { contextLength: 32768 });
     expect(readGguf(file)).toMatchObject({
-      type: "model", architecture: "testarch", name: "Test Model", quantization: "Q4_K_M", trainContext: 32768,
+      type: "model", architecture: "testarch", name: "Test Model", quantization: "Q4_K_M", trainContext: 32768, blockCount: 32,
     });
   });
 

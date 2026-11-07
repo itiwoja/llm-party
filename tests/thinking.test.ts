@@ -75,6 +75,18 @@ describe("思考の段階の保存と送信", () => {
     expect(bad.status).toBe(400);
   });
 
+  it("GPU の割合は既定が自動で、0〜100 を保存し、自動へ戻せる（D-77）", async () => {
+    const { preset } = await setup("{{ enable_thinking }}");
+    expect(preset.gpuRatio).toBeNull();
+    const patched = await worker.api(`/presets/${preset.id}`, { method: "PATCH", body: { gpuRatio: 60 } });
+    expect(patched.body.gpuRatio).toBe(60);
+    const unrelated = await worker.api(`/presets/${preset.id}`, { method: "PATCH", body: { name: "q" } });
+    expect(unrelated.body.gpuRatio).toBe(60);
+    const auto = await worker.api(`/presets/${preset.id}`, { method: "PATCH", body: { gpuRatio: null } });
+    expect(auto.body.gpuRatio).toBeNull();
+    expect((await worker.api(`/presets/${preset.id}`, { method: "PATCH", body: { gpuRatio: 101 } })).status).toBe(400);
+  });
+
   it("起動時に、対応を読んでいないモデルをファイルから埋める", async () => {
     const file = path.join(worker.dir, "old.gguf");
     writeGguf(file, { chatTemplate: "{{ enable_thinking }}" });

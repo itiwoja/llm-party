@@ -4,10 +4,12 @@ import { api, ApiRequestError } from "../../api";
 import { Button } from "../../components/Button";
 import { SelectField, SwitchField } from "../../components/Controls";
 import { TextArea, TextField } from "../../components/Field";
+import { GpuRatioField, gpuNeedText } from "../../components/GpuRatioField";
 import { IconButton } from "../../components/IconButton";
 import { DropdownMenu } from "../../components/Menu";
 import { useToast } from "../../components/Toast";
 import { CP } from "../../copy";
+import { DEFAULT_GPU_RATIO } from "../../../server/hf/memory";
 import { DEFAULT_EFFORT, thinkingChoice, thinkingOptions, thinkingPatch } from "../../thinking";
 import type { Effort } from "../../types";
 import type { AdapterItem, ModelItem } from "../models/types";
@@ -27,6 +29,7 @@ export interface PresetFull {
   thinking: boolean;
   effort: Effort;
   contextSize: number;
+  gpuRatio: number | null;
 }
 
 /** 入力中は文字列で持つ（「0.」などの途中の形を壊さない） */
@@ -39,6 +42,7 @@ export interface FormValues {
   thinking: boolean;
   effort: Effort;
   contextSize: string;
+  gpuRatio: number | null;
 }
 
 const strings = (s: Sampling): Record<keyof Sampling, string> => ({
@@ -56,6 +60,7 @@ export function valuesOf(preset: PresetFull): FormValues {
     thinking: preset.thinking,
     effort: preset.effort,
     contextSize: String(preset.contextSize),
+    gpuRatio: preset.gpuRatio,
   };
 }
 
@@ -71,6 +76,7 @@ export function newValues(models: ModelItem[], defaultContextSize: number): Form
     thinking: QWEN_CHAT.thinking,
     effort: DEFAULT_EFFORT,
     contextSize: String(contextFor(defaultContextSize, model?.trainContext ?? null)),
+    gpuRatio: null,
   };
 }
 
@@ -138,6 +144,7 @@ export function PresetForm({ preset, initial, models, adapters, onSaved }: Props
         thinking: values.thinking,
         effort: values.effort,
         contextSize,
+        gpuRatio: values.gpuRatio,
       };
       const saved = preset ? await api.patch<PresetFull>(`/presets/${preset.id}`, body) : await api.post<PresetFull>("/presets", body);
       toast(CP.saved);
@@ -210,6 +217,13 @@ export function PresetForm({ preset, initial, models, adapters, onSaved }: Props
         <SwitchField label={PG4.thinking} checked={values.thinking} onCheckedChange={(v) => set("thinking", v)} />
       )}
       <TextField label={PG4.contextSize} type="number" min={CONTEXT_MIN} step={1} value={values.contextSize} onChange={(e) => set("contextSize", e.target.value)} error={errors.contextSize} required />
+      <SwitchField label={PG4.gpuAuto} checked={values.gpuRatio === null} onCheckedChange={(auto) => set("gpuRatio", auto ? null : DEFAULT_GPU_RATIO)} />
+      {values.gpuRatio !== null ? (
+        <>
+          <GpuRatioField value={values.gpuRatio} onChange={(v) => set("gpuRatio", v)} />
+          {model ? <p className="field-hint numeric">{gpuNeedText(model.sizeBytes, values.gpuRatio)}</p> : null}
+        </>
+      ) : null}
 
       {errors.general ? <p className="field-error" role="alert">{errors.general}</p> : null}
       <div className="preset-actions">

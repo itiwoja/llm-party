@@ -44,7 +44,7 @@ describe("API-053 検索", () => {
     const res = await worker.api("/hf/search?q=tiny");
     expect(res.status).toBe(200);
     expect(res.body.items).toEqual([
-      { repo: "acme/tiny-GGUF", downloads: 1000, updatedAt: "2026-11-01T00:00:00.000Z", createdAt: "2026-10-01T00:00:00.000Z", gated: false, pipelineTag: null, license: "mit", params: 9e9, memoryGb: 7 },
+      { repo: "acme/tiny-GGUF", downloads: 1000, updatedAt: "2026-11-01T00:00:00.000Z", createdAt: "2026-10-01T00:00:00.000Z", gated: false, pipelineTag: null, license: "mit", params: 9e9 },
     ]);
     const search = new URL(`http://x${hf.hfRequests.at(-1)!.url}`).searchParams;
     expect(search.get("search")).toBe("tiny");
@@ -98,8 +98,14 @@ describe("API-053 検索", () => {
     });
 
     it("RAM も同じく効く。両方あれば両方を満たすものだけ", async () => {
-      expect(repos(await worker.api("/hf/search?q=acme/&ram=8"))).toEqual(["acme/tiny-GGUF", "acme/chat-GGUF"]);
-      expect(repos(await worker.api("/hf/search?q=acme/&vram=8&ram=5"))).toEqual(["acme/chat-GGUF"]);
+      expect(repos(await worker.api("/hf/search?q=acme/&vram=8&ram=4"))).toEqual(["acme/tiny-GGUF", "acme/chat-GGUF"]);
+      expect(repos(await worker.api("/hf/search?q=acme/&vram=8&ram=3"))).toEqual([]);
+    });
+
+    it("GPU の割合で VRAM と RAM の目安が変わる", async () => {
+      expect(repos(await worker.api("/hf/search?q=acme/&ram=8&gpu=0"))).toEqual(["acme/chat-GGUF"]);
+      expect(repos(await worker.api("/hf/search?q=acme/&ram=8&gpu=100"))).toEqual(["acme/tiny-GGUF", "acme/chat-GGUF", "acme/vision-GGUF"]);
+      expect((await worker.api("/hf/search?q=acme/&gpu=101")).status).toBe(400);
     });
 
     it("語もジャンルもなくても、VRAM か RAM だけで一覧できる", async () => {

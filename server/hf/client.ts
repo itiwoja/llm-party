@@ -1,7 +1,7 @@
 import { ApiError } from "../http-error";
 import { GENRES, GGUF_ONLY_GENRES, type Genre } from "./genres";
 import { assertRepo, encodePath, type TreeFile } from "./names";
-import { estimateQ4Gb, fits, type MemoryLimit } from "./memory";
+import { DEFAULT_GPU_RATIO, fits, memoryNeed, q4Bytes, type MemoryLimit } from "./memory";
 import { readHfToken } from "./token";
 
 /** 切れた・混んでいるなど、待てば直るかもしれない失敗 */
@@ -16,11 +16,10 @@ const FILTER_FETCH_LIMIT = 100;
 /** 検索で使う項目。指定しないと lastModified と gated が返らない。指定すると既定の項目も消えるので全部書く */
 const SEARCH_FIELDS = ["downloads", "lastModified", "createdAt", "gated", "pipeline_tag", "tags", "gguf", "safetensors"];
 
-/** GGUF か safetensors のパラメータ数から、パラメータ数と Q4 の目安を取る */
-function sizeOf(item: { gguf?: { total?: unknown }; safetensors?: { total?: unknown } }): Pick<HfRepo, "params" | "memoryGb"> {
+/** GGUF か safetensors のパラメータ数を取る */
+function sizeOf(item: { gguf?: { total?: unknown }; safetensors?: { total?: unknown } }): Pick<HfRepo, "params"> {
   const total = item.gguf?.total ?? item.safetensors?.total;
-  const params = typeof total === "number" && total > 0 ? total : null;
-  return { params, memoryGb: params === null ? null : estimateQ4Gb(params) };
+  return { params: typeof total === "number" && total > 0 ? total : null };
 }
 
 export const GATED_MESSAGE = "ゲート付きリポジトリ。設定で HF トークンが必要";
@@ -37,14 +36,14 @@ export interface HfRepo {
   license: string | null;
   /** パラメータ数（GGUF か safetensors の値）。分からなければ null */
   params: number | null;
-  /** Q4_K_M で動かすときの目安メモリ（GB）。params が null なら null */
-  memoryGb: number | null;
 }
 
 export interface HfSearch extends Partial<MemoryLimit> {
   query: string;
   genre: Genre;
   uncensored: boolean;
+  /** 絞り込みで使う、GPU に載せる割合（0〜100）。VRAM・RAM の目安はこれで変わる */
+  gpuRatio?: number;
 }
 
 /** HF との通信。トークンは HF 自身のオリジンにだけ付け、リダイレクト先（CDN）には送らない */
@@ -102,14 +101,14 @@ export class HfClient {
   }
 
   /** ジャンルと語で探す。pipeline_tag が複数のジャンルは検索ごとの結果を DL 数の順に混ぜる */
-  async search({ query, genre, uncensored, vram = null, ram = null }: HfSearch): Promise<HfRepo[]> {
+  async search({ query, genre, uncensored, vram = null, ram = null, gpuRatio = DEFAULT_GPU_RATIO }: HfSearch): Promise<HfRepo[]> {
     const tags: readonly (string | null)[] = GENRES[genre].length > 0 ? GENRES[genre] : [null];
     const filters = [...(GGUF_ONLY_GENRES.includes(genre) ? ["gguf"] : []), ...(uncensored ? ["uncensored"] : [])];
     const limit = vram === null && ram === null ? SEARCH_LIMIT : FILTER_FETCH_LIMIT;
     const results = await Promise.all(tags.map((tag) => this.searchOne(query, tag, filters, limit)));
     const merged = new Map(results.flat().map((repo) => [repo.repo, repo]));
     return [...merged.values()]
-      .filter((repo) => fits(repo.memoryGb, { vram, ram }))
+      .filter((repo) => fits(repo.params === null ? null : memoryNeed(q4Bytes(repo.params), gpuRatio), { vram, ram }))
       .sort((a, b) => b.downloads - a.downloads)
       .slice(0, SEARCH_LIMIT);
   }

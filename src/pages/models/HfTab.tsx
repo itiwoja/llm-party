@@ -2,10 +2,12 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { api, ApiRequestError } from "../../api";
 import { Button } from "../../components/Button";
 import { RadioField, SelectField, SwitchField } from "../../components/Controls";
+import { GpuRatioField } from "../../components/GpuRatioField";
 import { SearchField } from "../../components/SearchField";
 import { Table, type Column } from "../../components/Table";
 import { MISSING_COPY } from "../../copy";
 import { hrefOf } from "../../router";
+import { DEFAULT_GPU_RATIO, memoryNeed, q4Bytes } from "../../../server/hf/memory";
 import { PG3, PG3_MISSING } from "./copy";
 import { ErrorLine } from "./ErrorLine";
 import { distinctLabels } from "./fileLabel";
@@ -15,7 +17,7 @@ import type { HfFile, HfRepo } from "./types";
 
 type Genre = keyof typeof PG3_MISSING.genres;
 /** VRAM・RAM は GB の上限。null は指定なし */
-interface Filters { query: string; genre: Genre; uncensored: boolean; vram: number | null; ram: number | null }
+interface Filters { query: string; genre: Genre; uncensored: boolean; vram: number | null; ram: number | null; gpuRatio: number }
 
 /** 入力欄の文字を GB にする。空や 0 以下は指定なし */
 function parseGb(text: string): number | null {
@@ -94,7 +96,9 @@ async function fetchMossRecipe(): Promise<ImageRecipe | null> {
 
 /** Hugging Face を探す（API-053〜055）。語は Enter で送り、ジャンルと無検閲は変えた時点で探し直す */
 export function HfTab({ onStarted }: { onStarted(): void }) {
-  const [filters, setFilters] = useState<Filters>({ query: "", genre: "all", uncensored: false, vram: null, ram: null });
+  const [filters, setFilters] = useState<Filters>({ query: "", genre: "all", uncensored: false, vram: null, ram: null, gpuRatio: DEFAULT_GPU_RATIO })
+  // バーを動かしている間の値。表はこの値ですぐ変え、絞り込みは離したときに探し直す
+  const [gpuRatio, setGpuRatio] = useState(DEFAULT_GPU_RATIO);
   // 数字の入力中は文字のまま持ち、欄を離れたか Enter で絞り込む
   const [memoryDraft, setMemoryDraft] = useState({ vram: "", ram: "" });
   const [repos, setRepos] = useState<HfRepo[] | null>(null);
@@ -137,12 +141,15 @@ export function HfTab({ onStarted }: { onStarted(): void }) {
     if (repo) filesRef.current?.scrollIntoView({ block: "start" });
   }, [repo, files]);
 
-  async function search({ query, genre, uncensored, vram, ram }: Filters) {
+  /** keepOpen はバーからの探し直し。開いているファイル一覧を閉じない */
+  async function search({ query, genre, uncensored, vram, ram, gpuRatio: gpu }: Filters, keepOpen = false) {
     const q = query.trim();
     const id = (latestSearch.current += 1);
     setFailure(null);
-    setRepo(null);
-    setFiles(null);
+    if (!keepOpen) {
+      setRepo(null);
+      setFiles(null);
+    }
     if (!q && genre === "all" && !uncensored && vram === null && ram === null) {
       setRepos(null);
       setSearching(false);
@@ -153,6 +160,7 @@ export function HfTab({ onStarted }: { onStarted(): void }) {
       const params = new URLSearchParams({ q, genre, uncensored: String(uncensored) });
       if (vram !== null) params.set("vram", String(vram));
       if (ram !== null) params.set("ram", String(ram));
+      if (vram !== null || ram !== null) params.set("gpu", String(gpu));
       const { items } = await api.get<{ items: HfRepo[] }>(`/hf/search?${params}`);
       if (id === latestSearch.current) setRepos(items);
     } catch (err) {
@@ -166,6 +174,14 @@ export function HfTab({ onStarted }: { onStarted(): void }) {
     const next = { ...filters, ...change };
     setFilters(next);
     void search(next);
+  }
+
+  /** バーを離したとき。上限が入っているときだけ結果が変わるので探し直す */
+  function commitRatio() {
+    if (gpuRatio === filters.gpuRatio) return;
+    const next = { ...filters, gpuRatio };
+    setFilters(next);
+    if (next.vram !== null || next.ram !== null) void search(next, true);
   }
 
   /** 欄を離れたとき。変わっていなければ探し直さない */
@@ -212,12 +228,16 @@ export function HfTab({ onStarted }: { onStarted(): void }) {
     ?.filter((f) => (chatRepo ? isModelFile(f.name) : isWeightFile(f.name)))
     .sort((a, b) => b.sizeBytes - a.sizeBytes || a.name.localeCompare(b.name));
 
+  const repoNeed = (r: HfRepo) => (r.params === null ? null : memoryNeed(q4Bytes(r.params), gpuRatio));
+  const ratioField = <GpuRatioField value={gpuRatio} onChange={setGpuRatio} onCommit={commitRatio} />;
+
   const repoColumns: Column<HfRepo>[] = [
     { key: "repo", header: PG3_MISSING.colRepo, render: (r) => <button type="button" className="link-btn numeric">{r.repo}</button> },
     { key: "strength", header: PG3_MISSING.colStrength, render: (r) => <StrengthBar params={r.params} max={maxParams} /> },
     { key: "genre", header: PG3_MISSING.genre, render: (r) => <span className="models-nowrap">{r.pipelineTag ? PIPELINE_LABELS[r.pipelineTag] ?? r.pipelineTag : ""}</span> },
     { key: "license", header: PG3_MISSING.colLicense, render: (r) => <span className="numeric models-nowrap">{r.license ?? ""}</span> },
-    { key: "memory", header: PG3_MISSING.colMemory, numeric: true, render: (r) => (r.memoryGb === null ? "" : gbText(r.memoryGb)) },
+    { key: "vram", header: PG3_MISSING.colVram, numeric: true, render: (r) => { const need = repoNeed(r); return need ? gbText(need.vramGb) : ""; } },
+    { key: "ram", header: PG3_MISSING.colRam, numeric: true, render: (r) => { const need = repoNeed(r); return need ? gbText(need.ramGb) : ""; } },
     { key: "downloads", header: PG3_MISSING.colDownloads, numeric: true, render: (r) => r.downloads.toLocaleString("en-US") },
     // updatedAt が null（HF が lastModified を返さない）ときは空にする。createdAt は出さない
     { key: "updated", header: PG3_MISSING.colUpdated, numeric: true, render: (r) => formatDate(r.updatedAt) },
@@ -236,8 +256,9 @@ export function HfTab({ onStarted }: { onStarted(): void }) {
       ),
     },
     { key: "quant", header: PG3.columns.quantization, render: (f) => f.quantization ?? "" },
-    { key: "size", header: PG3.columns.size, numeric: true, render: (f) => formatBytes(f.sizeBytes) },
-    { key: "memory", header: PG3_MISSING.colMemory, numeric: true, render: (f) => gbText(f.memoryGb) },
+    { key: "size", header: PG3_MISSING.colFileSize, numeric: true, render: (f) => formatBytes(f.sizeBytes) },
+    { key: "vram", header: PG3_MISSING.colVram, numeric: true, render: (f) => gbText(memoryNeed(f.sizeBytes, gpuRatio).vramGb) },
+    { key: "ram", header: PG3_MISSING.colRam, numeric: true, render: (f) => gbText(memoryNeed(f.sizeBytes, gpuRatio).ramGb) },
     {
       key: "dl",
       header: "",
@@ -292,6 +313,8 @@ export function HfTab({ onStarted }: { onStarted(): void }) {
           </label>
         ))}
       </div>
+      {ratioField}
+      <p className="models-note">{PG3_MISSING.splitHint}</p>
       {filters.vram !== null || filters.ram !== null ? <p className="models-note">{PG3_MISSING.memoryHint}</p> : null}
       <form className="models-search" onSubmit={(e) => { e.preventDefault(); void search(filters); }}>
         <SearchField value={filters.query} onChange={(query) => setFilters((f) => ({ ...f, query }))} label={PG3.searchRepo} clearLabel={MISSING_COPY.clearSearch} />
@@ -315,6 +338,7 @@ export function HfTab({ onStarted }: { onStarted(): void }) {
             />
           ) : <p className="models-note">{isImageRepo(repo) ? PG3_MISSING.imageHint : PG3_MISSING.saveOnly}</p>}
           {chatRepo ? <p className="models-note">{PG3_MISSING.modelsOnlyHint}</p> : null}
+          {shownFiles ? ratioField : null}
           {shownFiles ? <Table columns={fileColumns} rows={shownFiles} rowKey={(f) => f.name} caption={repo.repo} empty={chatRepo ? PG3_MISSING.noModelFile : PG3.emptySearch} /> : null}
         </section>
       ) : null}

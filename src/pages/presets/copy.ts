@@ -15,6 +15,7 @@ export const PG4 = {
   systemPrompt: "システムプロンプト", // CP-111
   thinking: "思考モード", // CP-112
   contextSize: "文脈長", // CP-113
+  gpuAuto: "GPU に載せる割合を自動で決める", // CP-324
   fillQwen: "Qwen 推奨値を入れる", // CP-114
   nameTaken: "同じ名前のプリセットあり。別の名前が必要", // CP-115
   contextRange: (min: number, max: number) => `文脈長の範囲外。${min}〜${max} で指定`, // CP-116

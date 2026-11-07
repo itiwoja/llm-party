@@ -4,7 +4,7 @@ import { z } from "zod";
 import type { Context } from "../context";
 import { HfClient } from "../hf/client";
 import { GENRE_NAMES } from "../hf/genres";
-import { fileNeedGb } from "../hf/memory";
+import { DEFAULT_GPU_RATIO } from "../hf/memory";
 import { assertRepo, groupFiles } from "../hf/names";
 import { parse } from "./parse";
 
@@ -18,6 +18,7 @@ const searchQuery = z.object({
   uncensored: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
   vram: memoryLimit,
   ram: memoryLimit,
+  gpu: z.coerce.number().int().min(0).max(100).default(DEFAULT_GPU_RATIO),
 }).refine(
   (input) => input.q !== "" || input.genre !== "all" || input.uncensored || input.vram !== undefined || input.ram !== undefined,
   { path: ["q"] },
@@ -29,8 +30,8 @@ export function hfRoutes({ downloads, hfBaseUrl, dataDir }: Context): Router {
   const hf = new HfClient(hfBaseUrl, dataDir);
 
   api.get("/hf/search", async (req, res) => {
-    const { q, genre, uncensored, vram, ram } = parse(searchQuery, req.query);
-    res.json({ items: await hf.search({ query: q, genre, uncensored, vram: vram ?? null, ram: ram ?? null }) });
+    const { q, genre, uncensored, vram, ram, gpu } = parse(searchQuery, req.query);
+    res.json({ items: await hf.search({ query: q, genre, uncensored, vram: vram ?? null, ram: ram ?? null, gpuRatio: gpu }) });
   });
 
   api.get("/hf/files", async (req, res) => {
@@ -43,8 +44,6 @@ export function hfRoutes({ downloads, hfBaseUrl, dataDir }: Context): Router {
       split: group.split,
       complete: group.complete,
       parts: group.parts.map((part) => ({ name: part.path, sizeBytes: part.size })),
-      // 動かすときの目安（実ファイルのサイズから）
-      memoryGb: fileNeedGb(group.sizeBytes),
     }));
     res.json({ items });
   });

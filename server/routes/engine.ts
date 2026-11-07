@@ -29,6 +29,7 @@ export function engineRoutes({ store, engine, bus }: Context): Router {
         presetId,
         modelPath: model.path,
         contextSize: preset.contextSize,
+        gpuRatio: preset.gpuRatio,
         adapterPaths: store.presets.adapters(presetId).map((adapter) => adapter.path),
       })
       .catch(() => undefined); // 失敗は engine イベントで届く

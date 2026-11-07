@@ -104,9 +104,10 @@ export function writeGguf(file: string, options: { type?: string; contextLength?
     ...kvU32("general.file_type", 15),
     str("tokenizer.ggml.tokens"), u32(9), u32(8), u64(tokens.length), ...tokens.map(str),
     ...kvU32("testarch.context_length", options.contextLength ?? 65536),
+    ...kvU32("testarch.block_count", 32),
     ...(options.chatTemplate === undefined ? [] : kvString("tokenizer.chat_template", options.chatTemplate)),
   ];
-  const count = options.chatTemplate === undefined ? 6 : 7;
+  const count = options.chatTemplate === undefined ? 7 : 8;
   writeFileSync(file, Buffer.concat([Buffer.from("GGUF"), u32(3), u64(0), u64(count), ...entries]));
 }
 

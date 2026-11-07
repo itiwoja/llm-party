@@ -136,6 +136,7 @@ LoRA の GGUF。主なカラム：`id`, `base_model_id`, `path`
 | thinking | INTEGER | NO | 0 | | 0 / 1 |
 | effort | TEXT | NO | medium | | `low` / `medium` / `high`（D-76） |
 | context_size | INTEGER | NO | 32768 | | |
+| gpu_ratio | INTEGER | YES | | | GPU に載せる割合（0〜100）。NULL は自動（D-77） |
 | created_at | TEXT | NO | | | |
 | updated_at | TEXT | NO | | | |
 
@@ -213,7 +214,7 @@ LoRA の GGUF。主なカラム：`id`, `base_model_id`, `path`
 | eval_set_id | TEXT | NO | | FK → eval_sets（CASCADE） | |
 | preset_id | TEXT | YES | | FK → presets（SET NULL） | 参考 |
 | preset_name | TEXT | NO | | | 推移の線の名前 |
-| preset_snapshot | TEXT(JSON) | NO | | | モデルのパス・sha256・LoRA と倍率・生成設定・システム・思考・段階（`effort`）・文脈長 |
+| preset_snapshot | TEXT(JSON) | NO | | | モデルのパス・sha256・LoRA と倍率・生成設定・システム・思考・段階（`effort`）・文脈長・GPU の割合（`gpuRatio`） |
 | backend | TEXT | NO | | | `cuda` / `vulkan` / `cpu` |
 | tag_filter | TEXT(JSON) | YES | | | 絞り込んだタグ |
 | status | TEXT | NO | `queued` | | 04 の値 |
