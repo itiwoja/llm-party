@@ -8,12 +8,13 @@ import { runAgentLoop, STEP_LIMIT, type AgentHost, type Decision } from "./agent
 import { agentSystemPrompt } from "./agent/prompt";
 import { streamCompletion, type ChatMessage, type Generation } from "./agent/stream";
 import { toolDefinitions } from "./agent/tools";
-import { loadKey, type EngineManager } from "./engine";
+import { loadKey, type EngineManager, type EngineSpec } from "./engine";
 import type { EventBus } from "./events";
 import { GENERATION_SLOTS, type GenerationSlot } from "./generation-slot";
 import { ApiError } from "./http-error";
 import type { Store } from "./store";
 import { sha256 } from "./store/changes";
+import type { Sampling } from "./store/presets";
 import { thinkingKwargs } from "./thinking";
 
 const ENGINE_STOPPED = "推論エンジンが停止しました";
@@ -36,6 +37,19 @@ interface Active {
   pending?: { toolCallId: string; preview?: string; resolve(decision: Decision): void };
   /** 40 回上限で止まっているときの返事待ち（API-037） */
   stepWait?: { resolve(answer: "continue" | "stop"): void };
+}
+
+/** プリセットの生成設定を llama-server の形にする */
+export function samplingBody(sampling: Sampling, adapters: { scale: number }[]): Record<string, unknown> {
+  return {
+    temperature: sampling.temperature,
+    top_p: sampling.topP,
+    top_k: sampling.topK,
+    min_p: sampling.minP,
+    presence_penalty: sampling.presencePenalty,
+    repeat_penalty: sampling.repeatPenalty,
+    ...(adapters.length ? { lora: adapters.map((adapter, id) => ({ id, scale: adapter.scale })) } : {}),
+  };
 }
 
 export interface ChatOptions {
@@ -82,14 +96,20 @@ export class ChatService {
 
   /** プリセットの読み込みの key（枠を一緒に持てるかの判定に使う） */
   private keyOf(presetId: string): string {
+    return loadKey(this.specOf(presetId));
+  }
+
+  /** プリセットを読み込むときの指定 */
+  specOf(presetId: string): EngineSpec {
     const preset = this.store.presets.get(presetId)!;
     const model = this.store.models.get(preset.modelId)!;
-    return loadKey({
+    return {
+      presetId,
       modelPath: model.path,
       contextSize: preset.contextSize,
       gpuRatio: preset.gpuRatio,
       adapterPaths: this.store.presets.adapters(presetId).map((adapter) => adapter.path),
-    });
+    };
   }
 
   /** API-034 の応答に生成中の文字を重ねる */
@@ -242,15 +262,7 @@ export class ChatService {
     const slotContext = Math.floor(contextSize / GENERATION_SLOTS);
 
     const system = [preset.systemPrompt, workspace ? agentSystemPrompt(workspace.path) : "", workspace?.instructions].filter(Boolean).join("\n\n");
-    const samplingBody = {
-      temperature: sampling.temperature,
-      top_p: sampling.topP,
-      top_k: sampling.topK,
-      min_p: sampling.minP,
-      presence_penalty: sampling.presencePenalty,
-      repeat_penalty: sampling.repeatPenalty,
-      ...(adapters.length ? { lora: adapters.map((adapter, id) => ({ id, scale: adapter.scale })) } : {}),
-    };
+    const sampled = samplingBody(sampling, adapters);
     const toolsText = workspace ? JSON.stringify(toolDefinitions()) : "";
     /** 直前の生成の usage（入力＋出力）と、そのとき history に入っていた件数（応答の assistant を含む） */
     let baseline: { used: number; count: number } | undefined;
@@ -325,7 +337,7 @@ export class ChatService {
             messages: system ? [{ role: "system", content: system }, ...history] : history,
             ...(workspace ? { tools: toolDefinitions() } : {}),
             max_tokens: MAX_TOKENS,
-            ...samplingBody,
+            ...sampled,
             chat_template_kwargs: thinkingKwargs(model, preset),
           },
           onDelta: (delta) => {
@@ -366,13 +378,7 @@ export class ChatService {
     try {
       // 評価のケースが動いていたら、その合間まで待つ（FR-016）
       release = await this.slot.acquire(signal, this.keyOf(presetId));
-      await this.engine.load({
-        presetId,
-        modelPath: model.path,
-        contextSize: preset.contextSize,
-        gpuRatio: preset.gpuRatio,
-        adapterPaths: adapters.map((adapter) => adapter.path),
-      });
+      await this.engine.load(this.specOf(presetId));
       signal.throwIfAborted();
 
       if (!workspace) {
