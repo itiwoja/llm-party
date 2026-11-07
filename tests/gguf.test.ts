@@ -29,6 +29,18 @@ describe("readGguf", () => {
     expect(readGguf(file)).toMatchObject({ supportsThinking, supportsEffort });
   });
 
+  it("最後の nextn 層しか持たない GGUF は MTP（先読みの補助部分）だけとみなす", () => {
+    const file = path.join(temp.dir, "mtp-m.gguf");
+    writeGguf(file, { nextn: 1, tensors: ["token_embd.weight", "blk.31.attn_q.weight", "output.weight"] });
+    expect(readGguf(file).type).toBe("mtp");
+  });
+
+  it("MTP の層を含んでいても、本体の層があればモデル", () => {
+    const file = path.join(temp.dir, "m.gguf");
+    writeGguf(file, { nextn: 1, tensors: ["token_embd.weight", "blk.0.attn_q.weight", "blk.31.attn_q.weight"] });
+    expect(readGguf(file).type).toBe("model");
+  });
+
   it("GGUF でなければ INVALID_GGUF", () => {
     const file = path.join(temp.dir, "x.gguf");
     writeFileSync(file, "this is not a gguf file at all!!");

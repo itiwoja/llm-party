@@ -8,7 +8,7 @@ import type { LlamaFlavor } from "./runtime/manifest";
 import { killTree, processLabel, treeSpawnOptions } from "./process-tree";
 import { hasNvidiaGpu, ignoredOverrideWarning, resolveLlama } from "./runtime/resolver";
 import type { EventBus } from "./events";
-import { readGguf } from "./gguf";
+import { MTP_ONLY_MESSAGE, readGguf } from "./gguf";
 import { ApiError } from "./http-error";
 import { GENERATION_SLOTS } from "./generation-slot";
 
@@ -55,6 +55,15 @@ function blockCountOf({ gpuRatio, modelPath }: EngineSpec): number | null {
     return readGguf(modelPath).blockCount;
   } catch {
     return null;
+  }
+}
+
+/** 先読みの補助部分（MTP）だけのファイルか。読めないファイルの失敗は llama-server に報告させる */
+function isMtpOnly(modelPath: string): boolean {
+  try {
+    return readGguf(modelPath).type === "mtp";
+  } catch {
+    return false;
   }
 }
 
@@ -191,6 +200,11 @@ export class EngineManager {
     if (this.state === "ready" && this.spec && sameLoad(this.spec, spec)) {
       this.presetId = spec.presetId;
       return;
+    }
+    if (isMtpOnly(spec.modelPath)) {
+      // llama-server はこのファイルでエラーを出さずに落ちるので、起動する前に理由を返す
+      this.setState("failed", MTP_ONLY_MESSAGE);
+      throw new ApiError("ENGINE_FAILED", MTP_ONLY_MESSAGE);
     }
     await this.options.beforeLoad?.();
     this.warning = ignoredOverrideWarning(this.options.bin);

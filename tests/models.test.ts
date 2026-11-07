@@ -16,6 +16,14 @@ describe("モデル（API-050〜052）", () => {
   const register = (file: string, mode: "reference" | "copy" = "reference") =>
     worker.api("/models", { body: { path: file, mode } });
 
+  it("MTP（先読みの補助部分）だけの GGUF は登録しない", async () => {
+    const file = path.join(worker.dir, "mtp-a.gguf");
+    writeGguf(file, { nextn: 1, tensors: ["blk.31.attn_q.weight"] });
+    const res = await register(file);
+    expect(res.status).toBe(400);
+    expect(res.body.error.message).toMatch(/MTP/);
+  });
+
   it("一覧は行ごとに存在を確かめ、ないファイルに missing を付ける", async () => {
     const file = path.join(worker.dir, "a.gguf");
     writeGguf(file);
