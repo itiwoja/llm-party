@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { localRoutes } from "../server/routes/local";
+import { modelNameOf } from "../server/hf/names";
 import { ggufBytes, startFakeHf, type FakeHf } from "./fixtures/fake-hf";
 import { FAKE_LLAMA, startWorker, type TestWorker } from "./helpers";
 
@@ -78,7 +79,7 @@ describe("DL の完了とモデル登録", () => {
     expect(done).toMatchObject({ receivedBytes: small.length, resultId: expect.any(String), error: null });
     const model = (await worker.api("/models")).body.items[0];
     expect(model).toMatchObject({
-      id: done.resultId, path: file, source: "hf", architecture: "testarch", quantization: "Q4_K_M", sizeBytes: small.length, name: "Test Model",
+      id: done.resultId, path: file, source: "hf", architecture: "testarch", quantization: "Q4_K_M", sizeBytes: small.length, name: "tiny",
     });
     expect(worker.context.db.prepare("SELECT hf_repo FROM models").get()).toEqual({ hf_repo: "acme/tiny-GGUF" });
   });
@@ -341,5 +342,20 @@ describe("起動時とシャットダウン", () => {
     await worker.context.downloads.shutdown();
     expect(existsSync(path.join(models(), "acme/tiny-GGUF/tiny-Q4_K_M.gguf.part"))).toBe(true);
     expect(worker.context.store.downloads.get(res.body.id)!.status).toBe("failed");
+  });
+});
+
+describe("DL したモデルの表示名", () => {
+  it("ファイル名から量子化と分割の番号を除く", () => {
+    expect(modelNameOf("granite-4.2-8b-heretic-Q4_K_M.gguf")).toBe("granite-4.2-8b-heretic");
+    expect(modelNameOf("sub/dir/Qwen3.5-9B-Q8_0.gguf")).toBe("Qwen3.5-9B");
+    expect(modelNameOf("big-Q4_K_M-00001-of-00003.gguf")).toBe("big");
+    expect(modelNameOf("MOSS-Image-SFT-UD-Q4_K_XL.gguf")).toBe("MOSS-Image-SFT");
+  });
+
+  it("量子化が途中にあれば残し、名前が量子化だけなら空にしない", () => {
+    expect(modelNameOf("model-Q4_K_M-imat.gguf")).toBe("model-Q4_K_M-imat");
+    expect(modelNameOf("Q4_K_M.gguf")).toBe("Q4_K_M");
+    expect(modelNameOf("plain.GGUF")).toBe("plain");
   });
 });

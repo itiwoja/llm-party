@@ -45,6 +45,17 @@ export function quantOf(file: string): string | null {
   return matches.length ? matches[matches.length - 1][1].toUpperCase() : null;
 }
 
+/**
+ * DL したモデルの表示名。ファイル名から分割の番号と末尾の量子化を除く（量子化は別の列に出る）。
+ * GGUF の general.name は作者が自由に書く欄で、変換元の別の名前が残っていることがあるので使わない
+ */
+export function modelNameOf(file: string): string {
+  const base = path.basename(file).replace(/\.gguf$/i, "").replace(/-\d{5}-of-\d{5}$/, "");
+  const quant = [...base.matchAll(QUANT)].at(-1);
+  if (!quant || quant.index + quant[0].length !== base.length) return base;
+  return base.slice(0, quant.index) || base;
+}
+
 export interface TreeFile {
   path: string;
   size: number;
