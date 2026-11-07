@@ -4,7 +4,8 @@ export interface RecipePart { key: string; repo: string; file: string }
 /** parts の先頭が主の部品。models.path になる */
 export const MOSS_IMAGE: RecipePart[] = [
   { key: "diffusion", repo: "unsloth/MOSS-Image-SFT-GGUF", file: "MOSS-Image-SFT-UD-Q4_K_XL.gguf" },
-  { key: "llm", repo: "unsloth/Qwen3.5-9B-GGUF", file: "Qwen3.5-9B-Q8_0.gguf" },
+  // Q-15 の結論。Qwen3.5-9B Q8_0（約 9GB）より小さく、8GB の GPU で実機で確かめた組み合わせ（エンコーダは CPU で動かす）
+  { key: "llm", repo: "pottokao/MOSS-Image-Text-Encoder-Heretic-DHQ-GGUF", file: "moss-te-heretic-dhq-K-6.6G.gguf" },
   { key: "vae", repo: "unsloth/MOSS-Image-SFT-FP8", file: "vae/diffusion_pytorch_model.safetensors" },
   { key: "tokenizer", repo: "unsloth/MOSS-Image-SFT-FP8", file: "tokenizer/tokenizer.json" },
 ];

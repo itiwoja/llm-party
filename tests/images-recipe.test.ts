@@ -7,7 +7,7 @@ import { FAKE_LLAMA, startWorker, type TestWorker } from "./helpers";
 
 const repos = (reported?: number) => ({
   "unsloth/MOSS-Image-SFT-GGUF": { files: [{ path: "MOSS-Image-SFT-UD-Q4_K_XL.gguf", data: ggufBytes(), reportedSize: reported }] },
-  "unsloth/Qwen3.5-9B-GGUF": { files: [{ path: "Qwen3.5-9B-Q8_0.gguf", data: ggufBytes() }] },
+  "pottokao/MOSS-Image-Text-Encoder-Heretic-DHQ-GGUF": { files: [{ path: "moss-te-heretic-dhq-K-6.6G.gguf", data: ggufBytes() }] },
   "unsloth/MOSS-Image-SFT-FP8": {
     files: [
       { path: "vae/diffusion_pytorch_model.safetensors", data: Buffer.from("vae-bytes") },

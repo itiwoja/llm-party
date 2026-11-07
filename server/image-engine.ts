@@ -34,6 +34,9 @@ export interface ImageModelSpec { path: string; parts: ImageParts | null }
 
 const POLL_MS = 500;
 
+/** 部品モデルのテキストエンコーダは大きく、8GB の GPU では DiT と一緒に載らない。CPU（Windows の RAM）で動かす（R-18） */
+const PARTS_BACKEND = ["--backend", "te=cpu"];
+
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function freePort(): Promise<number> {
@@ -140,7 +143,7 @@ export class ImageEngine {
     // 終了はプロセスグループごと行うので、自分のグループを持たせる
     const { parts } = model;
     const modelArgs = parts
-      ? ["--diffusion-model", parts.diffusion, "--llm", parts.llm, "--vae", parts.vae, "--tokenizer", parts.tokenizer]
+      ? ["--diffusion-model", parts.diffusion, "--llm", parts.llm, "--vae", parts.vae, "--tokenizer", parts.tokenizer, ...PARTS_BACKEND]
       : ["-m", model.path];
     const child = spawn(this.options.bin, [...modelArgs, "--listen-ip", "127.0.0.1", "--listen-port", String(port)], {
       stdio: ["ignore", "pipe", "pipe"],
@@ -210,7 +213,7 @@ export class ImageEngine {
     const out = path.join(runDir, `${randomUUID()}.png`);
     const host = (file: string) => this.toHostPath(file);
     const modelArgs = model.parts
-      ? ["--diffusion-model", host(model.parts.diffusion), "--llm", host(model.parts.llm), "--vae", host(model.parts.vae), "--tokenizer", host(model.parts.tokenizer)]
+      ? ["--diffusion-model", host(model.parts.diffusion), "--llm", host(model.parts.llm), "--vae", host(model.parts.vae), "--tokenizer", host(model.parts.tokenizer), ...PARTS_BACKEND]
       : ["-m", host(model.path)];
     const args = [
       ...modelArgs,

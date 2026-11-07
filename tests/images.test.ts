@@ -90,6 +90,7 @@ describe("ImageEngine", () => {
     expect(line).toContain("--llm /m/l.gguf");
     expect(line).toContain("--vae /m/v.safetensors");
     expect(line).toContain("--tokenizer /m/t.json");
+    expect(line).toContain("--backend te=cpu");
     expect(line.split(" ")).not.toContain("-m");
   });
 
@@ -99,6 +100,7 @@ describe("ImageEngine", () => {
     const line = loggedArgs();
     expect(line).toContain("-m /models/a.safetensors");
     expect(line).not.toContain("--diffusion-model");
+    expect(line).not.toContain("--backend");
   });
 
   it("起動直後に落ちたら ENGINE_FAILED", async () => {
