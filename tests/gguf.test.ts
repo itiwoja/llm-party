@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { readGguf } from "../server/gguf";
+import { PARTIAL_MESSAGE, readGguf, unusableReason } from "../server/gguf";
 import { tempDir, writeGguf } from "./helpers";
 
 describe("readGguf", () => {
@@ -53,5 +53,28 @@ describe("readGguf", () => {
     const whole = readFileSync(file);
     writeFileSync(file, whole.subarray(0, 40));
     expect(() => readGguf(file)).toThrow("GGUF を読めません");
+  });
+
+  it.each([
+    ["まとめた形", ["blk.0.ffn_gate_exps.weight", "blk.0.ffn_down_exps.weight"]],
+    ["上下をまとめた形", ["blk.0.ffn_gate_up_exps.weight"]],
+    ["Mixtral の1つずつの形", ["blk.0.ffn_down.0.weight", "blk.0.ffn_down.1.weight"]],
+  ])("MoE で専門家の重みがあればモデル（%s）", (_label, tensors) => {
+    const file = path.join(temp.dir, "moe.gguf");
+    writeGguf(file, { experts: 8, tensors: ["token_embd.weight", ...tensors] });
+    expect(readGguf(file).type).toBe("model");
+  });
+
+  it("MoE なのに専門家の重みが .scale しかない GGUF（Strata 向けの切り出し）は一部だけとみなす", () => {
+    const file = path.join(temp.dir, "dense.gguf");
+    writeGguf(file, { experts: 512, tensors: ["token_embd.weight", "blk.0.ffn_down_exps.scale", "blk.0.ffn_down_exps.input_scale", "blk.0.ffn_gate_inp.weight"] });
+    expect(readGguf(file).type).toBe("partial");
+    expect(unusableReason(readGguf(file))).toBe(PARTIAL_MESSAGE);
+  });
+
+  it("専門家の数が 0 なら重みがなくてもモデル", () => {
+    const file = path.join(temp.dir, "dense0.gguf");
+    writeGguf(file, { experts: 0, tensors: ["token_embd.weight", "blk.0.attn_q.weight"] });
+    expect(readGguf(file).type).toBe("model");
   });
 });
