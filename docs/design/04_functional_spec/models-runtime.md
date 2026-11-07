@@ -97,6 +97,9 @@ flowchart LR
   | 画像生成 | `text-to-image` | |
 
   `pipeline_tag` は1回に1つしか受けないので、2つあるジャンルは別々に検索し、重複を除いて DL 数の順に混ぜて 50 件に切る。無検閲はジャンルではなくタグなので、スイッチにして各ジャンルと組み合わせられる
+- 思考で絞る（D-90）：「エフォートあり」は `gguf.chat_template` に `reasoning_effort` があるもの、「思考あり」は `enable_thinking` か `reasoning_effort` があるもの。判定は DL 後のモデルと同じ `server/thinking.ts`。HF はテンプレートで絞れないので、取った上位から絞る。エフォート・思考・VRAM・RAM を指定した検索は、1検索あたり 500 件取る（ほかは 100 件）
+- 用途で絞る（D-90）：日本語は `ja` `japanese`、コーディングは `code` `coding`、ロールプレイは `roleplay` `rp` のタグ。`filter` は重ねると AND になるので、タグごとに検索を分けて混ぜる
+- 思考か用途を指定すると、ジャンルが「すべて」でもチャットだけを探す。ジャンルが画像生成なら HF に聞かず空を返す。画面は画像生成のとき欄を隠し、指定を外す
 - ファイル一覧：`GET /api/models/<repo>/tree/main` で全ファイルを並べ、モデル本体（`.gguf` `.safetensors` `.ckpt` `.pt` `.pth` `.bin` `.onnx`）を先に出す。量子化の種類（ファイル名から）とサイズを出す。分割の GGUF / safetensors（`-00001-of-0000N`）は1つにまとめて表示し、全部を DL する
 - DL の種類（`kind`）：
 
