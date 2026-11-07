@@ -246,6 +246,8 @@ svg.lucide, .btn svg, .icon-btn svg { width: var(--icon-size); height: var(--ico
 .composer-info { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
 .composer-info .icon-btn { margin-right: calc(var(--space-2) * -1); }
 .composer-model { display: flex; align-items: center; gap: var(--space-1); min-width: 0; margin-left: auto; }
+.composer-thinking:disabled { background: transparent; cursor: default; }
+.composer-thinking-on, .composer-thinking-on:hover { color: var(--color-primary); }
 .composer-send { background: var(--button-primary-bg); color: var(--button-primary-fg); }
 @media (hover: hover) { .composer-send:hover:not(:disabled) { background: var(--color-primary-hover); color: var(--button-primary-fg); } }
 .composer-send:disabled { background: var(--color-hover); color: var(--color-muted-fg); cursor: default; }

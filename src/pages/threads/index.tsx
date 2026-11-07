@@ -1,4 +1,4 @@
-import { ArrowUp, Folder, PanelRight, Square } from "lucide-react";
+import { ArrowUp, Brain, Folder, PanelRight, Square } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiRequestError } from "../../api";
 import { useAppData, useBand, useServerEvent } from "../../app-data";
@@ -11,7 +11,7 @@ import { CP, MISSING_COPY } from "../../copy";
 import { WorkLayout } from "../../layouts";
 import { navigate, useRoute } from "../../router";
 import { pickFolder } from "../../platform";
-import { thinkingChoice, thinkingOptions, thinkingPatch } from "../../thinking";
+import { thinkingLevels, thinkingPatch } from "../../thinking";
 import type { EngineState } from "../../types";
 import { Conversation } from "./Conversation";
 import { imageStore, useImageState } from "./imageStore";
@@ -96,10 +96,11 @@ export function ThreadsPage() {
     [presets, imageModels],
   );
   const modelChoice = imageMode ? `image:${imageModelId}` : `preset:${presetId}`;
-  /** 選んでいるプリセットのモデルで変えられる思考の選択肢（D-76）。無ければ欄を出さない */
+  /** 選んでいるプリセットのモデルで変えられる思考（D-76）。オンオフはボタン、段階はセレクト（UI の D-37）。変えられないものは出さない */
   const preset = presets.find((p) => p.id === presetId);
   const presetModel = models.find((m) => m.id === preset?.modelId);
-  const thinkingChoices = imageMode ? [] : thinkingOptions(presetModel);
+  const thinkingToggle = !imageMode && presetModel?.supportsThinking === true;
+  const levelChoices = imageMode || !preset || !presetModel ? [] : thinkingLevels(presetModel, preset);
   // 生成中の依頼。文は生成が終わるまで DB に入らないので、画面を離れても消えない場所に持つ（D-84）
   const { job: imageJob, progress: imageProgress, failure: imageFailure } = useImageState();
   const imageBusy = imageJob !== null;
@@ -568,16 +569,26 @@ export function ThreadsPage() {
               options={modelOptions}
               disabled={generating || imageBusy}
             />
-            {preset && presetModel && thinkingChoices.length > 0 ? (
+            {preset && levelChoices.length > 0 ? (
               <SelectField
                 compact
                 hideLabel
                 label={CP.thinkingSelect}
-                value={thinkingChoice(presetModel, preset)}
+                value={preset.effort}
                 onValueChange={chooseThinking}
-                options={thinkingChoices}
+                options={levelChoices}
                 disabled={generating || imageBusy}
               />
+            ) : null}
+            {preset && thinkingToggle ? (
+              <IconButton
+                className={preset.thinking ? "composer-thinking composer-thinking-on" : "composer-thinking"}
+                label={preset.thinking ? CP.thinkingOn : CP.thinkingOff}
+                disabled={generating || imageBusy}
+                onClick={() => chooseThinking(preset.thinking ? "off" : "on")}
+              >
+                <Brain aria-hidden />
+              </IconButton>
             ) : null}
             {generating ? (
               <IconButton className="composer-stop" label={CP.stop} disabled={stepWait} onClick={() => turn && void api.post(`/turns/${turn.id}/cancel`).catch((err) => setError(errorText(err)))}>
