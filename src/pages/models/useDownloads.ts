@@ -1,15 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../api";
-import { useAppData, useServerEvent } from "../../app-data";
+import { useServerEvent } from "../../app-data";
 import { errorMessage } from "./format";
 import type { DownloadItem } from "./types";
 
 /** 残り時間を出すために、最初に見た時刻とバイト数を覚える */
 interface Seen { at: number; bytes: number }
 
-/** DL の一覧と進み（API-056 と download.progress）。完了したらモデルの一覧も読み直す */
+/** DL の一覧と進み（API-056 と download.progress）。完了時のモデル・プリセットの読み直しは AppDataProvider がする */
 export function useDownloads() {
-  const { reloadModels } = useAppData();
   const [items, setItems] = useState<DownloadItem[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState("");
@@ -42,7 +41,6 @@ export function useDownloads() {
     }));
     // 新しい DL・完了・失敗は、filePath やエラー文を持つ一覧を取り直す
     if (!known || status === "completed" || status === "failed") void reload();
-    if (status === "completed") void reloadModels().catch((err) => setError(errorMessage(err)));
   });
 
   /** 残り秒。見積もれないときは null */
