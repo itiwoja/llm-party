@@ -273,4 +273,32 @@ export const MIGRATIONS: string[] = [
     created_at TEXT NOT NULL
   );
   `,
+  // v8：音楽を専用の画面に移す（D-80）。曲はスレッドから独立させ（thread_id を NULL 可・ON DELETE SET NULL）、
+  // v7 まで messages の本文（JSON）に持っていた bpm・keyscale・reasoning を列に移す。SQLite は列の制約を変えられないので作り直す。
+  // 結合の条件は CASE で包む：SQLite が評価順を入れ替えても、role = 'music' 以外の普通の会話文を JSON として読まないように
+  `
+  CREATE TABLE tracks_v8 (
+    id TEXT PRIMARY KEY,
+    thread_id TEXT REFERENCES threads(id) ON DELETE SET NULL,
+    model_name TEXT NOT NULL,
+    prompt TEXT NOT NULL,
+    lyrics TEXT NOT NULL,
+    duration INTEGER NOT NULL,
+    seed INTEGER NOT NULL,
+    path TEXT NOT NULL,
+    bpm INTEGER,
+    keyscale TEXT,
+    reasoning TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL
+  );
+  INSERT INTO tracks_v8
+  SELECT t.id, t.thread_id, t.model_name, t.prompt, t.lyrics, t.duration, t.seed, t.path,
+         json_extract(m.content, '$.bpm'), json_extract(m.content, '$.keyscale'),
+         COALESCE(json_extract(m.content, '$.reasoning'), ''), t.created_at
+  FROM tracks t
+  LEFT JOIN messages m ON CASE WHEN m.role = 'music' AND json_valid(m.content) THEN json_extract(m.content, '$.trackId') END = t.id;
+  DROP TABLE tracks;
+  ALTER TABLE tracks_v8 RENAME TO tracks;
+  CREATE INDEX idx_tracks_created ON tracks(created_at DESC, id DESC);
+  `,
 ];

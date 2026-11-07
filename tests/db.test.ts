@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
+import Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
 import { openDatabase, openMemoryDatabase } from "../server/db";
 import { MIGRATIONS } from "../server/db/schema";
@@ -99,5 +100,47 @@ describe("スレッド検索（D-58）", () => {
     const second = store.threads.list({ limit: 1, cursor: first.nextCursor! });
     expect(new Set([first.items[0].id, second.items[0].id])).toEqual(new Set([a.id, b.id]));
     expect(second.nextCursor).toBeNull();
+  });
+});
+
+describe("v8：曲をスレッドから独立させる", () => {
+  /** v7 までの DB を作り、会話文・音楽のメッセージ・曲を入れてから v8 に上げる */
+  function v7Database() {
+    const db = new Database(":memory:");
+    db.pragma("foreign_keys = ON");
+    db.transaction(() => {
+      for (let i = 0; i < 7; i += 1) db.exec(MIGRATIONS[i]);
+      db.pragma("user_version = 7");
+    })();
+    db.prepare("INSERT INTO threads (id, title, created_at, updated_at) VALUES ('t1', 't', 'x', 'x')").run();
+    // 普通の会話文は JSON ではない。移行が json_extract で落ちないこと
+    db.prepare("INSERT INTO messages (id, thread_id, turn_id, seq, role, content, created_at) VALUES ('m1', 't1', NULL, 1, 'user', '{ これは JSON ではない', 'x')").run();
+    db.prepare("INSERT INTO messages (id, thread_id, turn_id, seq, role, content, created_at) VALUES ('m2', 't1', NULL, 2, 'assistant', 'こんにちは', 'x')").run();
+    db.prepare("INSERT INTO messages (id, thread_id, turn_id, seq, role, content, created_at) VALUES ('m3', 't1', NULL, 3, 'music', ?, 'x')")
+      .run(JSON.stringify({ trackId: 'k1', bpm: 120, keyscale: 'C major', reasoning: '考え' }));
+    for (const id of ["k1", "k2"]) {
+      db.prepare("INSERT INTO tracks (id, thread_id, model_name, prompt, lyrics, duration, seed, path, created_at) VALUES (?, 't1', 'm', 'p', 'l', 30, 1, '/a.mp3', '2026-01-01')").run(id);
+    }
+    return db;
+  }
+
+  it("bpm・keyscale・reasoning を列に移し、メッセージの無い曲は既定値になる", () => {
+    const db = v7Database();
+    db.transaction(() => { db.exec(MIGRATIONS[7]); db.pragma("user_version = 8"); })();
+    const rows = db.prepare("SELECT id, thread_id, bpm, keyscale, reasoning FROM tracks ORDER BY id").all();
+    expect(rows).toEqual([
+      { id: "k1", thread_id: "t1", bpm: 120, keyscale: "C major", reasoning: "考え" },
+      { id: "k2", thread_id: "t1", bpm: null, keyscale: null, reasoning: "" },
+    ]);
+    expect(db.prepare("SELECT name FROM sqlite_master WHERE name = 'idx_tracks_created'").all()).toHaveLength(1);
+  });
+
+  it("スレッドを消しても曲は残り、thread_id が NULL になる", () => {
+    const db = v7Database();
+    db.transaction(() => { db.exec(MIGRATIONS[7]); db.pragma("user_version = 8"); })();
+    db.prepare("DELETE FROM threads WHERE id = 't1'").run();
+    expect(db.prepare("SELECT id, thread_id FROM tracks ORDER BY id").all()).toEqual([
+      { id: "k1", thread_id: null }, { id: "k2", thread_id: null },
+    ]);
   });
 });

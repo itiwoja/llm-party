@@ -67,7 +67,7 @@ const VAE_CHUNK = "384";
 /** かな・漢字があれば日本語の歌にする。無ければ LM に任せる */
 const hasJapanese = (text: string) => /[぀-ヿ一-鿿]/.test(text);
 
-function languageOf({ prompt, lyrics }: MusicParams): string {
+function languageOf({ prompt, lyrics }: Pick<MusicParams, "prompt" | "lyrics">): string {
   if (lyrics === INSTRUMENTAL) return "unknown";
   return hasJapanese(`${prompt}\n${lyrics}`) ? "ja" : "";
 }
@@ -105,6 +105,35 @@ export class MusicEngine {
   private host(bin: string, file: string): string {
     if (!bin.toLowerCase().endsWith(".exe") || process.platform !== "linux") return file;
     return execFileSync("wslpath", ["-w", file], { encoding: "utf8" }).trim();
+  }
+
+  /**
+   * 歌詞だけを下書きする（FR-023）。ace-lm を CPU で動かすだけで、音声コードは作らない（VRAM を使わない）。
+   * LM が返す bpm・keyscale・caption などは使わず、歌詞だけを返す
+   */
+  async draft(input: { prompt: string }, parts: MusicParts, signal: AbortSignal, onThought: (reasoning: string) => void): Promise<string> {
+    const lm = this.binary("ace-lm");
+    if (!lm) throw new ApiError("ENGINE_FAILED", "音楽エンジンがありません");
+    const work = path.join(this.runDir, `music-${randomUUID()}`);
+    mkdirSync(work, { recursive: true });
+    try {
+      const request = path.join(work, "request.json");
+      writeFileSync(request, JSON.stringify({
+        caption: input.prompt,
+        lyrics: "",
+        lm_mode: "inspire",
+        vocal_language: languageOf({ prompt: input.prompt, lyrics: "" }),
+        lm_model: path.basename(parts.lm),
+      }));
+      await this.run(lm, ["--models", this.host(lm, path.dirname(parts.dit)), "--request", this.host(lm, request), "--device", "CPU"], signal, thoughtReader(onThought));
+      const drafted = path.join(work, "request0.json");
+      if (!existsSync(drafted)) throw new ApiError("ENGINE_FAILED", "歌詞の下書きに失敗しました");
+      const lyrics = (JSON.parse(readFileSync(drafted, "utf8")) as { lyrics?: string }).lyrics?.trim() ?? "";
+      if (!lyrics) throw new ApiError("ENGINE_FAILED", "歌詞の下書きに失敗しました");
+      return lyrics;
+    } finally {
+      rmSync(work, { recursive: true, force: true });
+    }
   }
 
   /** 1 曲作る。signal が止まれば子プロセスを止める。時間の上限は置かない（D-78） */
