@@ -165,14 +165,15 @@ sequenceDiagram
     actor U as 利用者
     participant R as SCR-010
     participant W as worker
+    participant E as llama-server
     participant L as ace-lm（CPU）
     participant S as ace-synth（Vulkan）
     participant D as TBL-018
     U->>R: AI に下書き
     R->>W: POST /api/music/draft
     W-->>R: 202 running
-    W->>L: lm_mode inspire
-    L-->>W: request0.json（歌詞）
+    W->>E: プリセットのモデルで作詞（API-101）
+    E-->>W: 歌詞
     W-->>R: music draft completed
     U->>R: 歌詞を手直しして生成する
     R->>W: POST /api/music/generate

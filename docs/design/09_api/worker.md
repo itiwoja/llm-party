@@ -125,7 +125,7 @@ sequenceDiagram
 | API-105 | GET | `/api/music/:id` | 生成した MP3 を返す（`dataDir/music` の中だけ）。消した曲は 404 | FR-025, FR-027, D-78 |
 | API-106 | POST | `/api/music-recipes` | `{ recipe: "ace-step" }` を受けて、部品を DL の待ち行列に入れる（kind `music-set`）。形は API-097 と同じ | FR-012, D-78 |
 | API-107 | GET | `/api/music-recipes` | レシピの一覧。形は API-098 と同じ。`installed` は部品がそろい、モデルとして登録済みのときだけ true（API-098 も同じ） | FR-012, FR-022, D-78 |
-| API-108 | POST | `/api/music/draft` | `{ modelId, prompt }` を受けて 202 `{ status: "running" }`。歌詞だけを作る | FR-023 |
+| API-108 | POST | `/api/music/draft` | `{ presetId, prompt, duration? }` を受けて 202 `{ status: "running" }`。`duration` は 10〜240 秒（既定 60）。プリセットのモデルが歌詞だけを作る。プリセットが無ければ 404 | FR-023, D-90 |
 | API-109 | POST | `/api/music/generate` | `{ modelId, prompt, lyrics?, duration? }` を受けて 202 `{ status: "running" }`。`duration` は 10〜240 秒（既定 60）。`lyrics` は空なら作詞を任せ、`[Instrumental]` なら歌なし。シードは毎回新しい。音楽モデル（`use: music`）だけを受ける | FR-025 |
 | API-110 | POST | `/api/music/cancel` | 実行中の下書き・生成を止める。`{ status: "cancelling" }`、動いていなければ `{ status: "idle" }` | FR-023, FR-025 |
 | API-111 | GET | `/api/tracks` | 曲の一覧。`{ items: [{ id, prompt, duration, createdAt }], nextCursor }`。新しい順、既定 50 件 | FR-027 |

@@ -76,7 +76,7 @@ flowchart LR
 | FR-020 | 設定 | 置き場・バックエンド・HF トークン・既定値 | UC-001, UC-004 | Must | [app](app.md#fr-020設定) | localhost（一部 exe） |
 | FR-021 | ログ・診断 | ログ 14 日、診断情報の書き出し | UC-002 | Must | [app](app.md#fr-021ログ診断) | localhost |
 | FR-022 | 音楽モデルの用意 | XL turbo Q8 のレシピ、古いモデルの置き換え | UC-009 | Should | [music](music.md#fr-022音楽モデルの用意) | localhost |
-| FR-023 | 歌詞の下書き | LM に歌詞だけを作らせる | UC-009 | Should | [music](music.md#fr-023歌詞の下書き) | localhost |
+| FR-023 | 歌詞の下書き | 説明をもとにチャットのモデルに歌詞だけを作らせる | UC-009 | Should | [music](music.md#fr-023歌詞の下書き) | localhost |
 | FR-024 | 歌詞の編集 | 歌詞の入力、構成タグのボタン | UC-009 | Should | [music](music.md#fr-024歌詞の編集) | localhost |
 | FR-025 | 曲の生成 | LM → 合成、保存、止める | UC-009, UC-010 | Should | [music](music.md#fr-025曲の生成) | localhost |
 | FR-026 | 作り直し | できた曲の内容をエディタに戻す | UC-010 | Should | [music](music.md#fr-026作り直し) | localhost |

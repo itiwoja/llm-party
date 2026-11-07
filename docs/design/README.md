@@ -24,7 +24,7 @@
 | R-20 | リスク | acestep.cpp は公式の配布物がなく、作者のサイトの `/temp/` の Windows 版を使っている。sha256 の公開もなく、場所が消える恐れがある | 版 07abf07 の sha256 を ADR-013 に控えた。exe 段階までに自前のビルドに切り替える | FR-012 | [ADR-013](adr/ADR-013-acestep-cli.md) |
 | R-21 | リスク | この Windows 版には cublas64_13.dll が無く CUDA が読めないので、合成は Vulkan、LM は CPU で動く。LM は Vulkan だと結果が壊れる | LM は常に CPU を指定。合成の結果は CPU と波形が一致することを確認済み。CUDA 版が手に入れば見直す | FR-012 | [ADR-013](adr/ADR-013-acestep-cli.md) |
 | R-22 | リスク | XL の VRAM の山は 6.8GB で、8GB の GPU の余裕は約 1.4GB。他のアプリが GPU を使うと失敗しうる | 失敗しても編集中の内容を残し、CP-353 で案内する | — | [music](04_functional_spec/music.md#-判断してほしいこと) |
-| R-23 | リスク | AI の下書きは説明とずれることがあり、長さも守らない。長い歌詞を短い曲に渡したときの歌われ方は未確認 | 手直しの土台と位置づけ、長さは画面の指定を優先。実装時に耳で確かめる | FR-023 | [music](04_functional_spec/music.md#-判断してほしいこと) |
+| R-23 | リスク | AI の下書きの品質はモデルしだいで、行数の指示を超えることがある（D-90）。長い歌詞を短い曲に渡したときの歌われ方は未確認 | 手直しの土台と位置づけ、長さは画面の指定を優先。実装時に耳で確かめる | FR-023 | [music](04_functional_spec/music.md#-判断してほしいこと) |
 
 番号の欠け（Q-01, Q-02, Q-03, Q-04, Q-05, Q-06, Q-07, Q-08, Q-09）は決着済み → [00 決定事項ログ](00_overview.md#決定事項ログ)（D-55, D-86, D-33, D-43, D-46, D-86, D-42, D-38, D-56）。Q-02 と Q-06 は D-86 で決着（元は D-59）。
 
@@ -67,6 +67,7 @@ flowchart LR
 | [ADR-015](adr/ADR-015-music-page.md) | 音楽は専用の画面に一本化し、曲をスレッドから切り離す | 承認 |
 
 ## 最近の変更
+- 2026-11-08：AI の下書きを、説明をもとにチャットのモデルが書く形に変更（D-90、[変更記録](changes/2026-11-08-lyrics-from-description.md)）
 - 2026-11-07：音楽専用の画面と XL turbo への置き換えを設計（D-79〜D-83、[変更レポート](changes/2026-11-07-music-studio.md)）。実装はこれから
 - 2026-11-07：音楽生成に対応（D-78、[ADR-013](adr/ADR-013-acestep-cli.md)、[変更記録](changes/2026-11-07-music-generation.md)）。R-20、R-21 を追加
 - 2026-11-07：`LLM_PARTY_LLAMA_BIN` の無効な指定で読み込みを止めないように変更（[ADR-012](adr/ADR-012-invalid-llama-override.md)、[変更レポート](changes/2026-11-07-invalid-llama-override.md)）。R-14 を決着として閉じ、R-19、D-74、CP-313 を追加
