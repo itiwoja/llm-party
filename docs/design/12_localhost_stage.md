@@ -93,7 +93,7 @@ flowchart TD
 - **画面への渡し方**：起動時にターミナルへ `http://127.0.0.1:8787/#token=<トークン>` を出す。画面はルーターが動く前に読み取って `localStorage` に入れ、URL から消す。次からは `http://127.0.0.1:8787/` だけで開ける。トークンがなければ入力を求める
 - **他のサイトからの防御**（R-16）：`Host` が `127.0.0.1:<ポート>` か `localhost:<ポート>` でなければ拒否する（DNS リバインディング対策）。`Origin` があるなら同じ2つだけ許す。CORS のヘッダーは返さない
 - **SSE**：`EventSource` はヘッダーを付けられないので、画面は `fetch` のストリームで読む（[API-099](09_api/worker.md#api-099get-apievents)。exe 段階も同じ）
-- **CSP**：`npm start` では `default-src 'self'` を基本にかける。`npm run dev` は Vite の都合で緩める
+- **CSP**：`npm start` では `default-src 'self'` を基本にかける。生成した画像・音声は認証付きの fetch で取って `blob:` の URL で見せるので、`img-src` と `media-src` だけ `blob:` を許す。`npm run dev` は Vite の都合で緩める
 
 ## IPC の代わり
 画面は `src/platform` の接続層（`window.llmParty` と同じ関数の形）だけを呼ぶ。localhost 段階の実装と Electron の実装を差し替える。

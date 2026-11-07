@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { PRODUCTION_CSP } from "../server/csp";
 import { localRoutes } from "../server/routes/local";
 import { FAKE_LLAMA, startWorker, type TestWorker } from "./helpers";
 
@@ -27,5 +28,18 @@ describe("localhost の入口だけ", () => {
     } finally {
       await worker.close();
     }
+  });
+});
+
+describe("npm start の CSP", () => {
+  const directive = (name: string) => PRODUCTION_CSP.split(";").map((part) => part.trim().split(/\s+/)).find(([key]) => key === name)?.slice(1) ?? [];
+
+  // 生成した画像・音声は blob: の URL で見せる。default-src にだけ頼ると画面に出ない
+  it.each(["img-src", "media-src"])("%s は blob: を許す", (name) => {
+    expect(directive(name)).toEqual(["'self'", "blob:"]);
+  });
+
+  it("基本は自分のオリジンだけのまま", () => {
+    expect(directive("default-src")).toEqual(["'self'"]);
   });
 });

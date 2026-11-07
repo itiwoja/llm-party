@@ -7,6 +7,7 @@ import { createContext } from "./context";
 import { logger, pruneLogs } from "./logger";
 import { ignoredOverrideWarning } from "./runtime/resolver";
 import { localRoutes } from "./routes/local";
+import { PRODUCTION_CSP } from "./csp";
 import { loadOrCreateToken } from "./token";
 
 /** localhost 段階の起動の入口（12） */
@@ -22,7 +23,7 @@ const server = createServer(app);
 if (process.env.NODE_ENV === "production") {
   const dist = path.resolve("dist");
   app.use((_req, res, next) => {
-    res.setHeader("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline'");
+    res.setHeader("Content-Security-Policy", PRODUCTION_CSP);
     next();
   });
   app.use(express.static(dist));
