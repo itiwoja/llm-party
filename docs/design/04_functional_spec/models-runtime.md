@@ -84,18 +84,17 @@ flowchart LR
 - 検索：Hugging Face の `GET /api/models?sort=downloads&limit=50` に、語（`search`）・ジャンル（`pipeline_tag`）・無検閲（`filter=uncensored`）を足して使う。`expand[]` で項目を指定する（指定しないと `lastModified` と `gated` が返らない）。表示はリポジトリ名・ジャンル・ライセンス・DL 数・更新日。語がなくても、ジャンルか無検閲を選べば DL 数の順に一覧できる（D-71）。`expand[]` に `gguf` と `safetensors` を足し、パラメータ数（`gguf.total` か `safetensors.total`）を取る
 - VRAM・RAM で絞る：欄に GB の上限を入れると、VRAM は VRAM推奨、RAM は RAM推奨（下の式）がその上限以下のものだけ出す。どちらの値もバー（GPU に載せる割合）で変わる。両方入れたら両方を満たすもの。パラメータ数の分からないものは絞るときに外す。HF はサイズで絞れないので、件数の上限 100 で取ってから絞り、50 件に切る。語もジャンルもなくても、上限だけで一覧できる
 - VRAM推奨・RAM推奨：GPU に載せる割合 r（0〜100%、D-77）で動かすときの目安（GB）。重み W はファイル一覧ならファイルのサイズ、検索結果なら Q4_K_M の `パラメータ数 × 0.61 byte`。`VRAM推奨 = W × 1.1 × r + 1GB`（r が 0 なら 0）、`RAM推奨 = W × 1.1 × (1 − r) + 4GB`（r が 0 ならさらに 1GB）。4GB は OS とアプリの分。文脈長（既定 32K、D-22）で増えるので、目安はあくまで粗い見積もり
+- 出すもの（D-89）：使えると確定したリポジトリとファイルだけ。HF が判断の材料を返さないものは出さない
+  - チャット：`pipeline_tag` がチャットの2つ（なしは出さない）、`text-encoder` `prompt-*` のタグや Text Encoder の名前が付かない、`gguf.architecture` が対応形式（`server/hf/usable.ts`）、`gguf.chat_template` あり、GGUF のファイルあり
+  - 画像：`pipeline_tag` が `text-to-image`、`config.diffusers._class_name` が `StableDiffusionPipeline` か `StableDiffusionXLPipeline`、直下に単一の `.safetensors` あり。ファイル一覧では頭を読み、UNet・VAE・テキストエンコーダが揃うものだけ出す
+  - 対応形式の一覧は固定で持つ。llama-server を上げたら見直す
 - ジャンル：
 
   | ジャンル | `pipeline_tag` | 補足 |
   |---|---|---|
-  | すべて | なし | 形式を問わない |
+  | すべて | なし | チャットと画像生成の検索を混ぜる |
   | チャット | `text-generation`, `image-text-to-text` | GGUF に絞る（`filter=gguf`）。動かせるのは GGUF だけなので |
   | 画像生成 | `text-to-image` | |
-  | 映像生成 | `text-to-video` | |
-  | 音楽生成 | `text-to-audio` | 検索で見つけたモデルは保存だけ。生成に使うのは ACE-Step 1.5 のレシピ（D-78） |
-  | 音声生成 | `text-to-speech` | |
-  | 文字起こし | `automatic-speech-recognition` | |
-  | Embedding | `feature-extraction`, `sentence-similarity` | |
 
   `pipeline_tag` は1回に1つしか受けないので、2つあるジャンルは別々に検索し、重複を除いて DL 数の順に混ぜて 50 件に切る。無検閲はジャンルではなくタグなので、スイッチにして各ジャンルと組み合わせられる
 - ファイル一覧：`GET /api/models/<repo>/tree/main` で全ファイルを並べ、モデル本体（`.gguf` `.safetensors` `.ckpt` `.pt` `.pth` `.bin` `.onnx`）を先に出す。量子化の種類（ファイル名から）とサイズを出す。分割の GGUF / safetensors（`-00001-of-0000N`）は1つにまとめて表示し、全部を DL する
@@ -104,13 +103,12 @@ flowchart LR
   | kind | 対象 | DL の後 |
   |---|---|---|
   | `model` | GGUF | 確認して `models` に登録 |
-  | `adapter` | GGUF | 確認して、利用者がベースモデルを選んで登録 |
+  | `adapter` | GGUF | 確認して、利用者がベースモデルを選んで登録。画面からは始めない（D-89） |
   | `image` | 単一の `.safetensors` | 画像生成のモデルとして登録（D-72）。分割・GGUF は取れない |
   | `image-set` | レシピの部品一式（MOSS-Image：DiT・エンコーダ・VAE・トークナイザ） | 部品を一括で取り、1 つの画像モデルとして登録（D-73, ADR-010）。部品は固定の一覧で、利用者は選ばない。API-097 から始める |
-  | `file` | 形式を問わない | 保存だけ。チャットのモデルには載せない（D-71）。DL の表に保存先を出す |
+  | `file` | 新しくは作らない（D-88） | D-88 より前の保存だけの行。ファイルが全部登録済みのモデルの本体か部品になったら行を出さない（D-87） |
 
-  チャットのリポジトリ（`pipeline_tag` が上のチャットの2つか、なし）の GGUF だけ `model` / `adapter` を選べる。それ以外のファイル・リポジトリは `file` になる。実行エンジンはチャットが llama-server、画像生成が sd-server（ADR-009）。映像・音楽・音声・文字起こし・Embedding はアプリ内では動かせないため保存だけ（D-72）
-- リポジトリ全体の DL：`files` を省くと全ファイルを `file` で取る。複数ファイルが揃って初めて動くモデル向け。保存先に同じサイズのファイルがあれば取り直さない
+  チャットのリポジトリは GGUF を `model` で、画像のリポジトリは確かめた `.safetensors` を `image` で取る。実行エンジンはチャットが llama-server、画像生成が sd-server（ADR-009）。それ以外のファイルは一覧に出さない（D-88）
 - DL：
   1. 空き容量が「ファイルサイズ＋2GB」以上か確かめる（BR-05, D-31）。足りなければ始めない
   2. `https://huggingface.co/<repo>/resolve/main/<file>` を `<置き場>\<repo>\<file>.part` に保存する。切れたら `Range` で続きから

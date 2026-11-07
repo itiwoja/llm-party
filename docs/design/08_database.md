@@ -230,7 +230,7 @@ LoRA の GGUF。主なカラム：`id`, `base_model_id`, `path`
 主なカラム：`id`, `eval_run_id`（CASCADE）, `eval_case_id`（SET NULL。ケースを消しても結果は残す）, `case_name`, `status`（04 の値）, `answer`（最終応答）, `transcript`（JSON：メッセージとツール呼び出し）, `test_output`, `score`（1〜5）, `reviewed_at`, `prompt_tokens`, `completion_tokens`, `tokens_per_sec`, `duration_ms`
 
 ### TBL-014：downloads
-主なカラム：`id`, `kind`（`model` / `adapter` / `file`。`file` は保存だけで `result_id` は空）, `hf_repo`, `files`（JSON：ファイル名・サイズ・sha256）, `dest_dir`, `status`（04 の値）, `received_bytes`, `total_bytes`, `retry_count`, `error`, `result_id`（できた models.id）, `created_at`, `updated_at`
+主なカラム：`id`, `kind`（`model` / `adapter` / `file`。`file` は保存だけで `result_id` は空。D-88 で新しくは作らない）, `hf_repo`, `files`（JSON：ファイル名・サイズ・sha256）, `dest_dir`, `status`（04 の値）, `received_bytes`, `total_bytes`, `retry_count`, `error`, `result_id`（できた models.id）, `created_at`, `updated_at`
 
 ### TBL-015：runtime_packs
 主なカラム：`id`, `backend`（`cuda`）, `cuda_version`, `llama_build`, `path`, `sha256`, `installed_at`
