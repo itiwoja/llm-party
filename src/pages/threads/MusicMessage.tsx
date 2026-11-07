@@ -30,6 +30,8 @@ export function MusicMessage({ content }: { content: string }) {
   const payload = parsePayload(content);
   const [src, setSrc] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+  /** 404 は消した曲。そのほかの失敗（通信・サーバーのエラー）とは文言を分ける */
+  const [deleted, setDeleted] = useState(false);
 
   useEffect(() => {
     if (!payload) return;
@@ -37,11 +39,13 @@ export function MusicMessage({ content }: { content: string }) {
     let url: string | null = null;
     const { baseUrl, token } = getConnection();
     fetch(`${baseUrl}/music/${encodeURIComponent(payload.trackId)}`, { headers: { Authorization: `Bearer ${token ?? ""}` } })
-      .then((res) => {
+      .then(async (res) => {
+        if (res.status === 404) {
+          if (alive) setDeleted(true);
+          return;
+        }
         if (!res.ok) throw new Error(String(res.status));
-        return res.blob();
-      })
-      .then((blob) => {
+        const blob = await res.blob();
         if (!alive) return;
         url = URL.createObjectURL(blob);
         setSrc(url);
@@ -64,7 +68,7 @@ export function MusicMessage({ content }: { content: string }) {
       {src ? (
         <audio controls src={src} aria-label={payload.prompt} />
       ) : (
-        <p className="image-message-state">{failed ? PG1.musicLoadFailed : PG1.musicLoading}</p>
+        <p className="image-message-state">{deleted ? PG1.musicDeleted : failed ? PG1.musicLoadFailed : PG1.musicLoading}</p>
       )}
       <figcaption>
         {payload.prompt}
