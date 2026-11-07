@@ -100,6 +100,7 @@ flowchart LR
   2. シードは常に `-1`（毎回新しいシード。D-82）。`ace-lm`（CPU）→ `ace-synth`（`--vae-chunk 384`）の順に動かす
   3. MP3 を `dataDir/music/<ULID>.mp3` に保存し、TBL-018 に `thread_id = NULL` で入れる。`bpm`・`keyscale`・`reasoning` も入れる
 - 出力：`music` イベントの `{ job: "track", status: "completed", trackId }`。一覧の先頭に足して選ぶ
+- 完了したら編集中の内容は空に戻す。内容は曲に保存済みで、「作り直す」で戻せる。別の曲や別の画面を見ているときは画面を移らない
 - 時間切れは置かない（D-78）。止めるボタンで止める
 - 進捗：`composing`（作詞と構成）→ `rendering`（生成）。割合は出ない。LM の思考は折りたたみで見せる
 - エラー・例外：
