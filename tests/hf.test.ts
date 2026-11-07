@@ -63,7 +63,7 @@ describe("API-053 検索", () => {
     const res = await worker.api("/hf/search?q=tiny");
     expect(res.status).toBe(200);
     expect(res.body.items).toEqual([
-      { repo: "acme/tiny-GGUF", downloads: 1000, updatedAt: "2026-11-01T00:00:00.000Z", createdAt: "2026-10-01T00:00:00.000Z", gated: false, pipelineTag: "text-generation", license: "mit", params: 9e9, use: "chat" },
+      { repo: "acme/tiny-GGUF", downloads: 1000, updatedAt: "2026-11-01T00:00:00.000Z", createdAt: "2026-10-01T00:00:00.000Z", gated: false, pipelineTag: "text-generation", license: "mit", params: 9e9, use: "chat", supportsThinking: false, supportsEffort: false },
     ]);
     const search = new URL(`http://x${hf.hfRequests.at(-1)!.url}`).searchParams;
     expect(search.get("search")).toBe("tiny");
@@ -99,6 +99,54 @@ describe("API-053 検索", () => {
   it("無検閲はタグの絞り込みで、ジャンルと組み合わせられる", async () => {
     expect(repos(await worker.api("/hf/search?genre=image&uncensored=true"))).toEqual(["acme/sdxl-uncensored"]);
     expect(repos(await worker.api("/hf/search?uncensored=true"))).toEqual(["acme/sdxl-uncensored"]);
+  });
+
+  describe("思考と用途で絞る（D-90）", () => {
+    beforeEach(() => {
+      const repo = (extra: object) => ({ pipelineTag: "text-generation", files: [{ path: "x-Q4_K_M.gguf", data }], ...extra });
+      hf.repos.set("acme/effort-GGUF", repo({ chatTemplate: "{{ reasoning_effort }}{{ enable_thinking }}", tags: ["gguf", "ja"] }));
+      hf.repos.set("acme/effort-only-GGUF", repo({ chatTemplate: "{{ reasoning_effort }}", tags: ["gguf", "rp"] }));
+      hf.repos.set("acme/think-GGUF", repo({ chatTemplate: "{{ enable_thinking }}", tags: ["gguf", "japanese", "coding"] }));
+    });
+
+    it("エフォートは段階を選べるモデルだけ。語がなくても一覧でき、画像は混ざらない", async () => {
+      const res = await worker.api("/hf/search?effort=true");
+      expect(repos(res).sort()).toEqual(["acme/effort-GGUF", "acme/effort-only-GGUF"]);
+      expect(res.body.items[0]).toMatchObject({ supportsEffort: true });
+    });
+
+    it("手元で絞るものがあるときだけ深く取る", async () => {
+      const limit = () => new URL(`http://x${hf.hfRequests.at(-1)!.url}`).searchParams.get("limit");
+      await worker.api("/hf/search?effort=true");
+      expect(limit()).toBe("500");
+      await worker.api("/hf/search?genre=chat&vram=8");
+      expect(limit()).toBe("500");
+      await worker.api("/hf/search?purpose=japanese");
+      expect(limit()).toBe("100");
+    });
+
+    it("思考はオンオフか段階を変えられるモデル", async () => {
+      expect(repos(await worker.api("/hf/search?thinking=true")).sort()).toEqual(["acme/effort-GGUF", "acme/effort-only-GGUF", "acme/think-GGUF"]);
+    });
+
+    it("用途は別名のタグのどれかが付いていれば出る", async () => {
+      expect(repos(await worker.api("/hf/search?purpose=japanese")).sort()).toEqual(["acme/effort-GGUF", "acme/think-GGUF"]);
+      expect(repos(await worker.api("/hf/search?purpose=roleplay"))).toEqual(["acme/effort-only-GGUF"]);
+      expect(repos(await worker.api("/hf/search?purpose=coding&thinking=true"))).toEqual(["acme/think-GGUF"]);
+      expect((await worker.api("/hf/search?purpose=cooking")).status).toBe(400);
+    });
+
+    it("画像のジャンルと組み合わせると空。HF には聞かない", async () => {
+      const before = hf.hfRequests.length;
+      expect(repos(await worker.api("/hf/search?genre=image&effort=true"))).toEqual([]);
+      expect(repos(await worker.api("/hf/search?genre=image&purpose=coding"))).toEqual([]);
+      expect(hf.hfRequests.length).toBe(before);
+    });
+
+    it("思考の値はテンプレートのないモデルでは false", async () => {
+      const res = await worker.api("/hf/search?genre=image");
+      expect(res.body.items[0]).toMatchObject({ supportsThinking: false, supportsEffort: false });
+    });
   });
 
   it("使えると確定しないリポジトリは検索に出さない（D-89）", async () => {
@@ -145,9 +193,9 @@ describe("API-053 検索", () => {
       expect(repos(await worker.api("/hf/search?genre=chat&vram=2"))).toEqual([]);
     });
 
-    it("絞るときは多めに取ってから絞る（HF の件数上限 100）", async () => {
+    it("絞るときは多めに取ってから絞る（1検索 500 件）", async () => {
       await worker.api("/hf/search?q=acme/&vram=8");
-      expect(new URL(`http://x${hf.hfRequests.at(-1)!.url}`).searchParams.get("limit")).toBe("100");
+      expect(new URL(`http://x${hf.hfRequests.at(-1)!.url}`).searchParams.get("limit")).toBe("500");
     });
 
     it("上限は正の数だけ。0・負・数字でない値は 400", async () => {
