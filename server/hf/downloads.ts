@@ -11,7 +11,7 @@ import type { DownloadRecord } from "../store/downloads";
 import { HfClient, RetryableError } from "./client";
 import { readSafetensors } from "../safetensors";
 import { RECIPES, type Recipe, type RecipeKind } from "./recipes";
-import { assertFileName, assertGguf, assertRepo, assertSafetensors, expandSelection, insideDir, quantOf } from "./names";
+import { assertFileName, assertGguf, assertRepo, assertSafetensors, expandSelection, insideDir, modelNameOf, quantOf } from "./names";
 
 export interface DownloadOptions {
   store: Store;
@@ -392,9 +392,8 @@ export class DownloadService {
     // LoRA は登録しない。ベースモデルは利用者が選び、画面が POST /api/adapters を呼ぶ
     let resultId: string | null = null;
     if (record.kind === "model") {
-      const name = info.name ?? path.basename(first, ".gguf").replace(/-00001-of-\d{5}$/, "");
       const model = store.models.create({
-        name, path: first, source: "hf", architecture: info.architecture,
+        name: modelNameOf(first), path: first, source: "hf", architecture: info.architecture,
         quantization: info.quantization ?? quantOf(first), sizeBytes: total, trainContext: info.trainContext,
         supportsThinking: info.supportsThinking, supportsEffort: info.supportsEffort,
       });

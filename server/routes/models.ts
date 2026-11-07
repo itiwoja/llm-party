@@ -62,7 +62,7 @@ export function modelRoutes({ store, dataDir }: Context): Router {
     const copied = input.mode === "copy" ? copyToDir(store, store.models.modelsDir(dataDir), file, info.sizeBytes) : null;
     try {
       const model = store.models.create({
-        name: input.name ?? info.name ?? path.basename(file, ".gguf"),
+        name: input.name ?? path.basename(file, ".gguf"),
         path: copied ?? file,
         source: copied ? "local_copy" : "local_ref",
         architecture: info.architecture,
