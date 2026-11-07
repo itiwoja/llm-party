@@ -21,6 +21,9 @@
 .table .models-actions { white-space: nowrap; }
 .models-nowrap { white-space: nowrap; }
 .models-main .table th { white-space: nowrap; }
+/* 列が多い表は幅が足りないとき表の中だけで横に動かし、一括 DL のボタンなどを押し出さない */
+.models-main .tabs, .models-main .tabs-content { min-width: 0; }
+.models-main .table-scroll { overflow-x: auto; }
 /* 強さのバー（HF 検索）。色は tokens.css のトークンだけ */
 .strength { display: inline-flex; align-items: center; gap: var(--space-2); min-width: 9em; }
 .strength-track { display: block; flex: 1; min-width: 5em; height: 8px; border-radius: var(--radius-full); background: var(--color-line); overflow: hidden; }
