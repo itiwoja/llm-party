@@ -18,7 +18,7 @@ const FETCH_LIMIT = 100;
 /** エフォート・思考・VRAM・RAM は HF で絞れず、取った後に大きく減るので深く取る（D-90） */
 const DEEP_FETCH_LIMIT = 500;
 /** 検索で使う項目。指定しないと lastModified と gated が返らない。指定すると既定の項目も消えるので全部書く */
-const SEARCH_FIELDS = ["downloads", "lastModified", "createdAt", "gated", "pipeline_tag", "tags", "gguf", "safetensors", "siblings", "config"];
+const SEARCH_FIELDS = ["downloads", "lastModified", "createdAt", "gated", "pipeline_tag", "tags", "gguf", "safetensors", "siblings", "config", "library_name"];
 
 /** HF が GGUF の代表に選ぶことがある、単体では動かない先読みの下書きモデルの architecture */
 const DRAFT_ARCHITECTURES = new Set(["dflash"]);

@@ -97,7 +97,7 @@ function str(value: string): Buffer {
 /** 語彙の配列を含む、最小の GGUF を書く */
 export function writeGguf(
   file: string,
-  options: { type?: string; contextLength?: number; chatTemplate?: string; nextn?: number; tensors?: string[] } = {},
+  options: { type?: string; contextLength?: number; chatTemplate?: string; nextn?: number; experts?: number; tensors?: string[] } = {},
 ): void {
   const tokens = ["a", "b", "c"];
   const entries = [
@@ -110,8 +110,9 @@ export function writeGguf(
     ...kvU32("testarch.block_count", 32),
     ...(options.chatTemplate === undefined ? [] : kvString("tokenizer.chat_template", options.chatTemplate)),
     ...(options.nextn === undefined ? [] : kvU32("testarch.nextn_predict_layers", options.nextn)),
+    ...(options.experts === undefined ? [] : kvU32("testarch.expert_count", options.experts)),
   ];
-  const count = 7 + (options.chatTemplate === undefined ? 0 : 1) + (options.nextn === undefined ? 0 : 1);
+  const count = 7 + [options.chatTemplate, options.nextn, options.experts].filter((value) => value !== undefined).length;
   // テンソルの情報：名前・次元数 1・大きさ・型・位置
   const tensors = (options.tensors ?? []).flatMap((name) => [str(name), u32(1), u64(1), u32(0), u64(0)]);
   writeFileSync(file, Buffer.concat([Buffer.from("GGUF"), u32(3), u64(options.tensors?.length ?? 0), u64(count), ...entries, ...tensors]));

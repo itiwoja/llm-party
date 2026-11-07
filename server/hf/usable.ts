@@ -23,6 +23,12 @@ const IMAGE_PIPELINES: ReadonlySet<string> = new Set(["StableDiffusionPipeline",
 
 const CHAT_TAGS: ReadonlySet<string> = new Set(["text-generation", "image-text-to-text"]);
 
+/**
+ * llama.cpp で読む GGUF を置くリポジトリの library_name。書いていないもの（null）も多いので通す。
+ * strata・mlx・vllm などは、GGUF の名前でも別のツール専用の形式（一部だけの GGUF など）なので外す
+ */
+const GGUF_LIBRARIES: ReadonlySet<string> = new Set(["gguf", "llama.cpp", "transformers"]);
+
 /** 分割していない、リポジトリ直下の .safetensors。サブフォルダは部品（unet/ や vae/）なので外す */
 export const isRootSafetensors = (name: string) => /^[^/]+\.safetensors$/i.test(name) && !/-\d{5}-of-\d{5}\.safetensors$/i.test(name);
 
@@ -33,6 +39,7 @@ interface RepoInfo {
   id?: unknown;
   tags?: string[];
   pipeline_tag?: string | null;
+  library_name?: string | null;
   gguf?: { architecture?: unknown; chat_template?: unknown };
   config?: { diffusers?: { _class_name?: unknown } };
   siblings?: { rfilename?: unknown }[];
@@ -46,6 +53,7 @@ export function usableAs(item: RepoInfo): "chat" | "image" | null {
   if (
     tag !== null && CHAT_TAGS.has(tag)
     && !isImagePart(String(item.id ?? ""), item.tags ?? [])
+    && (item.library_name == null || GGUF_LIBRARIES.has(item.library_name))
     && typeof architecture === "string" && CHAT_ARCHITECTURES.has(architecture)
     && Boolean(template)
     && files.some((file) => file.toLowerCase().endsWith(".gguf"))

@@ -8,7 +8,7 @@ import type { LlamaFlavor } from "./runtime/manifest";
 import { killTree, processLabel, treeSpawnOptions } from "./process-tree";
 import { hasNvidiaGpu, ignoredOverrideWarning, resolveLlama } from "./runtime/resolver";
 import type { EventBus } from "./events";
-import { MTP_ONLY_MESSAGE, readGguf } from "./gguf";
+import { readGguf, unusableReason } from "./gguf";
 import { ApiError } from "./http-error";
 import { GENERATION_SLOTS } from "./generation-slot";
 
@@ -58,12 +58,12 @@ function blockCountOf({ gpuRatio, modelPath }: EngineSpec): number | null {
   }
 }
 
-/** 先読みの補助部分（MTP）だけのファイルか。読めないファイルの失敗は llama-server に報告させる */
-function isMtpOnly(modelPath: string): boolean {
+/** MTP だけ・専門家の重みがないなど、llama-server で動かないファイルの理由。読めないファイルの失敗は llama-server に報告させる */
+function unusableFile(modelPath: string): string | null {
   try {
-    return readGguf(modelPath).type === "mtp";
+    return unusableReason(readGguf(modelPath));
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -201,10 +201,11 @@ export class EngineManager {
       this.presetId = spec.presetId;
       return;
     }
-    if (isMtpOnly(spec.modelPath)) {
-      // llama-server はこのファイルでエラーを出さずに落ちるので、起動する前に理由を返す
-      this.setState("failed", MTP_ONLY_MESSAGE);
-      throw new ApiError("ENGINE_FAILED", MTP_ONLY_MESSAGE);
+    const unusable = unusableFile(spec.modelPath);
+    if (unusable) {
+      // llama-server はエラーを出さずに落ちるか、長いログしか出さないので、起動する前に理由を返す
+      this.setState("failed", unusable);
+      throw new ApiError("ENGINE_FAILED", unusable);
     }
     await this.options.beforeLoad?.();
     this.warning = ignoredOverrideWarning(this.options.bin);

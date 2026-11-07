@@ -3,7 +3,7 @@ import path from "node:path";
 import { Router } from "express";
 import { z } from "zod";
 import type { Context } from "../context";
-import { MTP_ONLY_MESSAGE, readGguf } from "../gguf";
+import { readGguf, unusableReason } from "../gguf";
 import { ApiError } from "../http-error";
 import { COPY_MARGIN_BYTES } from "../store/models";
 import type { Store } from "../store";
@@ -58,7 +58,8 @@ export function modelRoutes({ store, dataDir }: Context): Router {
     );
     const file = path.resolve(input.path);
     const info = readFileInfo(file);
-    if (info.type === "mtp") throw new ApiError("INVALID_GGUF", MTP_ONLY_MESSAGE);
+    const unusable = unusableReason(info);
+    if (unusable) throw new ApiError("INVALID_GGUF", unusable);
     if (info.type !== "model") throw new ApiError("INVALID_GGUF", "これはモデルの GGUF ではありません");
     const copied = input.mode === "copy" ? copyToDir(store, store.models.modelsDir(dataDir), file, info.sizeBytes) : null;
     try {
