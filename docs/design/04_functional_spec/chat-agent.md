@@ -11,7 +11,7 @@
 |---|---|---|---|---|---|
 | R-04 | リスク | 9B と b12125 で `chat_template_kwargs.enable_thinking` がリクエストごとに効くことを確認済み。`lora` は `/v1/chat/completions` が受け取ることをソースで確認済みで、倍率が効くことの実機確認だけ残る（手元に LoRA の GGUF がない） | — | 手元の LoRA で確かめる（[exe 段階へ進む条件](../12_localhost_stage.md#exe-段階へ進む条件)の1）。だめなら、倍率・思考モードが違うときもエンジンを読み込み直す（BR-01 を変更） | FR-003, FR-005 |
 
-その他の論点（Q-06, R-05, R-06, R-10）は [04 README](README.md#-判断してほしいこと)。
+その他の論点（R-05, R-06, R-10）は [04 README](README.md#-判断してほしいこと)。
 
 ## 全体図
 ```mermaid
@@ -145,7 +145,7 @@ flowchart TD
 | `search` | 読み取り | pattern（正規表現）, path?, glob? | 一致した行を「パス:行番号: 内容」で返す |
 | `write_file` | 書き込み | path, content | 新規作成または全体の上書き。フォルダがなければ作る |
 | `edit_file` | 書き込み | path, oldText, newText, replaceAll? | `oldText` が1か所だけ一致するときに置換（`replaceAll` なら全部）。0 か所・複数は失敗としてモデルに返す |
-| `run_command` | コマンド | command, cwd? | シェル（Q-06。localhost 段階は bash）で実行。cwd はワークスペース内。120 秒で終了（D-23）。終了コードと出力を返す |
+| `run_command` | コマンド | command, cwd? | Windows PowerShell 5.1（D-86）で実行。cwd はワークスペース内。120 秒で終了（D-23）。終了コードと出力を返す |
 
 - 出力の上限：1 回 8,000 トークン（D-26）。超えたら先頭と末尾を残し、間に「…N 行省略。startLine / endLine を指定して読めます…」を入れる
 - `run_command` の時間切れ・停止はプロセスツリーごと終了する（`taskkill /T /F` 相当）

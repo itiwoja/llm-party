@@ -166,7 +166,7 @@ flowchart LR
 - アプリのリリースは DC-Designer の `release-windows.yml` と同じ3段（D-05）。build で、`runtime-manifest.json` に書いたビルド番号の llama.cpp（`llama-<ビルド番号>-bin-win-cpu-x64.zip`・`-win-vulkan-x64.zip`）を ggml-org/llama.cpp の Releases から取り、sha256 を確かめてステージに入れる
 - CUDA パックは別のワークフロー。`runtime-<ビルド番号>` タグで `llama-<ビルド番号>-bin-win-cuda-<版>-x64.zip` と `cudart-llama-bin-win-cuda-<版>-x64.zip` を1つにまとめ、sha256 をマニフェストに書く（R-09 の確認が先）
 - llama.cpp の版を上げるときは、先に runtime リリースを出し、マニフェストを更新してからアプリのタグを打つ
-- 環境：localhost 段階（WSL。worker が `http://127.0.0.1:8787` で画面も配る。[12](12_localhost_stage.md#起動のしかた)）/ 本番（インストール版）
+- 環境：localhost 段階（Windows。worker が `http://127.0.0.1:8787` で画面も配る。[12](12_localhost_stage.md#起動のしかた)）/ 本番（インストール版）
 - ここのリリースの仕組みは exe 段階で作る
 
 ## ログ・監視・エラー通知

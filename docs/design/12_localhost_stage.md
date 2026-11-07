@@ -1,8 +1,8 @@
 # 12. localhost 段階の仕様
-- プロジェクト：LLM-PARTY ／ 版数：v0.2（2026-11-07） ／ インプット：[ADR-008](adr/ADR-008-localhost-first.md)、[07](07_architecture.md)、[09](09_api/README.md)
+- プロジェクト：LLM-PARTY ／ 版数：v0.3（2026-11-07） ／ インプット：[ADR-008](adr/ADR-008-localhost-first.md)、[07](07_architecture.md)、[09](09_api/README.md)
 
 > **3行で**
-> 1. 最初は Electron なしで作り、WSL の worker が `http://127.0.0.1:8787` で画面と API を出す。ブラウザで色々試す。
+> 1. 最初は Electron なしで作り、Windows の worker が `http://127.0.0.1:8787` で画面と API を出す。ブラウザで色々試す。開発は WSL（D-86）。
 > 2. 利用者がこの段階で「OK」と言ってから、Electron に包んで exe にする（exe 段階）。exe の設計はそのまま残す。
 > 3. worker と画面は両段階で同じものを使い、違いは「画面の接続層」と「worker の起動の入口」に閉じ込める。
 
@@ -10,25 +10,24 @@
 | # | 種類 | 論点 | 選択肢 | おすすめ（理由） | 決まらないと止まるもの |
 |---|---|---|---|---|---|
 | R-19 | リスク | `LLM_PARTY_LLAMA_BIN` の打ち間違いでも読み込みは止まらないので、自分でビルドした本体を試すつもりで別の本体が動くことがある。何も取得していなければ約 780MB の自動取得も始まる | — | 警告を画面とターミナルに出して気づけるようにする（CP-313、[ADR-012](adr/ADR-012-invalid-llama-override.md)） | — |
-| R-15 | リスク | PowerShell・ジャンクション・Windows のパスなどの動きは、exe 段階まで確かめられない | — | [exe 段階でやること](#exe-段階でやること)に Windows での確認を入れる。パスとシェルは差し替えられる形で作る | exe 段階 |
 | R-16 | リスク | エージェントがコマンドを動かす API をブラウザから呼ぶので、他のサイトから叩かれないようにする必要がある | — | トークンに加えて Host と Origin を確かめる（[接続と認証](#接続と認証)） | — |
 
 ## 全体図
 ```mermaid
 flowchart LR
-  subgraph WIN[Windows]
+  subgraph DEV[WSL（開発）]
+    SRC[ソース・npm test]
+  end
+  subgraph WIN[Windows（実行）]
     B[ブラウザ<br/>http://127.0.0.1:8787]
-  end
-  subgraph WSL
     W[worker<br/>画面の配信・API・SSE]
-    L[llama-server<br/>CUDA 版]
-    DB[(data/ の SQLite)]
-    FS[(ワークスペース・モデル)]
+    L[llama-server / sd-cli / ace<br/>CUDA 版]
+    DB[(%LOCALAPPDATA%\\llm-party<br/>SQLite・モデル)]
   end
+  SRC -->|npm run win で写す| W
   B -->|同一オリジン + Bearer| W
   W -->|spawn / HTTP| L
   W --> DB
-  W --> FS
   W -.-> HF[(Hugging Face)]
 ```
 見てほしいところ：Electron の main と preload がなく、画面は worker から直接配られる。GitHub への通信もこの段階にはない。
@@ -47,30 +46,32 @@ flowchart LR
 ## 段階の定義
 | 段階 | 目的 | 使う人 | 動く場所 | 終わり |
 |---|---|---|---|---|
-| localhost 段階 | 機能と使い勝手を試して固める | 開発者本人（P-1）だけ | WSL＋Windows のブラウザ | [exe 段階へ進む条件](#exe-段階へ進む条件)を満たす |
+| localhost 段階 | 機能と使い勝手を試して固める | 開発者本人（P-1）だけ | Windows（開発は WSL） | [exe 段階へ進む条件](#exe-段階へ進む条件)を満たす |
 | exe 段階 | Electron に包んで知人に配る | P-1・P-2 | Windows（NSIS でインストール） | 設計書の最終形 |
 
-WSL で動かすのは検証のためで、Linux 版の配布ではない。D-19（配布は Windows のみ）は変わらない。
+WSL はソースの編集とテストだけに使う。アプリは WSL では動かさない（[ADR-016](adr/ADR-016-windows-runtime.md)）。
 
 ## 起動のしかた
-| コマンド | 使う場面 | 画面の出し方 |
+| コマンド | 実行する場所 | 使う場面 |
 |---|---|---|
-| `npm run dev` | 開発中 | worker（tsx）が Vite をミドルウェアとして抱える。変更はすぐ反映 |
-| `npm start` | ビルドして試す | worker がビルド済みの画面を配る |
+| `npm run win` | WSL | ソースを `%LOCALAPPDATA%\llm-party\app` へ写し、依存が変わっていれば入れ直し、Windows でビルドして起動する |
+| `npm test` / `npm run typecheck` | WSL | テストと型の確認 |
+| `scripts\win-start.ps1` | Windows | 写し済みの `app` をそのまま起動する |
+| `scripts\win-stop.ps1` | Windows | worker を子プロセスごと止める。`npm run win` は起動の前と終わるときに呼ぶ |
 
-どちらも URL は `http://127.0.0.1:8787` の1つだけ。8787 が使用中なら起動エラーにして、自動で別の番号へ移らない。
+URL は `http://127.0.0.1:8787` の1つだけ。8787 が使用中なら起動エラーにして、自動で別の番号へ移らない。
 
 | 環境変数 | 既定 | 説明 |
 |---|---|---|
 | `LLM_PARTY_LLAMA_BIN` | なし（任意） | 使う llama-server のパスを上書きする。未設定なら worker が `data/runtime/` を見て、無ければ自動に取得する（[ADR-011](adr/ADR-011-runtime-resolver.md)）。パスが実在しなければ、警告を出して未設定と同じに動く（[ADR-012](adr/ADR-012-invalid-llama-override.md)） |
-| `LLM_PARTY_SD_BIN` | なし（画像生成だけ使えない） | 使う sd-server のパス（ADR-009） |
+| `LLM_PARTY_SD_BIN` | `npm run win` では `<データ>\runtime\sd\sd-cli.exe` | 使う sd-cli / sd-server のパス（ADR-009、D-85） |
 | `LLM_PARTY_ACE_DIR` | `<LLM_PARTY_DATA_DIR>/runtime/ace`（無ければ音楽生成だけ使えない） | ace-lm と ace-synth のあるフォルダ（ADR-013） |
 | `LLM_PARTY_BACKEND` | `cuda` | `LLM_PARTY_LLAMA_BIN` の本体を使うときのバックエンド名（`cuda` / `vulkan` / `cpu`）。自動で決めた本体には効かない |
 | `LLM_PARTY_PORT` | `8787` | 待ち受けポート |
-| `LLM_PARTY_DATA_DIR` | リポジトリの `data/` | データの置き場。`data/` は Git に入れない |
+| `LLM_PARTY_DATA_DIR` | `npm run win` では `%LOCALAPPDATA%\llm-party` | データの置き場 |
 
 ## llama-server の用意
-初回のモデル読み込みで、worker が自動に取得する（[ADR-011](adr/ADR-011-runtime-resolver.md)）。取得先は `<LLM_PARTY_DATA_DIR>/runtime/llama/b12125-<種類>/`。NVIDIA の GPU があれば CUDA 版（約 780MB：本体＋cudart）、無ければ CPU 版（約 23MB）。
+初回のモデル読み込みで、worker が自動に取得する（[ADR-011](adr/ADR-011-runtime-resolver.md)）。取得先は `<LLM_PARTY_DATA_DIR>/runtime/llama/b12125-<種類>/`。NVIDIA の GPU があれば CUDA 12.4 版（約 680MB：本体＋cudart）、無ければ CPU 版（約 25MB）。
 
 自分で用意した llama-server を使うときだけ、`LLM_PARTY_LLAMA_BIN` にそのパスを書く（上書き）。
 
@@ -101,7 +102,7 @@ flowchart TD
 | ID | 関数 | localhost 段階 |
 |---|---|---|
 | API-001 | `getInfo()` | API-093 |
-| API-002 / 003 | `pickFolder()` / `pickFile()` | パスの入力ダイアログ（WSL のパスを貼り付ける）。正しいかは今の登録 API が確かめる |
+| API-002 / 003 | `pickFolder()` / `pickFile()` | パスの入力ダイアログ（Windows のパスを貼り付ける）。正しいかは今の登録 API が確かめる |
 | API-004〜006, 010 | 更新 | なし。更新の UI を出さない |
 | API-007 | `setHfToken()` / `hasHfToken()` | API-094 |
 | API-008 | `getConnection()` | 同じオリジン＋`localStorage` のトークン |
@@ -116,11 +117,11 @@ API-093 と API-094 は localhost 段階の起動の入口でだけ有効にす�
 
 この段階だけの画面の文言は [ui/08_copy](ui/08_copy.md#localhost-段階だけの文言)（CP-200〜CP-206）。
 
-## WSL での違い
+## 実行環境での違い
 | 項目 | localhost 段階 | exe 段階 |
 |---|---|---|
-| ワークスペースにできない場所（FR-007） | `/`、`/mnt/<ドライブ>`、`$HOME` 直下、`/etc` `/usr` `/bin` `/sbin` `/lib*` `/boot` `/proc` `/sys` `/dev` `/var`、データフォルダ | [FR-007](04_functional_spec/app.md#fr-007ワークスペース選択) の Windows の表 |
-| `run_command` のシェル | `/bin/bash -c`。時間切れはプロセスグループごと終了 | Q-06 |
+| ワークスペースにできない場所（FR-007） | [FR-007](04_functional_spec/app.md#fr-007ワークスペース選択) の Windows の表 | 同じ |
+| `run_command` のシェル | Windows PowerShell 5.1。時間切れは `taskkill /T /F` で子孫ごと終了 | 同じ |
 | GPU | `nvidia-smi` が動けば CUDA、無ければ CPU（ADR-011 の D3）。`LLM_PARTY_LLAMA_BIN` の本体を使うときだけ `LLM_PARTY_BACKEND` に従う | FR-001 |
 | CUDA パック | なし（`GET /api/system` のパックの状態は空、画面に出さない） | FR-002 |
 | 初回セットアップ（UC-001） | GPU の手順を飛ばし、モデルの準備から始める | UC-001 全部 |
@@ -143,11 +144,10 @@ API-093 と API-094 は localhost 段階の起動の入口でだけ有効にす�
 - Electron の main・preload、`app://llm-party`、worker の utilityProcess 起動、`src/platform` の Electron 実装
 - FR-001・FR-002、FR-019、safeStorage、NSIS、GitHub Actions のリリース（[07 デプロイ構成](07_architecture.md#デプロイ構成リリース)）
 - better-sqlite3 の Electron 用ビルド（R-08）
-- Windows での確認：Q-06 のシェル、FR-007 の表、パス検査（リンク・ジャンクション）、プロセスツリーの終了（R-15）
 - 11 §11 の E2E（CUDA あり / なし、更新の適用）を実機で行う
 
-localhost 段階のデータは exe 版へ引き継がない。パスの形が変わるため。評価セットは JSONL の書き出し（FR-015）で持っていける。
+localhost 段階のデータは exe 版と同じ場所・同じパスの形なので、引き継ぎの要否は exe 段階で決める。
 
 ## このドキュメントで決まったこと
-- D-49〜D-54、D-59（[00 決定事項ログ](00_overview.md#決定事項ログ)）
+- D-49〜D-54、D-59、D-86（[00 決定事項ログ](00_overview.md#決定事項ログ)）
 - [ADR-008](adr/ADR-008-localhost-first.md)

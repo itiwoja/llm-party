@@ -12,7 +12,7 @@
 
 - 「リポジトリ全体を DL」は複数ファイルがそろって動くモデル向け。普通は1ファイルで足りる。
 - チャットで動かせるのは GGUF だけ。画像生成は単一の `.safetensors`（SD 1.x・SDXL など）が「画像モデル」として登録され、スレッドの「画像」から使える（FLUX・SD3 など複数ファイルのものは未対応）。それ以外（音声など）は「保存するだけ」になる。
-- 画像生成には sd-server か sd-cli が要る。`LLM_PARTY_SD_BIN` にパスを指定する。WSL では Linux 版の Vulkan が GPU を見つけられないので、Windows の CUDA 版 `sd-cli.exe` を指定する。
+- 画像生成には sd-cli か sd-server が要る。`npm run win` は `%LOCALAPPDATA%\llm-party\runtime\sd\sd-cli.exe` を使う。別の場所のものを使うときは `LLM_PARTY_SD_BIN` にパスを指定する。
 - 音楽生成の **ACE-Step 1.5** は、モデル画面の「一括で DL する」で部品をまとめて入れる（約 5.6GB）。実行ファイルは `data/runtime/ace/`（または `LLM_PARTY_ACE_DIR`）に置く。検索で見つけた音楽モデルは保存だけで、生成には使えない。
 
 画像生成の **MOSS-Image** は、部品（本体・テキストエンコーダ・VAE・トークナイザ）を一括で入れられる。「Hugging Face を探す」の上の欄で「一括で DL する」を押すと、4 つの部品が 1 つの DL として入り、終わると画像モデルが 1 つ登録される。入っていれば「入っています」と出て、押せない。合計サイズもこの欄に出る。既定の組み合わせは **16GB 以上の GPU を前提**にしている。

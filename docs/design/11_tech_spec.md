@@ -89,12 +89,12 @@ flowchart LR
 - ログ：ローカルに日ごと、14 日、診断 zip は利用者が書き出す（FR-021）
 
 ## 10. 環境・設定
-| 項目 | localhost 段階（WSL） | 本番（インストール版） |
+| 項目 | localhost 段階（Windows） | 本番（インストール版） |
 |---|---|---|
 | 画面 | worker が `127.0.0.1:8787` で配る（開発中は Vite をミドルウェアに） | `app://llm-party` |
 | worker | tsx または Node で起動 | utilityProcess（asar の外） |
 | llama-server | `data/runtime/llama/` に自動で取得（ADR-011）。`LLM_PARTY_LLAMA_BIN` は上書き用で、パスが実在しなければ警告して無視する（ADR-012） | `resources\llama\<ビルド番号>-<cpu\|vulkan>\`、CUDA は `runtime\` |
-| データ | リポジトリの `data/` | `%LOCALAPPDATA%\llm-party\` |
+| データ | `%LOCALAPPDATA%\llm-party\`（D-86） | `%LOCALAPPDATA%\llm-party\` |
 | 更新 | 動かさない | GitHub `itiwoja/llm-party` |
 
 - 同梱する設定：`runtime-manifest.json`（llama.cpp のビルド番号・各パックの URL・サイズ・sha256）、`app-update.yml`（electron-builder が生成）
@@ -128,7 +128,6 @@ flowchart LR
 | R-23 | 下書きの内容のずれ、長い歌詞の歌われ方が未確認 | 手直しの土台と位置づけ、実装時に耳で確かめる | 同上 |
 
 ## 13. 未決事項・Claude 判断で決めた項目
-- 未決：Q-02, Q-06。どちらも exe 段階で決める（[README](README.md#-判断してほしいこと)）
 - Claude 判断：ADR-002 のうち「子プロセスにする」点、D-45（細部の定石の一覧）、D-79・D-81 の一部、D-83（音楽の細部）。定石：D-33〜D-37, D-39（[00](00_overview.md#決定事項ログ)）
 
 ## 14. 参照ドキュメント

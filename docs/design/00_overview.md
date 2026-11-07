@@ -52,7 +52,7 @@ flowchart LR
 | In（MVP） | Out（Won't） |
 |---|---|
 | ローカル対話、ワークスペース内のエージェント、3ペイン GUI | アプリ内での学習（LoRA 学習・変換） |
-| HF 検索・DL、ローカル GGUF / LoRA の登録 | Linux / macOS 版（WSL の localhost 段階は検証用で配布しない）、portable / MSI |
+| HF 検索・DL、ローカル GGUF / LoRA の登録 | Linux / macOS 版、portable / MSI |
 | プリセット、評価セット（編集・JSONL 取込/書出・一括実行・3種の採点） | Ollama・クラウド API への接続 |
 | Vulkan / CPU 同梱、CUDA 追加パック | MCP、Web 検索ツール、画像入力 |
 | NSIS インストーラー、GitHub Releases からの更新 | コード署名（v1 は未署名。SignPath は後で） |
@@ -66,7 +66,7 @@ flowchart LR
 | 推論エンジン | engine | 子プロセスとして動く llama-server。同時に1プリセットだけ読み込む |
 | 実行バックエンド | backend | llama-server の種類。`cuda` / `vulkan` / `cpu` |
 | ランタイムパック | runtime pack | 追加 DL する llama-server 一式（CUDA 版）。[TBL-015](08_database.md#tbl-015runtime_packs) |
-| localhost 段階 | localhost stage | Electron なしで、WSL の worker とブラウザで試す最初の段階。[12](12_localhost_stage.md) |
+| localhost 段階 | localhost stage | Electron なしで、Windows の worker とブラウザで試す最初の段階（開発は WSL。D-86）。[12](12_localhost_stage.md) |
 | exe 段階 | exe stage | localhost 段階で OK が出た後に、Electron に包んで配る段階 |
 | ワークスペース | workspace | エージェントが触ってよいフォルダ。[TBL-005](08_database.md#tbl-005workspaces) |
 | スレッド | thread | 1つの会話。ワークスペースありなら「エージェント」、なしなら「チャット」 |
@@ -169,6 +169,7 @@ flowchart LR
 | D-83 | 内部の値：説明 2,000 文字・歌詞 4,000 文字（今のまま）、一覧 50 件（D-41）、`--vae-chunk 384`（ADR-013）、下書きはエンジンを止めない、下書きと生成の時間切れなし、空き VRAM の事前確認なし、音楽の目標値（NFR-051〜NFR-054：下書き 45 秒・60 秒の曲 150 秒・240 秒の曲 6 分・VRAM 7.0GB。実測に余裕を足した値） | Claude 判断（見直し可） | 今の実装と決定に合わせた | FR-023〜FR-027, NFR-051〜NFR-054 | — |
 | D-84 | 生成中に別の画面やスレッドへ移っても、生成は止めず、戻ると続きを表示する。画像の依頼と失敗はアプリのメモリに持ち（D-81 と同じ形）、再読み込みでは `GET /api/images/status`（API-115）から戻す。チャットの生成中の文字は `GET /api/threads/:id/messages`（API-034）が重ねて返す | Claude 判断 | Claude 判断（見直し可） | 画像の依頼は生成が終わるまで DB に入らず、チャットの本文も止まるまで DB に入らないので、画面の状態だけでは戻せない | FR-004, FR-012 | — |
 | D-85 | 画像生成は部品も含めて全部 GPU で動かす（CPU へ回す `--backend te=cpu` をやめる）。8GB の GPU に載せるため部品モデルは `--max-vram 5.5` で順に載せ替える。WSL では Linux 版の Vulkan が GPU を見つけず CPU に落ちるので、Windows の CUDA 版 `sd-cli.exe` を `LLM_PARTY_SD_BIN` に指定する。生成中はスレッドに途中の画像（`proj`、毎ステップ）とステップ数を出す。画像は SSE に流さず、`previewSeq` を見た画面が API-116 で取る。Windows の exe には `%LOCALAPPDATA%\llm-party\image-models` の写しから読ませる（モデルを消すと写しも消す）。音楽の作詞（ace-lm）は CPU のまま | ユーザー（全部 GPU・途中の画像とステップ数・5.5 の値・写し・作詞は CPU）＋ Claude 判断（`proj`・見直し可） | CPU では 1 ステップ約 95 秒で 1 枚 30 分超かかった。SSE は再送用に直近 1,000 件を持つので画像を流すとメモリを圧迫する | FR-012, API-115, API-116, ADR-010 | R-18 |
+| D-86 | 実行は Windows の Node、開発とテストは WSL（`npm run win` で `%LOCALAPPDATA%\llm-party\app` へ写して起動）。データは `%LOCALAPPDATA%\llm-party\`。シェルは Windows PowerShell 5.1（Q-06）、llama-server は `win-cuda-12.4-x64`（Q-02）。D-50 と D-59 の WSL の部分、D-85 の Windows の写しを改める | ユーザー（Windows で実行・WSL で開発・置き場・シェル・版）＋ Claude 判断（写し方） | WSL から Windows の exe を呼ぶ形は遅く、ポートにも届かない | FR-007, FR-009, 12 | [ADR-016](adr/ADR-016-windows-runtime.md) |
 
 ### ID体系
 | 接頭辞 | 対象 | ファイル |

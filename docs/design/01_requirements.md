@@ -89,7 +89,7 @@ flowchart LR
 ### 6. 制約条件
 | 種類 | 内容 |
 |---|---|
-| OS | 配布は Windows 10/11 x64 のみ（D-19）。localhost 段階は開発者の WSL だけで動かす（D-50） |
+| OS | 配布は Windows 10/11 x64 のみ（D-19）。localhost 段階は開発者の Windows で動かし、開発は WSL（D-86） |
 | 動作環境 | 最低 RAM 16GB・VRAM 8GB の GPU（D-43）。GPU なしでも CPU で動くが案内の対象外 |
 | 開発の進め方 | 先に localhost で試し、OK が出てから exe にする（D-49、[12](12_localhost_stage.md)）。「段階」列はその機能を最初に作る段階 |
 | 配布 | public リポジトリ `itiwoja/llm-party` の GitHub Releases。v1 は未署名（D-02, D-10） |
