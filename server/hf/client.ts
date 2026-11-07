@@ -1,8 +1,9 @@
 import { ApiError } from "../http-error";
-import { GENRES, type Genre, type GenreQuery } from "./genres";
+import { GENRES, PURPOSES, type Genre, type GenreQuery, type Purpose } from "./genres";
 import { headerLength, isCheckpointHeader, usableAs } from "./usable";
 import { assertRepo, encodePath, type TreeFile } from "./names";
 import { DEFAULT_GPU_RATIO, fits, memoryNeed, q4Bytes, type MemoryLimit } from "./memory";
+import { thinkingSupport } from "../thinking";
 import { readHfToken } from "./token";
 
 /** 切れた・混んでいるなど、待てば直るかもしれない失敗 */
@@ -14,6 +15,8 @@ const MAX_TREE_PAGES = 100;
 const SEARCH_LIMIT = 50;
 /** 取った後に絞るので多めに取る（HF は使えるかどうかもサイズも絞れない） */
 const FETCH_LIMIT = 100;
+/** エフォート・思考・VRAM・RAM は HF で絞れず、取った後に大きく減るので深く取る（D-90） */
+const DEEP_FETCH_LIMIT = 500;
 /** 検索で使う項目。指定しないと lastModified と gated が返らない。指定すると既定の項目も消えるので全部書く */
 const SEARCH_FIELDS = ["downloads", "lastModified", "createdAt", "gated", "pipeline_tag", "tags", "gguf", "safetensors", "siblings", "config"];
 
@@ -21,6 +24,12 @@ const SEARCH_FIELDS = ["downloads", "lastModified", "createdAt", "gated", "pipel
 function sizeOf(item: { gguf?: { total?: unknown }; safetensors?: { total?: unknown } }): Pick<HfRepo, "params"> {
   const total = item.gguf?.total ?? item.safetensors?.total;
   return { params: typeof total === "number" && total > 0 ? total : null };
+}
+
+/** HF の filter は重ねると AND になるので、用途の別名はタグごとに検索を分けて、結果を混ぜる */
+function withPurpose(queries: readonly GenreQuery[], purpose: Purpose): readonly GenreQuery[] {
+  const tags: readonly string[] = PURPOSES[purpose];
+  return tags.length === 0 ? queries : queries.flatMap((item) => tags.map((tag) => ({ ...item, filters: [...item.filters, tag] })));
 }
 
 export const GATED_MESSAGE = "ゲート付きリポジトリ。設定で HF トークンが必要";
@@ -37,12 +46,20 @@ export interface HfRepo {
   license: string | null;
   /** パラメータ数（GGUF か safetensors の値）。分からなければ null */
   params: number | null;
+  /** DL 後のモデルと同じ判定（server/thinking.ts）。画像モデルはテンプレートが無いので両方 false */
+  supportsThinking: boolean;
+  supportsEffort: boolean;
 }
 
 export interface HfSearch extends Partial<MemoryLimit> {
   query: string;
   genre: Genre;
   uncensored: boolean;
+  /** 思考の段階（低・中・高）を選べるモデルだけ */
+  effort?: boolean;
+  /** アプリから思考を操作できるモデルだけ（オンオフか段階） */
+  thinking?: boolean;
+  purpose?: Purpose;
   /** 絞り込みで使う、GPU に載せる割合（0〜100）。VRAM・RAM の目安はこれで変わる */
   gpuRatio?: number;
 }
@@ -102,19 +119,25 @@ export class HfClient {
   }
 
   /** ジャンルと語で探す。pipeline_tag が複数のジャンルは検索ごとの結果を DL 数の順に混ぜる */
-  async search({ query, genre, uncensored, vram = null, ram = null, gpuRatio = DEFAULT_GPU_RATIO }: HfSearch): Promise<HfRepo[]> {
-    const results = await Promise.all(GENRES[genre].map((item: GenreQuery) => this.searchOne(query, item, uncensored)));
+  async search({ query, genre, uncensored, effort = false, thinking = false, purpose = "all", vram = null, ram = null, gpuRatio = DEFAULT_GPU_RATIO }: HfSearch): Promise<HfRepo[]> {
+    // 思考と用途はチャットのモデルにしかない（D-90）
+    const chatOnly = effort || thinking || purpose !== "all";
+    if (chatOnly && genre === "image") return [];
+    const queries = withPurpose(chatOnly ? GENRES.chat : GENRES[genre], purpose);
+    const limit = effort || thinking || vram !== null || ram !== null ? DEEP_FETCH_LIMIT : FETCH_LIMIT;
+    const results = await Promise.all(queries.map((item) => this.searchOne(query, item, uncensored, limit)));
     const merged = new Map(results.flat().map((repo) => [repo.repo, repo]));
     return [...merged.values()]
+      .filter((repo) => (!effort || repo.supportsEffort) && (!thinking || repo.supportsThinking || repo.supportsEffort))
       .filter((repo) => fits(repo.params === null ? null : memoryNeed(q4Bytes(repo.params), gpuRatio), { vram, ram }))
       .sort((a, b) => b.downloads - a.downloads)
       .slice(0, SEARCH_LIMIT);
   }
 
   /** 使えると確定したリポジトリだけ返す（D-89） */
-  private async searchOne(query: string, { tag, filters }: GenreQuery, uncensored: boolean): Promise<HfRepo[]> {
+  private async searchOne(query: string, { tag, filters }: GenreQuery, uncensored: boolean, limit: number): Promise<HfRepo[]> {
     const url = new URL("/api/models", this.baseUrl);
-    const params = new URLSearchParams({ sort: "downloads", limit: String(FETCH_LIMIT) });
+    const params = new URLSearchParams({ sort: "downloads", limit: String(limit) });
     if (query) params.set("search", query);
     params.set("pipeline_tag", tag);
     for (const filter of [...filters, ...(uncensored ? ["uncensored"] : [])]) params.append("filter", filter); // filter を重ねると AND になる
@@ -134,6 +157,7 @@ export class HfClient {
       pipelineTag: item.pipeline_tag ?? null,
       license: (item.tags as string[] | undefined)?.find((tag) => tag.startsWith("license:"))?.slice("license:".length) ?? null,
       ...sizeOf(item),
+      ...thinkingSupport(item.gguf?.chat_template),
       }] : [];
     });
   }

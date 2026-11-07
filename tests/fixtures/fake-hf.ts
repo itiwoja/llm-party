@@ -38,8 +38,8 @@ export interface FakeRepo {
   files: FakeFile[];
   /** GGUF の形式。既定は qwen35。null なら HF が形式を返さない */
   architecture?: string | null;
-  /** false ならチャットテンプレートを返さない */
-  chatTemplate?: boolean;
+  /** false ならチャットテンプレートを返さない。文字列ならその中身を返す */
+  chatTemplate?: boolean | string;
   /** diffusers の組み立て（config.diffusers._class_name） */
   pipeline?: string;
   /** 付けるとゲート付き。resolve は Bearer がこの値のときだけ通る */
@@ -100,7 +100,7 @@ export async function startFakeHf(repos: Record<string, FakeRepo> = {}): Promise
   const fakeGguf = (repo: FakeRepo) => ({
     ...(repo.params ? { total: repo.params } : {}),
     ...(repo.architecture === null ? {} : { architecture: repo.architecture ?? "qwen35" }),
-    ...(repo.chatTemplate === false ? {} : { chat_template: "{{ messages }}" }),
+    ...(repo.chatTemplate === false ? {} : { chat_template: typeof repo.chatTemplate === "string" ? repo.chatTemplate : "{{ messages }}" }),
   });
   const hf = createServer((req, res) => {
     fake.hfRequests.push(note(req));

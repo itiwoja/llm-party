@@ -15,3 +15,15 @@ export const GENRES = {
 export type Genre = keyof typeof GENRES;
 
 export const GENRE_NAMES = Object.keys(GENRES) as [Genre, ...Genre[]];
+
+/** 用途ごとの HF のタグ。同じ意味で別のタグが使われているので、どれかが付いていれば出す（D-90） */
+export const PURPOSES = {
+  all: [],
+  japanese: ["ja", "japanese"],
+  coding: ["code", "coding"],
+  roleplay: ["roleplay", "rp"],
+} as const satisfies Record<string, readonly string[]>;
+
+export type Purpose = keyof typeof PURPOSES;
+
+export const PURPOSE_NAMES = Object.keys(PURPOSES) as [Purpose, ...Purpose[]];

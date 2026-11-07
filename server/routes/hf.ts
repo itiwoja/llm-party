@@ -3,7 +3,7 @@ import { Router } from "express";
 import { z } from "zod";
 import type { Context } from "../context";
 import { HfClient } from "../hf/client";
-import { GENRE_NAMES } from "../hf/genres";
+import { GENRE_NAMES, PURPOSE_NAMES } from "../hf/genres";
 import { DEFAULT_GPU_RATIO } from "../hf/memory";
 import { assertRepo, groupFiles } from "../hf/names";
 import { isRootSafetensors } from "../hf/usable";
@@ -12,16 +12,21 @@ import { parse } from "./parse";
 /** 空欄は指定なし。数字は GB の上限（1〜1024） */
 const memoryLimit = z.preprocess((value) => (value === undefined || value === "" ? undefined : Number(value)), z.number().positive().max(1024).optional());
 
-/** 語かジャンルか無検閲か VRAM・RAM のどれかが要る（全件の一覧は出さない） */
+const flag = z.enum(["true", "false"]).default("false").transform((value) => value === "true");
+
+/** 語かジャンルか、無検閲・エフォート・思考・用途・VRAM・RAM のどれかが要る（全件の一覧は出さない） */
 const searchQuery = z.object({
   q: z.string().trim().default(""),
   genre: z.enum(GENRE_NAMES).default("all"),
-  uncensored: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
+  uncensored: flag,
+  effort: flag,
+  thinking: flag,
+  purpose: z.enum(PURPOSE_NAMES).default("all"),
   vram: memoryLimit,
   ram: memoryLimit,
   gpu: z.coerce.number().int().min(0).max(100).default(DEFAULT_GPU_RATIO),
 }).refine(
-  (input) => input.q !== "" || input.genre !== "all" || input.uncensored || input.vram !== undefined || input.ram !== undefined,
+  (input) => input.q !== "" || input.genre !== "all" || input.uncensored || input.effort || input.thinking || input.purpose !== "all" || input.vram !== undefined || input.ram !== undefined,
   { path: ["q"] },
 );
 
@@ -31,8 +36,8 @@ export function hfRoutes({ downloads, store, hfBaseUrl, dataDir }: Context): Rou
   const hf = new HfClient(hfBaseUrl, dataDir);
 
   api.get("/hf/search", async (req, res) => {
-    const { q, genre, uncensored, vram, ram, gpu } = parse(searchQuery, req.query);
-    res.json({ items: await hf.search({ query: q, genre, uncensored, vram: vram ?? null, ram: ram ?? null, gpuRatio: gpu }) });
+    const { q, genre, uncensored, effort, thinking, purpose, vram, ram, gpu } = parse(searchQuery, req.query);
+    res.json({ items: await hf.search({ query: q, genre, uncensored, effort, thinking, purpose, vram: vram ?? null, ram: ram ?? null, gpuRatio: gpu }) });
   });
 
   api.get("/hf/files", async (req, res) => {
